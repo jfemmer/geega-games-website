@@ -16,18 +16,20 @@
     }
 
     header.top-banner {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-      padding: 15px 10px;
       background-color: white;
+      padding: 15px 10px;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-      gap: 10px;
+    }
+
+    .header-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
     }
 
     .logo-container img {
-      height: 50px;
+      height: 100px;
       max-width: 100%;
     }
 
@@ -35,6 +37,7 @@
       display: flex;
       width: 100%;
       max-width: 500px;
+      gap: 6px;
     }
 
     .search-bar-container input {
@@ -55,11 +58,11 @@
       cursor: pointer;
     }
 
-    .account-login-container,
-    .request-button-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
+    .header-actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
     }
 
     .account-login-container a {
@@ -76,7 +79,6 @@
     }
 
     .request-button-container a {
-      margin-left: 10px;
       background-color: rebeccapurple;
       color: white;
       padding: 8px 14px;
@@ -122,21 +124,19 @@
       margin-bottom: 10px;
     }
 
-    @media (max-width: 600px) {
+    @media (min-width: 768px) {
+      .header-inner {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+
       .search-bar-container {
-        flex-direction: column;
+        max-width: 400px;
       }
 
-      .search-bar-container input,
-      .search-bar-container button {
-        width: 100%;
-        border-radius: 6px;
-        margin-top: 5px;
-      }
-
-      .account-login-container,
-      .request-button-container {
-        margin-top: 10px;
+      .header-actions {
+        justify-content: flex-end;
       }
     }
   </style>
@@ -145,25 +145,28 @@
 <body>
 
   <header class="top-banner">
-    <div class="logo-container">
-      <img src="images/logo.png" alt="Geega Games Logo" class="site-logo">
-    </div>
+    <div class="header-inner">
+      <div class="logo-container">
+        <img src="images/logo.png" alt="Geega Games Logo" class="site-logo">
+      </div>
 
-    <div class="search-bar-container">
-      <input type="text" id="search-input" placeholder="Search for a card...">
-      <button id="search-button">Search</button>
-    </div>
+      <div class="search-bar-container">
+        <input type="text" id="search-input" placeholder="Search for a card...">
+        <button id="search-button">Search</button>
+      </div>
 
-    <div class="account-login-container">
-      <a href="login.html" id="login-button" title="Login">
-        <i class="fa-solid fa-user"></i>
-      </a>
-    </div>
-
-    <div class="request-button-container">
-      <a href="request.html" class="request-button">
-        <i class="fa-solid fa-plus"></i> Request a Card
-      </a>
+      <div class="header-actions">
+        <div class="request-button-container">
+          <a href="request.html" class="request-button">
+            <i class="fa-solid fa-plus"></i> Request a Card
+          </a>
+        </div>
+        <div class="account-login-container">
+          <a href="login.html" id="login-button" title="Login">
+            <i class="fa-solid fa-user"></i>
+          </a>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -276,5 +279,4 @@
   </script>
 
 </body>
-
 </html>

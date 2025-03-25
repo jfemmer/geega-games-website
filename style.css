@@ -11,102 +11,6 @@ h1 {
   margin-top: 20px;
 }
 
-/* === HEADER / TOP BANNER === */
-.top-banner {
-  background-color: rebeccapurple;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  height: 120px;
-  position: relative;
-}
-
-.logo-container {
-  display: flex;
-  align-items: center;
-}
-
-.site-logo {
-  height: 150px; /* Increased size for better visibility */
-  width: auto;
-}
-
-/* === SEARCH BAR CENTER === */
-.search-bar-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-}
-
-#search-input {
-  width: 700px;
-  padding: 10px 15px;
-  font-size: 16px;
-  border-radius: 5px 0 0 5px;
-  border: none;
-}
-
-#search-button {
-  padding: 10px 20px;
-  font-size: 16px;
-  border: none;
-  background-color: #ffffff;
-  color: rebeccapurple;
-  border-radius: 0 5px 5px 0;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-#search-button:hover {
-  background-color: #ddd;
-}
-
-/* === BUTTONS ON RIGHT SIDE === */
-.right-buttons-container {
-  display: flex;
-  align-items: center;
-  gap: 30px; /* Space between buttons */
-}
-
-/* === MY LIST BUTTON === */
-#my-list-button {
-  padding: 10px 20px;
-  background-color: #ffffff;
-  color: rebeccapurple;
-  border: none;
-  border-radius: 5px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-#my-list-button:hover {
-  background-color: #ddd;
-}
-
-/* === ACCOUNT LOGIN ICON === */
-.account-login-container {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-}
-
-#login-button {
-  color: white;
-  font-size: 40px;
-  margin-right: 25px;
-  text-decoration: none;
-  cursor: pointer;
-  transition: color 0.3s;
-}
-
-#login-button:hover {
-  color: #ddd;
-}
-
 /* === SORT DROPDOWN === */
 .sort-dropdown-container {
   text-align: center;
@@ -230,40 +134,7 @@ button.add-to-list-btn:hover {
   background-color: darkgreen;
 }
 
-/* === REQUEST BUTTON === */
-.request-button-container {
-  text-align: center;
-  margin: 20px 0;
-}
-
-.request-button {
-  display: inline-block;
-  padding: 12px 24px;
-  background-color: rebeccapurple;
-  color: #fff;
-  border-radius: 8px;
-  text-decoration: none;
-  font-size: 16px;
-  font-weight: bold;
-  transition: background-color 0.3s, transform 0.2s;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.request-button i {
-  margin-right: 8px;
-}
-
-.request-button:hover {
-  background-color: #663399;
-  transform: translateY(-2px);
-}
-
-.request-button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* === GENERAL BUTTONS === */
+/* === GENERAL BUTTON STYLING === */
 button {
   cursor: pointer;
 }

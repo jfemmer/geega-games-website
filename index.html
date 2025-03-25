@@ -1,77 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Geega Games - Card Viewer</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
     body {
       margin: 0;
-      padding: 0;
       font-family: Arial, sans-serif;
-      background-color: #f5f5f5;
+      background: #f5f5f5;
     }
 
     header.top-banner {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
+      padding: 15px 10px;
       background-color: white;
-      padding: 10px 15px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      gap: 10px;
     }
 
     .logo-container img {
       height: 50px;
+      max-width: 100%;
     }
 
     .search-bar-container {
-      flex: 1;
       display: flex;
-      align-items: center;
-      margin: 10px;
+      width: 100%;
+      max-width: 500px;
     }
 
     .search-bar-container input {
       flex: 1;
-      padding: 8px;
+      padding: 10px;
       font-size: 16px;
-      margin-right: 5px;
       border: 1px solid #ccc;
-      border-radius: 4px;
+      border-radius: 6px 0 0 6px;
     }
 
     .search-bar-container button {
-      padding: 8px 12px;
+      padding: 10px 16px;
       font-size: 16px;
-      background-color: rebeccapurple;
-      color: white;
       border: none;
-      border-radius: 4px;
-    }
-
-    .account-login-container a,
-    .request-button-container a {
-      color: rebeccapurple;
-      font-size: 20px;
-      text-decoration: none;
-      margin-left: 10px;
-    }
-
-    .request-button-container a {
-      font-size: 16px;
       background-color: rebeccapurple;
       color: white;
-      padding: 6px 10px;
-      border-radius: 4px;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+    }
+
+    .account-login-container,
+    .request-button-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .account-login-container a {
+      font-size: 22px;
+      color: rebeccapurple;
+      text-decoration: none;
+      border: 2px solid rebeccapurple;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .request-button-container a {
+      margin-left: 10px;
+      background-color: rebeccapurple;
+      color: white;
+      padding: 8px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 15px;
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -79,94 +90,78 @@
 
     .sort-dropdown-container {
       text-align: center;
-      margin: 20px;
+      margin-top: 15px;
     }
 
     #sort-dropdown {
-      padding: 10px;
+      padding: 8px;
       font-size: 16px;
-      width: 80%;
-      max-width: 300px;
     }
 
     #card-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
       gap: 20px;
       padding: 20px;
     }
 
     .card {
-      background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      background: white;
       padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      max-width: 220px;
       text-align: center;
     }
 
     .card img {
-      max-width: 100%;
+      width: 100%;
       height: auto;
-      border-radius: 6px;
+      border-radius: 8px;
+      margin-bottom: 10px;
     }
 
-    .card h3 {
-      margin: 10px 0 5px;
-      font-size: 18px;
-    }
-
-    .card p {
-      margin: 4px 0;
-      font-size: 14px;
-      color: #555;
-    }
-
-    @media (max-width: 480px) {
+    @media (max-width: 600px) {
       .search-bar-container {
         flex-direction: column;
-        align-items: stretch;
       }
 
-      .search-bar-container input {
-        margin-bottom: 10px;
-        margin-right: 0;
+      .search-bar-container input,
+      .search-bar-container button {
+        width: 100%;
+        border-radius: 6px;
+        margin-top: 5px;
       }
 
-      .request-button-container a {
-        font-size: 14px;
-        padding: 5px 8px;
-      }
-
-      .card h3 {
-        font-size: 16px;
-      }
-
-      .card p {
-        font-size: 13px;
+      .account-login-container,
+      .request-button-container {
+        margin-top: 10px;
       }
     }
   </style>
 </head>
 
 <body>
+
   <header class="top-banner">
     <div class="logo-container">
-      <img src="images/logo.png" alt="Geega Games Logo" class="site-logo" />
+      <img src="images/logo.png" alt="Geega Games Logo" class="site-logo">
     </div>
 
     <div class="search-bar-container">
-      <input type="text" id="search-input" placeholder="Search for a card..." />
+      <input type="text" id="search-input" placeholder="Search for a card...">
       <button id="search-button">Search</button>
     </div>
 
     <div class="account-login-container">
-      <a href="login.html" title="Login">
+      <a href="login.html" id="login-button" title="Login">
         <i class="fa-solid fa-user"></i>
       </a>
     </div>
 
     <div class="request-button-container">
-      <a href="request.html">
+      <a href="request.html" class="request-button">
         <i class="fa-solid fa-plus"></i> Request a Card
       </a>
     </div>
@@ -193,10 +188,8 @@
       try {
         const response = await fetch(jsonFile);
         const data = await response.json();
-
         cardsData = data.filter(card => card.ImageURL && card.ImageURL.trim() !== '');
         filteredCards = [...cardsData];
-
         currentIndex = 0;
         displayNextBatch();
       } catch (error) {
@@ -247,33 +240,32 @@
       }
     });
 
-    document.getElementById('search-button').addEventListener('click', searchCards);
+    document.getElementById('search-button').addEventListener('click', () => {
+      searchCards();
+    });
+
     document.getElementById('search-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') searchCards();
+      if (e.key === 'Enter') {
+        searchCards();
+      }
     });
 
     function searchCards() {
       const query = document.getElementById('search-input').value.toLowerCase();
       const container = document.getElementById('card-container');
       container.innerHTML = '';
-
-      filteredCards = cardsData.filter(card =>
-        card.Name.toLowerCase().includes(query)
-      );
-
+      filteredCards = cardsData.filter(card => card.Name.toLowerCase().includes(query));
       currentIndex = 0;
       displayNextBatch();
     }
 
     document.getElementById('sort-dropdown').addEventListener('change', (e) => {
       const value = e.target.value;
-
       if (value === 'asc') {
         filteredCards.sort((a, b) => a.Name.localeCompare(b.Name));
       } else if (value === 'desc') {
         filteredCards.sort((a, b) => b.Name.localeCompare(a.Name));
       }
-
       const container = document.getElementById('card-container');
       container.innerHTML = '';
       currentIndex = 0;
@@ -282,5 +274,7 @@
 
     loadCards();
   </script>
+
 </body>
+
 </html>

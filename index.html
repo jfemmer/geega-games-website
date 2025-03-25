@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Geega Games - Card Viewer</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Optional: Font Awesome for Icons -->
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body>
+
+    <header class="top-banner">
+        <div class="logo-container">
+            <img src="images/logo.png" alt="Geega Games Logo" class="site-logo">
+        </div>
+
+        <div class="search-bar-container">
+            <input type="text" id="search-input" placeholder="Search for a card...">
+            <button id="search-button">Search</button>
+        </div>
+
+        <div class="account-login-container">
+            <a href="login.html" id="login-button" title="Login">
+                <i class="fa-solid fa-user"></i>
+            </a>
+        </div>
+
+        <div class="request-button-container">
+            <a href="request.html" class="request-button">
+                <i class="fa-solid fa-plus"></i> Request a Card
+            </a>
+        </div>
+    </header>
+
+    <br>
+
+    <div class="sort-dropdown-container">
+        <select id="sort-dropdown">
+            <option value="">Sort By</option>
+            <option value="asc">Name Ascending (A → Z)</option>
+            <option value="desc">Name Descending (Z → A)</option>
+        </select>
+    </div>
+
+    <br>
+
+    <!-- Card Display Area -->
+    <div id="card-container"></div>
+
+    <script>
+        const jsonFile = 'cards_with_images.json';
+        let cardsData = [];
+        let filteredCards = [];
+        let currentIndex = 0;
+        const cardsPerLoad = 50;
+
+        // Initial card loading
+        async function loadCards() {
+            try {
+                const response = await fetch(jsonFile);
+                const data = await response.json();
+
+                // Filter out cards missing an ImageURL
+                cardsData = data.filter(card => card.ImageURL && card.ImageURL.trim() !== '');
+                filteredCards = [...cardsData];
+
+                currentIndex = 0;
+                displayNextBatch();
+            } catch (error) {
+                console.error('Error loading card data:', error);
+            }
+        }
+
+        // Displays next batch of cards
+        function displayNextBatch() {
+            const container = document.getElementById('card-container');
+            const nextCards = filteredCards.slice(currentIndex, currentIndex + cardsPerLoad);
+
+            nextCards.forEach(card => {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'card';
+
+                const img = document.createElement('img');
+                img.src = card.ImageURL || 'images/placeholder.png';
+                img.alt = card.Name;
+                img.loading = 'lazy';
+
+                const title = document.createElement('h3');
+                title.textContent = card.Name;
+
+                const set = document.createElement('p');
+                set.textContent = `Set: ${card.Set}`;
+
+                const type = document.createElement('p');
+                type.textContent = `Type: ${card.Unknown || 'Unknown'}`;
+
+                const quantity = document.createElement('p');
+                quantity.textContent = `Quantity: ${card.Quantity || 0}`;
+
+                cardElement.appendChild(img);
+                cardElement.appendChild(title);
+                cardElement.appendChild(set);
+                cardElement.appendChild(type);
+                cardElement.appendChild(quantity);
+
+                container.appendChild(cardElement);
+            });
+
+            currentIndex += cardsPerLoad;
+        }
+
+        // Infinite scroll detection
+        window.addEventListener('scroll', () => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+                displayNextBatch();
+            }
+        });
+
+        // Search on button click
+        document.getElementById('search-button').addEventListener('click', () => {
+            searchCards();
+        });
+
+        // Search on Enter key press
+        document.getElementById('search-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchCards();
+            }
+        });
+
+        // Card search logic
+        function searchCards() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const container = document.getElementById('card-container');
+            container.innerHTML = '';
+
+            filteredCards = cardsData.filter(card =>
+                card.Name.toLowerCase().includes(query)
+            );
+
+            currentIndex = 0;
+            displayNextBatch();
+        }
+
+        // Sort logic
+        document.getElementById('sort-dropdown').addEventListener('change', (e) => {
+            const value = e.target.value;
+
+            if (value === 'asc') {
+                filteredCards.sort((a, b) => a.Name.localeCompare(b.Name));
+            } else if (value === 'desc') {
+                filteredCards.sort((a, b) => b.Name.localeCompare(a.Name));
+            }
+
+            const container = document.getElementById('card-container');
+            container.innerHTML = '';
+            currentIndex = 0;
+            displayNextBatch();
+        });
+
+        // Start loading on page load
+        loadCards();
+    </script>
+
+</body>
+
+</html>
+

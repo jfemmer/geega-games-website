@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Request a Card - Geega Games</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: Arial, sans-serif;
+        }
+
+        .request-container {
+            width: 400px;
+            margin: 80px auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .request-container h2 {
+            margin-bottom: 20px;
+            color: rebeccapurple;
+        }
+
+        .request-container input,
+        .request-container textarea {
+            width: 90%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        .info-section {
+            background-color: #f0f0f0;
+            border-left: 4px solid rebeccapurple;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: left;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .autocomplete-dropdown {
+            position: relative;
+            width: 90%;
+            margin: 0 auto;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+            border-radius: 5px;
+        }
+
+        .autocomplete-item {
+            padding: 10px;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            align-items: center;
+        }
+
+        .autocomplete-item img {
+            width: 40px;
+            height: 56px;
+            object-fit: cover;
+            margin-right: 10px;
+        }
+
+        .autocomplete-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .request-container button {
+            width: 95%;
+            padding: 12px;
+            background-color: rebeccapurple;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-top: 15px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .request-container button:hover {
+            background-color: #663399;
+        }
+
+        .back-link {
+            margin-top: 15px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="request-container">
+    <h2>Request a Card</h2>
+
+    <!-- INFO SECTION START -->
+    <div class="info-section">
+        <strong>Important:</strong> Once your request is submitted, we will notify you as soon as the requested cards arrive in our inventory. You will have <strong>24 hours</strong> to respond and claim the card before it becomes available to the public!
+    </div>
+    <!-- INFO SECTION END -->
+
+    <form id="request-form">
+        <input type="text" id="request-username" placeholder="Your Name" required><br>
+        <input type="email" id="request-email" placeholder="Your Email" required><br>
+
+        <!-- Autocomplete Search -->
+        <div class="autocomplete-dropdown">
+            <input type="text" id="card-name" placeholder="Card Name" autocomplete="off" required>
+            <div id="autocomplete-list" class="autocomplete-list"></div>
+        </div>
+
+        <input type="text" id="card-set" placeholder="Card Set (optional)"><br>
+        <textarea id="additional-info" placeholder="Additional Info (quantity, condition, etc.)" rows="4"></textarea><br>
+        <button type="submit">Submit Request</button>
+    </form>
+
+    <a href="index.html" class="back-link">← Back to Home</a>
+</div>
+
+<script>
+    const cardNameInput = document.getElementById('card-name');
+    const autocompleteList = document.getElementById('autocomplete-list');
+    let scryfallCards = [];
+
+    function normalize(str) {
+        return str.toLowerCase().replace(/[^\w\s]|_/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function scoreMatch(cardName, searchText) {
+        const name = normalize(cardName);
+        const search = normalize(searchText);
+
+        if (name.startsWith(search)) return 3;
+        if (name.includes(search)) return 2;
+        return 1;
+    }
+
+    async function fetchScryfallCards() {
+        try {
+            const response = await fetch('https://api.scryfall.com/catalog/card-names');
+            const data = await response.json();
+            scryfallCards = data.data;
+        } catch (error) {
+            console.error("Error fetching Scryfall cards:", error);
+        }
+    }
+
+    function showAutocompleteMatches(searchText) {
+        autocompleteList.innerHTML = '';
+
+        if (!searchText || scryfallCards.length === 0) return;
+
+        const sortedCards = scryfallCards
+            .map(name => ({ name, score: scoreMatch(name, searchText) }))
+            .filter(card => card.score > 1)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10);
+
+        sortedCards.forEach(card => {
+            const item = document.createElement('div');
+            item.classList.add('autocomplete-item');
+
+            const imageUrl = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(card.name)}&format=image&version=small`;
+
+            item.innerHTML = `
+                <img src="${imageUrl}" alt="${card.name}">
+                <span>${card.name}</span>
+            `;
+
+            item.addEventListener('click', () => {
+                cardNameInput.value = card.name;
+                autocompleteList.innerHTML = '';
+            });
+
+            autocompleteList.appendChild(item);
+        });
+    }
+
+    cardNameInput.addEventListener('input', () => {
+        const searchText = cardNameInput.value;
+        showAutocompleteMatches(searchText);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.autocomplete-dropdown')) {
+            autocompleteList.innerHTML = '';
+        }
+    });
+
+    document.getElementById('request-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const name = document.getElementById('request-username').value;
+        const email = document.getElementById('request-email').value;
+        const cardName = cardNameInput.value;
+        const cardSet = document.getElementById('card-set').value;
+        const additionalInfo = document.getElementById('additional-info').value;
+
+        alert(`Request Submitted!\n\nName: ${name}\nEmail: ${email}\nCard: ${cardName}\nSet: ${cardSet}\nDetails: ${additionalInfo}`);
+
+        this.reset();
+    });
+
+    fetchScryfallCards();
+</script>
+
+</body>
+</html>

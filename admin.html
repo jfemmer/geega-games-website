@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Inventory - Geega Games</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+
+        .admin-container {
+            width: 600px;
+            margin: 60px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        h2 {
+            color: rebeccapurple;
+            margin-bottom: 20px;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 10px 0;
+            width: 80%;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: rebeccapurple;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #663399;
+        }
+
+        .search-results {
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+
+        .card-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f3f3f3;
+            margin: 8px 0;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .card-item img {
+            height: 80px;
+            margin-right: 10px;
+            border-radius: 4px;
+        }
+
+        .card-info {
+            display: flex;
+            align-items: center;
+            text-align: left;
+        }
+
+        .card-info strong {
+            display: block;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .card-info span {
+            font-size: 14px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+<div class="admin-container">
+    <h2>Admin Inventory Control</h2>
+
+    <input type="text" id="search-input" placeholder="Search Scryfall for a card..." />
+    <button onclick="searchScryfall()">Search</button>
+
+    <div class="search-results" id="search-results"></div>
+</div>
+
+<script>
+    const SERVER_URL = 'http://localhost:3001/add-card'; // Make sure this matches your server port
+
+    function searchScryfall() {
+        const query = document.getElementById('search-input').value.trim();
+        if (!query) {
+            alert("Please enter a card name to search.");
+            return;
+        }
+
+        fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                const resultsDiv = document.getElementById('search-results');
+                resultsDiv.innerHTML = '';
+
+                if (!data.data || data.data.length === 0) {
+                    resultsDiv.innerHTML = `<p>No results found for "<strong>${query}</strong>".</p>`;
+                    return;
+                }
+
+                data.data.forEach(card => {
+                    const cardImage = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || null;
+
+                    if (!cardImage) return; // Skip cards with no image
+
+                    const cardName = card.name;
+                    const cardSet = card.set.toUpperCase();
+                    const typeLine = card.type_line || "Unknown";
+
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'card-item';
+
+                    cardDiv.innerHTML = `
+                        <div class="card-info">
+                            <img src="${cardImage}" alt="${cardName}">
+                            <div>
+                                <strong>${cardName}</strong>
+                                <span>Set: ${cardSet}</span><br>
+                                <span>${typeLine}</span>
+                            </div>
+                        </div>
+                        <button onclick="addToInventory('${cardName.replace(/'/g, "\\'").replace(/"/g, '&quot;')}', '${cardSet}', '${typeLine.replace(/'/g, "\\'").replace(/"/g, '&quot;')}', '${cardImage}')">Add</button>
+                    `;
+
+                    resultsDiv.appendChild(cardDiv);
+                });
+            })
+            .catch(err => {
+                console.error('Error searching Scryfall:', err);
+                alert('An error occurred while searching Scryfall.');
+            });
+    }
+
+    function addToInventory(name, set, typeLine, imageURL) {
+        const quantity = prompt(`How many copies of "${name}" from set "${set}" would you like to add?`, "1");
+
+        if (!quantity || isNaN(quantity)) {
+            alert("Please enter a valid number for quantity.");
+            return;
+        }
+
+        const cardData = {
+            quantity: parseInt(quantity, 10),
+            name,
+            set,
+            imageURL,
+            unknown: typeLine
+        };
+
+        fetch(SERVER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cardData)
+        })
+        .then(response => response.json())
+        .then(result => {
+            alert(result.message || "Card successfully added!");
+        })
+        .catch(err => {
+            console.error('Error adding card to inventory:', err);
+            alert("There was an error adding the card.");
+        });
+    }
+</script>
+
+</body>
+</html>

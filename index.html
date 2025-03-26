@@ -27,25 +27,54 @@
       flex-direction: column;
       align-items: center;
       gap: 12px;
+      position: relative;
     }
 
-    .logo-container img {
-      height: 100px;
-      max-width: 100%;
-    }
-
-    .search-login-wrapper {
+    .top-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 12px;
       width: 100%;
-      max-width: 500px;
+    }
+
+    .logo-container {
+      flex: 1;
+    }
+
+    .logo-container img {
+      height: 80px;
+      max-width: 100%;
+    }
+
+    .account-login-container {
+      position: absolute;
+      right: 10px;
+      top: 0;
+    }
+
+    .account-login-container a {
+      font-size: 22px;
+      color: white;
+      text-decoration: none;
+      border: 2px solid white;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .search-bar-wrapper {
+      width: 100%;
+      display: flex;
+      justify-content: center;
     }
 
     .search-bar-container {
       display: flex;
-      flex: 1;
+      width: 100%;
+      max-width: 500px;
     }
 
     .search-bar-container input {
@@ -64,19 +93,6 @@
       color: rebeccapurple;
       border-radius: 0 6px 6px 0;
       cursor: pointer;
-    }
-
-    .account-login-container a {
-      font-size: 22px;
-      color: white;
-      text-decoration: none;
-      border: 2px solid white;
-      border-radius: 50%;
-      width: 48px;
-      height: 48px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
     }
 
     .request-button-container {
@@ -124,17 +140,30 @@
         align-items: center;
       }
 
+      .top-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+      }
+
+      .logo-container {
+        flex: 0 0 auto;
+      }
+
+      .account-login-container {
+        position: static;
+        flex: 0 0 auto;
+      }
+
+      .search-bar-wrapper {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+      }
+
       .request-button-container {
         display: block;
-      }
-
-      .search-login-wrapper {
-        flex: 1;
-        justify-content: flex-end;
-      }
-
-      .search-bar-container {
-        max-width: 400px;
       }
     }
   </style>
@@ -147,23 +176,24 @@
         <img src="images/logo.png" alt="Geega Games Logo" class="site-logo" />
       </div>
 
-      <div class="search-login-wrapper">
+      <div class="search-bar-wrapper">
         <div class="search-bar-container">
           <input type="text" id="search-input" placeholder="Search for a card..." />
           <button id="search-button">Search</button>
         </div>
-        <div class="account-login-container">
-          <a href="login.html" id="login-button" title="Login">
-            <i class="fa-solid fa-user"></i>
-          </a>
-        </div>
       </div>
 
-      <div class="request-button-container">
-        <a href="request.html" class="request-button">
-          <i class="fa-solid fa-plus"></i> Request a Card
+      <div class="account-login-container">
+        <a href="login.html" id="login-button" title="Login">
+          <i class="fa-solid fa-user"></i>
         </a>
       </div>
+    </div>
+
+    <div class="request-button-container">
+      <a href="request.html" class="request-button">
+        <i class="fa-solid fa-plus"></i> Request a Card
+      </a>
     </div>
   </header>
 

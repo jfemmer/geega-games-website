@@ -9,171 +9,211 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
   <style>
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #f5f5f5;
-  }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+    }
 
-  header.top-banner {
-    background-color: rebeccapurple;
-    color: white;
-    padding: 12px 16px; /* even side spacing, reduced top/bottom */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  }
+    header.top-banner {
+      background-color: rebeccapurple;
+      color: white;
+      padding: 8px 10px; /* reduced from 15px */
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      position: relative;
+    }
 
-  .header-inner {
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* reduced space between rows */
-    width: 100%;
-  }
-
-  .top-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-  }
-
-  .logo-container,
-  .account-login-container {
-    display: flex;
-    align-items: center;
-  }
-
-  .logo-container {
-    justify-content: flex-start;
-  }
-
-  .logo-container img {
-    height: 80px;
-    max-width: 100%;
-  }
-
-  .account-login-container {
-    justify-content: flex-end;
-  }
-
-  .account-login-container a {
-    font-size: 22px;
-    color: white;
-    text-decoration: none;
-    border: 2px solid white;
-    border-radius: 50%;
-    width: 48px;
-    height: 48px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  .search-bar-wrapper {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    margin-bottom: 8px; /* reduce space below search bar */
-  }
-
-  .search-bar-container {
-    display: flex;
-    width: 100%;
-    max-width: 500px;
-  }
-
-  .search-bar-container input {
-    flex: 1;
-    padding: 10px;
-    font-size: 16px;
-    border: none;
-    border-radius: 6px 0 0 6px;
-  }
-
-  .search-bar-container button {
-    padding: 10px 16px;
-    font-size: 16px;
-    border: none;
-    background-color: white;
-    color: rebeccapurple;
-    border-radius: 0 6px 6px 0;
-    cursor: pointer;
-  }
-
-  .request-button-container {
-    display: none;
-  }
-
-  .sort-dropdown-container {
-    text-align: center;
-    margin-top: 15px;
-  }
-
-  #sort-dropdown {
-    padding: 8px;
-    font-size: 16px;
-  }
-
-  #card-container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 20px;
-    padding: 20px;
-  }
-
-  .card {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    max-width: 220px;
-    text-align: center;
-  }
-
-  .card img {
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-    margin-bottom: 10px;
-  }
-
-  @media (min-width: 768px) {
     .header-inner {
+      display: flex;
       flex-direction: column;
-      align-items: stretch;
+      align-items: center;
+      gap: 6px; /* reduced from 12px */
     }
 
-    .top-row {
-      flex-direction: row;
-    }
-
-    .request-button-container {
-      display: block;
+    .logo-container img {
+      height: 100px; /* reduced from 150px */
+      max-width: 100%;
     }
 
     .search-bar-wrapper {
-      margin-bottom: 0; /* reset margin for desktop */
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin: 4px 0; /* add light spacing to control vertical height */
     }
-  }
-</style>
+
+    .search-bar-container {
+      display: flex;
+      width: 100%;
+      max-width: 500px;
+    }
+
+    .search-bar-container input {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px 0 0 6px;
+    }
+
+    .search-bar-container button {
+      padding: 10px 16px;
+      font-size: 16px;
+      border: none;
+      background-color: white;
+      color: rebeccapurple;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+    }
+
+    .account-login-container {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .account-login-container a#login-button {
+      font-size: 22px;
+      color: white;
+      text-decoration: none;
+      border: 2px solid white;
+      border-radius: 50%;
+      width: 42px; /* slightly smaller */
+      height: 42px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-right: 15px; /* reduced from 30px */
+    }
+
+    /* Navigation Bar (Below Header) */
+    .nav-bar {
+      background-color: #6a0dad; /* slightly different purple */
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 15px;
+    }
+
+    .hamburger-menu {
+      position: relative;
+    }
+
+    #hamburger-icon {
+      font-size: 28px;
+      color: white;
+      cursor: pointer;
+    }
+
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      top: 40px;
+      left: 0;
+      background-color: white;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      overflow: hidden;
+      min-width: 160px;
+      z-index: 100;
+    }
+
+    .dropdown-menu a {
+      display: block;
+      padding: 12px 16px;
+      text-decoration: none;
+      color: rebeccapurple;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .dropdown-menu a:hover {
+      background-color: #eee;
+    }
+
+    .request-button {
+      color: white;
+      border: 2px solid white;
+      border-radius: 12px;
+      padding: 6px 12px;
+      font-size: 14px;
+      font-weight: bold;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease-in-out;
+      background: transparent;
+      white-space: nowrap;
+    }
+
+    .request-button i {
+      margin-right: 6px;
+    }
+
+    .request-button:hover {
+      background-color: white;
+      color: rebeccapurple;
+    }
+
+    /* Other Layout */
+    .sort-dropdown-container {
+      text-align: center;
+      margin-top: 15px;
+    }
+
+    #sort-dropdown {
+      padding: 8px;
+      font-size: 16px;
+    }
+
+    #card-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      max-width: 220px;
+      text-align: center;
+    }
+
+    .card img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    @media (min-width: 768px) {
+      .header-inner {
+        flex-direction: row;
+        justify-content: space-between;
+      }
+
+      .search-bar-wrapper {
+        flex: 1;
+      }
+    }
+  </style>
 </head>
 
 <body>
+  <!-- HEADER -->
   <header class="top-banner">
     <div class="header-inner">
-      <!-- Top Row: Logo Left, Profile Right -->
-      <div class="top-row">
-        <div class="logo-container">
-          <img src="images/logo.png" alt="Geega Games Logo" class="site-logo" />
-        </div>
-        <div class="account-login-container">
-          <a href="login.html" id="login-button" title="Login">
-            <i class="fa-solid fa-user"></i>
-          </a>
-        </div>
+      <div class="logo-container">
+        <img src="images/logo.png" alt="Geega Games Logo" class="site-logo" />
       </div>
 
-      <!-- Search Bar Centered Below -->
       <div class="search-bar-wrapper">
         <div class="search-bar-container">
           <input type="text" id="search-input" placeholder="Search for a card..." />
@@ -181,15 +221,33 @@
         </div>
       </div>
 
-      <!-- Optional Button for Desktop -->
-      <div class="request-button-container">
-        <a href="request.html" class="request-button">
-          <i class="fa-solid fa-plus"></i> Request a Card
+      <div class="account-login-container">
+        <a href="login.html" id="login-button" title="Login">
+          <i class="fa-solid fa-user"></i>
         </a>
       </div>
     </div>
   </header>
 
+  <!-- SECOND NAV BAR -->
+  <div class="nav-bar">
+    <!-- Hamburger -->
+    <div class="hamburger-menu">
+      <i class="fa fa-bars" id="hamburger-icon"></i>
+      <div class="dropdown-menu" id="dropdown-menu">
+        <a href="index.html">Home</a>
+        <a href="request.html">Request Card</a>
+        <a href="login.html">Login</a>
+      </div>
+    </div>
+
+    <!-- Request Button -->
+    <a href="request.html" class="request-button">
+      <i class="fa-solid fa-plus"></i> Request a Card
+    </a>
+  </div>
+
+  <!-- Sort Dropdown -->
   <div class="sort-dropdown-container">
     <select id="sort-dropdown">
       <option value="">Sort By</option>
@@ -198,6 +256,7 @@
     </select>
   </div>
 
+  <!-- Card Grid -->
   <div id="card-container"></div>
 
   <script>
@@ -295,6 +354,21 @@
       container.innerHTML = '';
       currentIndex = 0;
       displayNextBatch();
+    });
+
+    // Hamburger menu toggle
+    document.getElementById('hamburger-icon').addEventListener('click', () => {
+      const menu = document.getElementById('dropdown-menu');
+      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (event) => {
+      const menu = document.getElementById('dropdown-menu');
+      const icon = document.getElementById('hamburger-icon');
+      if (!menu.contains(event.target) && event.target !== icon) {
+        menu.style.display = 'none';
+      }
     });
 
     loadCards();

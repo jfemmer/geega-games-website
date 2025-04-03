@@ -1,4 +1,4 @@
-cconst express = require('express');
+const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
@@ -6,11 +6,11 @@ require('dotenv').config();
 
 const app = express();
 
-// Enable CORS and JSON parsing
+// ✅ Middleware
 app.use(cors());
 app.use(express.json());
 
-// ✅ MongoDB URI from Railway Environment Variables
+// ✅ Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
 const PORT = process.env.PORT || 3005;
 
@@ -24,15 +24,13 @@ mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => {
-  console.log('✅ Connected to MongoDB Atlas');
-})
+.then(() => console.log('✅ Connected to MongoDB Atlas'))
 .catch((err) => {
   console.error('❌ MongoDB connection error:', err.message);
-  process.exit(1); // Exit the server if the DB can't connect
+  process.exit(1);
 });
 
-// ✅ Mongoose User Schema
+// ✅ Mongoose Schema & Model
 const userSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
@@ -45,11 +43,12 @@ const userSchema = new mongoose.Schema({
   zip:      String,
   createdAt: { type: Date, default: Date.now }
 });
+
 const User = mongoose.model('User', userSchema);
 
-// ✅ Test Route
+// ✅ Root Route (Test)
 app.get('/', (req, res) => {
-  res.send('Hello from Geega Games API!');
+  res.send('🧙‍♂️ Welcome to the Geega Games API!');
 });
 
 // ✅ Signup Route
@@ -60,18 +59,21 @@ app.post('/signup', async (req, res) => {
       phone, address, state, zip
     } = req.body;
 
-    // Basic validation
+    // Minimal validation
     if (!username || !email || !password) {
       return res.status(400).json({ message: 'Username, email, and password are required.' });
     }
 
+    // Check if user already exists
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing) {
-      return res.status(400).json({ message: 'User already exists.' });
+      return res.status(409).json({ message: 'User already exists.' });
     }
 
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Create new user
     const user = new User({
       firstName,
       lastName,
@@ -86,12 +88,14 @@ app.post('/signup', async (req, res) => {
 
     await user.save();
 
-    res.status(201).json({ message: 'User created successfully.' });
+    res.status(201).json({ message: '🎉 User created successfully!' });
   } catch (err) {
     console.error('❌ Signup error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-// ✅ Start server
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// ✅ Start Server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});

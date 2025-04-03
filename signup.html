@@ -94,10 +94,10 @@
     <input type="password" id="confirm-password" placeholder="Confirm Password" required>
     <p id="error-message" class="error-message"></p>
     <input type="tel" id="phone" placeholder="Phone Number" required>
-    <input type="text" id="address" placeholder="Street Address" required autocomplete="off">
+    <input type="text" id="address" placeholder="Street Address" required>
     <input type="text" id="state" placeholder="State" required>
     <input type="text" id="zip" placeholder="Zip Code" required>
-    <button type="submit">Sign Up</button>
+    <button type="submit" id="signup-button">Sign Up</button>
   </form>
   <p>Already have an account? <a href="login.html">Log In</a></p>
 </div>
@@ -105,12 +105,13 @@
 <script>
   const signupForm = document.getElementById('signup-form');
   const errorMessage = document.getElementById('error-message');
+  const signupButton = document.getElementById('signup-button');
 
   signupForm.addEventListener('submit', async function (event) {
     event.preventDefault();
 
-    const password = document.getElementById('new-password').value;
-    const confirmPassword = document.getElementById('confirm-password').value;
+    const password = document.getElementById('new-password').value.trim();
+    const confirmPassword = document.getElementById('confirm-password').value.trim();
 
     if (password !== confirmPassword) {
       errorMessage.textContent = "Passwords do not match!";
@@ -118,6 +119,8 @@
     }
 
     errorMessage.textContent = "";
+    signupButton.disabled = true;
+    signupButton.textContent = "Creating Account...";
 
     const newUser = {
       firstName: document.getElementById('first-name').value.trim(),
@@ -139,15 +142,19 @@
       });
 
       const result = await response.json();
+
       if (response.ok) {
         alert(result.message || "Account created successfully!");
         window.location.href = "login.html";
       } else {
-        errorMessage.textContent = result.message || "Signup failed.";
+        errorMessage.textContent = result.message || "Signup failed. Please check your info.";
       }
     } catch (error) {
       console.error("Signup error:", error);
-      errorMessage.textContent = "Something went wrong. Please try again later.";
+      errorMessage.textContent = "Could not connect to the server. Try again later.";
+    } finally {
+      signupButton.disabled = false;
+      signupButton.textContent = "Sign Up";
     }
   });
 </script>

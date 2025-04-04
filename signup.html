@@ -59,6 +59,11 @@
       background-color: #663399;
     }
 
+    .signup-container button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
     .signup-container p {
       margin-top: 20px;
       font-size: 14px;
@@ -145,6 +150,7 @@
 
       if (response.ok) {
         alert(result.message || "Account created successfully!");
+        signupForm.reset();
         window.location.href = "login.html";
       } else {
         errorMessage.textContent = result.message || "Signup failed. Please check your info.";

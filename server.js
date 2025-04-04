@@ -97,5 +97,5 @@ app.post('/signup', async (req, res) => {
 
 // ✅ Start Server
 app.listen(port, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${port}`);
 });

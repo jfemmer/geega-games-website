@@ -88,7 +88,7 @@ app.post('/signup', async (req, res) => {
 
     await user.save();
 
-    res.status(201).json({ message: '🎉 User created successfully!' });
+    res.status(201).json({ message: '🐶 Welcome to the Pack! 🐶' });
   } catch (err) {
     console.error('❌ Signup error:', err);
     res.status(500).json({ message: 'Internal server error.' });

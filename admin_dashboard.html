@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard | Geega Games</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      margin: 0;
+    }
+
+    .sidebar {
+      background-color: rebeccapurple;
+      color: white;
+      padding: 20px;
+      width: 200px;
+      height: 100vh;
+    }
+
+    .sidebar h2 {
+      margin-top: 0;
+    }
+
+    .sidebar a {
+      color: white;
+      text-decoration: none;
+      display: block;
+      margin: 10px 0;
+    }
+
+    .main {
+      flex-grow: 1;
+      padding: 20px;
+      background-color: #ecf0f1;
+    }
+
+    .section {
+      background-color: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+
+    input, textarea, button {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+    
+    button {
+      background-color: rebeccapurple;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #5a2d85;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>Geega Admin</h2>
+    <a href="#">Dashboard</a>
+    <a href="#">Users</a>
+    <a href="#">Inventory</a>
+    <a href="#">Announcements</a>
+    <a href="#">Logout</a>
+  </div>
+
+  <div class="main">
+    <h1>Welcome, Admin!</h1>
+
+    <div class="section">
+        <h2>User Management</h2>
+        <div id="user-list">
+          <p>Loading users...</p>
+        </div>
+      </div>
+
+    <div class="section">
+        <h2>Update Inventory</h2>
+      
+        <!-- Add / Update Card Form -->
+        <form id="update-card-form">
+          <label for="cardName">Card Name</label>
+          <input type="text" id="cardName" name="cardName" required>
+      
+          <label for="quantity">Quantity</label>
+          <input type="number" id="quantity" name="quantity" min="0" required>
+      
+          <label for="set">Set</label>
+          <input type="text" id="set" name="set" required>
+      
+          <label for="condition">Condition</label>
+          <select id="condition" name="condition" required>
+            <option value="">Select Condition</option>
+            <option value="NM">Near Mint</option>
+            <option value="LP">Lightly Played</option>
+            <option value="MP">Moderately Played</option>
+            <option value="HP">Heavily Played</option>
+            <option value="DMG">Damaged</option>
+          </select>
+      
+          <label for="foil">Foil</label>
+          <input type="checkbox" id="foil" name="foil"> Yes
+      
+          <button type="submit">Add / Update Card</button>
+        </form>
+      
+        <hr style="margin: 20px 0;">
+      
+        <!-- Delete Card Form -->
+        <h3>Delete Card from Inventory</h3>
+        <form id="delete-card-form">
+          <label for="deleteCardName">Card Name</label>
+          <input type="text" id="deleteCardName" name="deleteCardName" required>
+      
+          <label for="deleteSet">Set</label>
+          <input type="text" id="deleteSet" name="deleteSet" required>
+      
+          <button type="submit" style="background-color: crimson;">Delete Card</button>
+        </form>
+      </div>
+
+    <div class="section">
+      <h2>Post Announcement</h2>
+      <form>
+        <label for="announcement">Message</label>
+        <textarea id="announcement" name="announcement" rows="4"></textarea>
+        <button type="submit">Post</button>
+      </form>
+    </div>
+  </div>
+</body>
+
+<script>
+    async function loadUsers() {
+      const userList = document.getElementById('user-list');
+      try {
+        const res = await fetch('https://geega-games-website-production.up.railway.app/api/users');
+        const users = await res.json();
+  
+        if (users.length === 0) {
+          userList.innerHTML = "<p>No users found.</p>";
+          return;
+        }
+  
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th style="text-align:left;">Name</th>
+              <th style="text-align:left;">Email</th>
+              <th style="text-align:left;">Phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(user => `
+              <tr>
+                <td>${user.name || ''}</td>
+                <td>${user.email || ''}</td>
+                <td>${user.phone || ''}</td>
+              </tr>`).join('')}
+          </tbody>
+        `;
+  
+        userList.innerHTML = '';
+        userList.appendChild(table);
+      } catch (error) {
+        userList.innerHTML = "<p>Error loading users.</p>";
+        console.error(error);
+      }
+    }
+  
+    loadUsers();
+  </script>
+</html>

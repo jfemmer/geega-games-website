@@ -143,45 +143,51 @@
 </body>
 
 <script>
-    async function loadUsers() {
-      const userList = document.getElementById('user-list');
-      try {
-        const res = await fetch('https://geega-games-website-production.up.railway.app/api/users');
-        const users = await res.json();
-  
-        if (users.length === 0) {
-          userList.innerHTML = "<p>No users found.</p>";
-          return;
-        }
-  
-        const table = document.createElement('table');
-        table.style.width = '100%';
-        table.innerHTML = `
-          <thead>
-            <tr>
-              <th style="text-align:left;">Name</th>
-              <th style="text-align:left;">Email</th>
-              <th style="text-align:left;">Phone</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${users.map(user => `
-              <tr>
-                <td>${user.name || ''}</td>
-                <td>${user.email || ''}</td>
-                <td>${user.phone || ''}</td>
-              </tr>`).join('')}
-          </tbody>
-        `;
-  
-        userList.innerHTML = '';
-        userList.appendChild(table);
-      } catch (error) {
-        userList.innerHTML = "<p>Error loading users.</p>";
-        console.error(error);
+  async function loadUsers() {
+    const userList = document.getElementById('user-list');
+    try {
+      const res = await fetch('https://geega-games-website-production.up.railway.app/api/users');
+      console.log('Status code:', res.status);
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`);
       }
+
+      const users = await res.json();
+      console.log('Fetched users:', users);
+
+      if (!Array.isArray(users) || users.length === 0) {
+        userList.innerHTML = "<p>No users found.</p>";
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th style="text-align:left;">Name</th>
+            <th style="text-align:left;">Email</th>
+            <th style="text-align:left;">Phone</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${users.map(user => `
+            <tr>
+              <td>${user.firstName || ''} ${user.lastName || ''}</td>
+              <td>${user.email || ''}</td>
+              <td>${user.phone || ''}</td>
+            </tr>`).join('')}
+        </tbody>
+      `;
+
+      userList.innerHTML = '';
+      userList.appendChild(table);
+    } catch (error) {
+      userList.innerHTML = "<p>❌ Error loading users.</p>";
+      console.error('❌ Fetch or render error:', error);
     }
-  
-    loadUsers();
-  </script>
+  }
+
+  loadUsers();
+</script>
 </html>

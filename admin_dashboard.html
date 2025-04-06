@@ -148,34 +148,6 @@
       passwordInput.focus();
     }
   });
-
-  document.getElementById("announcement-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const message = document.getElementById("announcement").value;
-  const type = document.getElementById("announcement-type").value;
-
-  try {
-    const response = await fetch("geega-games-website-production.up.railway.app/announce", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, type })
-    });
-
-    const data = await response.json();
-
-    if (data.success) {
-      alert(`✅ Announcement sent!\nEmails sent: ${data.result.email}\nSMS sent: ${data.result.sms}`);
-    } else {
-      alert("❌ Failed to send announcement.");
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    alert("❌ An error occurred while sending announcement.");
-  }
-
-  document.getElementById("announcement-form").reset();
-});
 </script>
 </head>
 <body>
@@ -497,4 +469,3 @@
   </script>
 </body>
 </html>
-

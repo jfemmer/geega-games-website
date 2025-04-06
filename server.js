@@ -6,7 +6,6 @@ require('dotenv').config();
 
 const app = express();
 
-
 app.get('/api/version-check', (req, res) => {
   res.send('✅ This is the latest version of the server.js file!');
 });
@@ -17,7 +16,7 @@ app.use(express.json());
 
 // ✅ Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
-const port = process.env.PORT;
+const port = process.env.PORT || 3000;
 
 if (!MONGODB_URI) {
   console.error('❌ MONGODB_URI is not set in environment variables!');
@@ -96,6 +95,17 @@ app.post('/signup', async (req, res) => {
     res.status(201).json({ message: '🐶 Welcome to the Pack! 🐶' });
   } catch (err) {
     console.error('❌ Signup error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Get all users (for admin dashboard)
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await User.find(); // select only relevant fields
+    res.json(users);
+  } catch (err) {
+    console.error('❌ Error fetching users:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });

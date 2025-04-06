@@ -99,32 +99,139 @@
       box-shadow: 0 0 0px 1000px white inset !important;
       -webkit-box-shadow: 0 0 0px 1000px white inset !important;
     }
-    .shimmer {
-    background: linear-gradient(
-      to right,
-      rebeccapurple 4%,
-      #ffffff 25%,
-      rebeccapurple 36%
-    );
-    background-size: 200% auto;
-    color: white;
-    background-clip: text;
-    text-fill-color: transparent;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: shimmer 2s linear infinite;
-    font-weight: bold;
-  }
 
-  @keyframes shimmer {
-    to {
-      background-position: 200% center;
+    .shimmer {
+      background: linear-gradient(
+        to right,
+        rebeccapurple 4%,
+        #ffffff 25%,
+        rebeccapurple 36%
+      );
+      background-size: 200% auto;
+      color: white;
+      background-clip: text;
+      text-fill-color: transparent;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 2s linear infinite;
+      font-weight: bold;
     }
-  }
+
+    @keyframes shimmer {
+      to {
+        background-position: 200% center;
+      }
+    }
 
   </style>
+
+<!-- 🔐 Login Logic -->
+<script>
+  document.getElementById("admin-login-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    const passwordInput = document.getElementById("admin-password-input");
+    const errorMessage = document.getElementById("login-error");
+    const loginOverlay = document.getElementById("admin-login");
+
+    const password = passwordInput.value.trim();
+
+    // 🔐 Replace with secure logic or backend validation
+    if (password === "yourSecretPassword") {
+      loginOverlay.style.display = "none";
+      errorMessage.textContent = "";
+      console.log("✅ Admin logged in.");
+      // window.location.href = "/admin_dashboard.html"; // Optional redirect
+    } else {
+      errorMessage.textContent = "❌ Incorrect password";
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+  });
+</script>
 </head>
 <body>
+  <div id="admin-login" style="
+  position: fixed;
+  inset: 0;
+  background: #ecf0f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+">
+  <div style="
+    background: white;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    width: 320px;
+    text-align: center;
+  ">
+    <h2 style="color: rebeccapurple; margin-bottom: 20px;">Admin Login</h2>
+
+    <form id="admin-login-form" style="margin-bottom: 20px;">
+      <input 
+        type="password"
+        id="admin-password-input"
+        placeholder="Enter password"
+        style="
+          padding: 10px;
+          font-size: 16px;
+          width: 93%;
+          margin-bottom: 15px;
+          border-radius: 6px;
+          border: 1px solid #ccc;
+        "
+        required
+      />
+      <button
+        type="submit"
+        style="
+          padding: 10px 20px;
+          font-size: 16px;
+          background-color: rebeccapurple;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+        "
+      >
+        Login
+      </button>
+    </form>
+
+    <p id="login-error" style="color: crimson; margin-top: 10px;"></p>
+  </div>
+</div>
+
+<!-- 🔐 Login Logic -->
+<script>
+  document.getElementById("admin-login-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    const passwordInput = document.getElementById("admin-password-input");
+    const errorMessage = document.getElementById("login-error");
+    const loginOverlay = document.getElementById("admin-login");
+
+    const password = passwordInput.value.trim();
+
+    // 🔐 Replace with secure logic or backend validation
+    if (password === "yourSecretPassword") {
+      loginOverlay.style.display = "none";
+      errorMessage.textContent = "";
+      console.log("✅ Admin logged in.");
+      // window.location.href = "/admin_dashboard.html"; // Optional redirect
+    } else {
+      errorMessage.textContent = "❌ Incorrect password";
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+  });
+</script>
+
+  <!-- Existing HTML remains unchanged below this line -->
+
   <div class="sidebar">
     <h2>Geega Admin</h2>
     <a href="#">Dashboard</a>
@@ -185,7 +292,7 @@
           <label
             for="foil"
             class="shimmer"
-            style="margin: 0; margin-top: 5px; font-size: 1.1rem; margin-bottom: 5px;"
+            style="margin: 0; margin-top: 5px; font-size: 1.1rem;"
           >
             Foil
           </label>
@@ -355,5 +462,4 @@
   </script>
 </body>
 </html>
-
 

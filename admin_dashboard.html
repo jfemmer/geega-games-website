@@ -148,6 +148,34 @@
       passwordInput.focus();
     }
   });
+
+  document.getElementById("announcement-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const message = document.getElementById("announcement").value;
+  const type = document.getElementById("announcement-type").value;
+
+  try {
+    const response = await fetch("geega-games-website-production.up.railway.app/announce", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, type })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      alert(`✅ Announcement sent!\nEmails sent: ${data.result.email}\nSMS sent: ${data.result.sms}`);
+    } else {
+      alert("❌ Failed to send announcement.");
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    alert("❌ An error occurred while sending announcement.");
+  }
+
+  document.getElementById("announcement-form").reset();
+});
 </script>
 </head>
 <body>
@@ -318,13 +346,20 @@
 
     <div class="section">
       <h2>Post Announcement</h2>
-      <form>
+      <form id="announcement-form">
         <label for="announcement">Message</label>
-        <textarea id="announcement" name="announcement" rows="4"></textarea>
-        <button type="submit">Post</button>
+        <textarea id="announcement" rows="4" required></textarea>
+    
+        <label for="announcement-type">Send via:</label>
+        <select id="announcement-type" required>
+          <option value="email">Email Only</option>
+          <option value="sms">SMS Only</option>
+          <option value="both">Both Email & SMS</option>
+        </select>
+    
+        <button type="submit">Post Announcement</button>
       </form>
     </div>
-  </div>
 
   <script>
     async function loadUsers() {

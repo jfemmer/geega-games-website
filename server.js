@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
+const nodemailer = require('nodemailer');
+const twilio = require('twilio');
 require('dotenv').config();
 
 const app = express();
@@ -124,7 +126,7 @@ app.post('/signup', async (req, res) => {
 // ✅ Get All Users (Admin Dashboard) — sorted by newest
 app.get('/api/users', async (req, res) => {
   try {
-    const users = await User.find().sort({ createdAt: -1 }); // 👈 newest first
+    const users = await User.find().sort({ createdAt: -1 });
     res.json(users);
   } catch (err) {
     console.error('❌ Error fetching users:', err);
@@ -134,7 +136,7 @@ app.get('/api/users', async (req, res) => {
 
 // ✅ Add Card to Inventory
 app.post('/api/inventory', async (req, res) => {
-  console.log('📥 Received inventory POST:', req.body); // for debugging
+  console.log('📥 Received inventory POST:', req.body);
 
   try {
     const { cardName, quantity, set, condition, foil } = req.body;
@@ -156,6 +158,57 @@ app.post('/api/inventory', async (req, res) => {
   } catch (err) {
     console.error('❌ Error adding card to inventory:', err);
     res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Add Card to Inventory
+app.post('/api/inventory', async (req, res) => {
+  // your existing logic...
+});
+
+// 👇 ADD YOUR ANNOUNCEMENT ROUTE HERE 👇
+app.post('/api/announce', async (req, res) => {
+  const { message, type } = req.body;
+  const users = await User.find();
+
+  const transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+
+  const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+
+  const result = { email: 0, sms: 0 };
+
+  try {
+    for (const user of users) {
+      if ((type === 'email' || type === 'both') && user.email) {
+        await transporter.sendMail({
+          from: `"Geega Games" <${process.env.EMAIL_USER}>`,
+          to: user.email,
+          subject: 'Announcement from Geega Games',
+          text: message
+        });
+        result.email++;
+      }
+
+      if ((type === 'sms' || type === 'both') && user.phone) {
+        await twilioClient.messages.create({
+          body: message,
+          from: process.env.TWILIO_PHONE,
+          to: user.phone
+        });
+        result.sms++;
+      }
+    }
+
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error('❌ Announcement error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error.' });
   }
 });
 

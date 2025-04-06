@@ -48,12 +48,12 @@
       margin: 10px 0 5px;
     }
 
-    input, textarea, button {
+    input, textarea, button, select {
       width: 100%;
       padding: 8px;
       margin-bottom: 10px;
     }
-    
+
     button {
       background-color: rebeccapurple;
       color: white;
@@ -64,6 +64,64 @@
     button:hover {
       background-color: #5a2d85;
     }
+
+    .card-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8f8f8;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      cursor: pointer;
+    }
+
+    .card-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-info img {
+      width: 80px;
+      height: auto;
+      border-radius: 4px;
+    }
+
+    .card-info div {
+      display: flex;
+      flex-direction: column;
+    }
+
+    input::-webkit-autofill,
+    input:-webkit-autofill {
+      box-shadow: 0 0 0px 1000px white inset !important;
+      -webkit-box-shadow: 0 0 0px 1000px white inset !important;
+    }
+    .shimmer {
+    background: linear-gradient(
+      to right,
+      rebeccapurple 4%,
+      #ffffff 25%,
+      rebeccapurple 36%
+    );
+    background-size: 200% auto;
+    color: white;
+    background-clip: text;
+    text-fill-color: transparent;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 2s linear infinite;
+    font-weight: bold;
+  }
+
+  @keyframes shimmer {
+    to {
+      background-position: 200% center;
+    }
+  }
+
   </style>
 </head>
 <body>
@@ -80,56 +138,76 @@
     <h1>Welcome, Admin!</h1>
 
     <div class="section">
-        <h2>User Management</h2>
-        <div id="user-list">
-          <p>Loading users...</p>
-        </div>
+      <h2>User Management</h2>
+      <div id="user-list">
+        <p>Loading users...</p>
       </div>
+    </div>
 
     <div class="section">
-        <h2>Update Inventory</h2>
-      
-        <!-- Add / Update Card Form -->
-        <form id="update-card-form">
-          <label for="cardName">Card Name</label>
-          <input type="text" id="cardName" name="cardName" required>
-      
-          <label for="quantity">Quantity</label>
-          <input type="number" id="quantity" name="quantity" min="0" required>
-      
-          <label for="set">Set</label>
-          <input type="text" id="set" name="set" required>
-      
-          <label for="condition">Condition</label>
-          <select id="condition" name="condition" required>
-            <option value="">Select Condition</option>
-            <option value="NM">Near Mint</option>
-            <option value="LP">Lightly Played</option>
-            <option value="MP">Moderately Played</option>
-            <option value="HP">Heavily Played</option>
-            <option value="DMG">Damaged</option>
-          </select>
-      
-          <label for="foil">Foil</label>
-          <input type="checkbox" id="foil" name="foil"> Yes
-      
-          <button type="submit">Add / Update Card</button>
-        </form>
-      
-        <hr style="margin: 20px 0;">
-      
-        <!-- Delete Card Form -->
-        <h3>Delete Card from Inventory</h3>
-        <form id="delete-card-form">
-          <label for="deleteCardName">Card Name</label>
-          <input type="text" id="deleteCardName" name="deleteCardName" required>
-      
-          <label for="deleteSet">Set</label>
-          <input type="text" id="deleteSet" name="deleteSet" required>
-      
-          <button type="submit" style="background-color: crimson;">Delete Card</button>
-        </form>
-      </div>
+      <h2>Add Inventory</h2>
+
+      <!-- 🔍 Scryfall Search -->
+      <h3>Search Magic Card</h3>
+      <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
+      <div id="search-results" style="margin-top: 10px;"></div>
+
+      <hr style="margin: 20px 0;">
+
+      <!-- Add / Update Card Form -->
+      <form id="update-card-form">
+        <label for="cardName">Card Name</label>
+        <input type="text" id="cardName" name="cardName" required>
+
+        <label for="quantity">Quantity</label>
+        <input type="number" id="quantity" name="quantity" min="0" required>
+
+        <label for="set">Set</label>
+        <input type="text" id="set" name="set" required>
+
+        <label for="condition">Condition</label>
+        <select id="condition" name="condition" required>
+          <option value="">Select Condition</option>
+          <option value="NM">Near Mint</option>
+          <option value="LP">Lightly Played</option>
+          <option value="MP">Moderately Played</option>
+          <option value="HP">Heavily Played</option>
+          <option value="DMG">Damaged</option>
+        </select>
+
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+          <input
+            type="checkbox"
+            id="foil"
+            name="foil"
+            style="width: 20px; height: 20px; margin: 0; margin-top: 5px; margin-bottom: 5px;"
+          >
+          <label
+            for="foil"
+            class="shimmer"
+            style="margin: 0; margin-top: 5px; font-size: 1.1rem; margin-bottom: 5px;"
+          >
+            Foil
+          </label>
+        </div>
+
+        <button type="submit">Add / Update Card</button>
+      </form>
+
+      <hr style="margin: 20px 0;">
+
+      <!-- Delete Card Form -->
+      <h3>Delete Card from Inventory</h3>
+      <form id="delete-card-form">
+        <label for="deleteCardName">Card Name</label>
+        <input type="text" id="deleteCardName" name="deleteCardName" required>
+
+        <label for="deleteSet">Set</label>
+        <input type="text" id="deleteSet" name="deleteSet" required>
+
+        <button type="submit" style="background-color: crimson;">Delete Card</button>
+      </form>
+    </div>
 
     <div class="section">
       <h2>Post Announcement</h2>
@@ -140,54 +218,140 @@
       </form>
     </div>
   </div>
-</body>
 
-<script>
-  async function loadUsers() {
-    const userList = document.getElementById('user-list');
-    try {
-      const res = await fetch('https://geega-games-website-production.up.railway.app/api/users');
-      console.log('Status code:', res.status);
-      if (!res.ok) {
-        throw new Error(`Server responded with ${res.status}`);
+  <script>
+    async function loadUsers() {
+      const userList = document.getElementById('user-list');
+      try {
+        const res = await fetch('https://geega-games-website-production.up.railway.app/api/users');
+        if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+        const users = await res.json();
+
+        if (!Array.isArray(users) || users.length === 0) {
+          userList.innerHTML = "<p>No users found.</p>";
+          return;
+        }
+
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th style="text-align:left;">Name</th>
+              <th style="text-align:left;">Email</th>
+              <th style="text-align:left;">Phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(user => `
+              <tr>
+                <td>${user.firstName || ''} ${user.lastName || ''}</td>
+                <td>${user.email || ''}</td>
+                <td>${user.phone || ''}</td>
+              </tr>`).join('')}
+          </tbody>
+        `;
+        userList.innerHTML = '';
+        userList.appendChild(table);
+      } catch (error) {
+        userList.innerHTML = "<p>❌ Error loading users.</p>";
+        console.error('❌ Fetch or render error:', error);
       }
+    }
 
-      const users = await res.json();
-      console.log('Fetched users:', users);
+    loadUsers();
 
-      if (!Array.isArray(users) || users.length === 0) {
-        userList.innerHTML = "<p>No users found.</p>";
+    let debounceTimeout;
+
+    document.getElementById('search-input').addEventListener('input', function () {
+      clearTimeout(debounceTimeout);
+      const query = this.value.trim();
+      if (query.length === 0) {
+        document.getElementById('search-results').innerHTML = '';
         return;
       }
+      debounceTimeout = setTimeout(() => {
+        searchScryfall(query);
+      }, 300);
+    });
 
-      const table = document.createElement('table');
-      table.style.width = '100%';
-      table.innerHTML = `
-        <thead>
-          <tr>
-            <th style="text-align:left;">Name</th>
-            <th style="text-align:left;">Email</th>
-            <th style="text-align:left;">Phone</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${users.map(user => `
-            <tr>
-              <td>${user.firstName || ''} ${user.lastName || ''}</td>
-              <td>${user.email || ''}</td>
-              <td>${user.phone || ''}</td>
-            </tr>`).join('')}
-        </tbody>
+    async function searchScryfall(query) {
+  const resultsDiv = document.getElementById('search-results');
+  resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+
+  try {
+    // First get the canonical card using fuzzy match
+    const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
+    if (!searchRes.ok) throw new Error('No matching card found');
+
+    const baseCard = await searchRes.json();
+
+    // Now fetch all printings of that card
+    const printRes = await fetch(baseCard.prints_search_uri);
+    const printData = await printRes.json();
+
+    // Sort: prioritize variant cards first, but include regulars
+    const sorted = [...printData.data].sort((a, b) => {
+      const aScore = (a.full_art || a.frame_effects?.length) ? 1 : 0;
+      const bScore = (b.full_art || b.frame_effects?.length) ? 1 : 0;
+      return bScore - aScore; // show variants first
+    });
+
+    const topResults = sorted.slice(0, 10);
+    resultsDiv.innerHTML = '';
+
+    topResults.forEach(card => {
+      const cardImage = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
+      if (!cardImage) return;
+
+      const cardName = card.name;
+      const cardSet = card.set.toUpperCase();
+      const typeLine = card.type_line || "Unknown";
+
+      let variantLabel = '';
+      if (card.frame_effects?.includes('showcase')) {
+        variantLabel = '(Showcase)';
+      } else if (card.frame_effects?.includes('extendedart')) {
+        variantLabel = '(Extended Art)';
+      } else if (card.frame_effects?.includes('borderless')) {
+        variantLabel = '(Borderless)';
+      } else if (card.full_art) {
+        variantLabel = '(Full Art)';
+      }
+
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'card-item';
+
+      cardDiv.innerHTML = `
+        <div class="card-info">
+          <img src="${cardImage}" alt="${cardName}">
+          <div>
+            <strong>${cardName} ${variantLabel}</strong>
+            <span>Set: ${cardSet}</span><br>
+            <span>${typeLine}</span>
+          </div>
+        </div>
       `;
 
-      userList.innerHTML = '';
-      userList.appendChild(table);
-    } catch (error) {
-      userList.innerHTML = "<p>❌ Error loading users.</p>";
-      console.error('❌ Fetch or render error:', error);
-    }
-  }
+      cardDiv.addEventListener('mousedown', e => e.preventDefault());
 
-  loadUsers();
-</script>
+      cardDiv.addEventListener('click', e => {
+        e.preventDefault();
+        document.getElementById('cardName').value = `${cardName} ${variantLabel}`.trim();
+        document.getElementById('set').value = card.set_name;
+        document.getElementById('search-input').value = '';
+        document.getElementById('quantity').value = 1;
+        resultsDiv.innerHTML = '';
+        document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
+      });
+
+      resultsDiv.appendChild(cardDiv);
+    });
+  } catch (err) {
+    console.error('Error searching Scryfall:', err);
+    resultsDiv.innerHTML = `<p>No results found for "<strong>${query}</strong>".</p>`;
+  }
+}
+  </script>
+</body>
 </html>

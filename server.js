@@ -6,6 +6,11 @@ require('dotenv').config();
 
 const app = express();
 
+
+app.get('/api/version-check', (req, res) => {
+  res.send('✅ This is the latest version of the server.js file!');
+});
+
 // ✅ Middleware
 app.use(cors());
 app.use(express.json());

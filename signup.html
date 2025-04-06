@@ -100,6 +100,7 @@
     <p id="error-message" class="error-message"></p>
     <input type="tel" id="phone" placeholder="Phone Number" required>
     <input type="text" id="address" placeholder="Street Address" required>
+    <input type="text" id="city" placeholder="City" required>
     <input type="text" id="state" placeholder="State" required>
     <input type="text" id="zip" placeholder="Zip Code" required>
     <button type="submit" id="signup-button">Sign Up</button>
@@ -135,6 +136,7 @@
       password: password,
       phone: document.getElementById('phone').value.trim(),
       address: document.getElementById('address').value.trim(),
+      city: document.getElementById('city').value.trim(),
       state: document.getElementById('state').value.trim(),
       zip: document.getElementById('zip').value.trim()
     };

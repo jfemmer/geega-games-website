@@ -6,35 +6,44 @@ require('dotenv').config();
 
 const app = express();
 
-app.get('/api/version-check', (req, res) => {
-  res.send('✅ This is the latest version of the server.js file!');
-});
-
 // ✅ Middleware
 app.use(cors());
 app.use(express.json());
 
 // ✅ Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
+const INVENTORY_DB_URI = process.env.INVENTORY_DB_URI;
 const port = process.env.PORT || 3000;
 
-if (!MONGODB_URI) {
-  console.error('❌ MONGODB_URI is not set in environment variables!');
+if (!MONGODB_URI || !INVENTORY_DB_URI) {
+  console.error('❌ One or more MongoDB URIs are missing in environment variables!');
   process.exit(1);
 }
 
-// ✅ Connect to MongoDB Atlas
+// ✅ Connect to MongoDB Atlas - Users
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('✅ Connected to MongoDB Atlas'))
+.then(() => console.log('✅ Connected to MongoDB Atlas (geegaUsers)'))
 .catch((err) => {
   console.error('❌ MongoDB connection error:', err.message);
   process.exit(1);
 });
 
-// ✅ Mongoose Schema & Model
+// ✅ Second Connection for Inventory DB
+const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+inventoryConnection.on('connected', () => {
+  console.log('✅ Connected to MongoDB Atlas (geegaInventory)');
+});
+inventoryConnection.on('error', (err) => {
+  console.error('❌ Inventory DB connection error:', err.message);
+});
+
+// ✅ User Schema & Model
 const userSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
@@ -50,9 +59,26 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// ✅ Root Route (Test)
+// ✅ Inventory Schema & Model (Card Inventory)
+const inventorySchema = new mongoose.Schema({
+  cardName: { type: String, required: true },
+  quantity: { type: Number, required: true },
+  set: { type: String, required: true },
+  condition: { type: String, required: true },
+  foil: { type: Boolean, default: false },
+  addedAt: { type: Date, default: Date.now }
+});
+
+// Force collection name: 'Card Inventory'
+const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
+
+// ✅ Root Test Route
 app.get('/', (req, res) => {
   res.send('🧙‍♂️ Welcome to the Geega Games API!');
+});
+
+app.get('/api/version-check', (req, res) => {
+  res.send('✅ This is the latest version of the server.js file!');
 });
 
 // ✅ Signup Route
@@ -63,21 +89,17 @@ app.post('/signup', async (req, res) => {
       phone, address, state, zip
     } = req.body;
 
-    // Minimal validation
     if (!username || !email || !password) {
       return res.status(400).json({ message: 'Username, email, and password are required.' });
     }
 
-    // Check if user already exists
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing) {
       return res.status(409).json({ message: 'User already exists.' });
     }
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
     const user = new User({
       firstName,
       lastName,
@@ -99,13 +121,38 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-// ✅ Get all users (for admin dashboard)
+// ✅ Get All Users (Admin Dashboard)
 app.get('/api/users', async (req, res) => {
   try {
-    const users = await User.find(); // select only relevant fields
+    const users = await User.find();
     res.json(users);
   } catch (err) {
     console.error('❌ Error fetching users:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Add Card to Inventory
+app.post('/api/inventory', async (req, res) => {
+  try {
+    const { cardName, quantity, set, condition, foil } = req.body;
+
+    if (!cardName || !quantity || !set || !condition) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
+
+    const card = new CardInventory({
+      cardName,
+      quantity,
+      set,
+      condition,
+      foil: !!foil,
+    });
+
+    await card.save();
+    res.status(201).json({ message: '🃏 Card added to inventory!' });
+  } catch (err) {
+    console.error('❌ Error adding card to inventory:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });

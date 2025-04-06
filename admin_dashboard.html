@@ -1,4 +1,458 @@
-topResults.forEach(card => {
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard | Geega Games</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      margin: 0;
+    }
+
+    .sidebar {
+      background-color: rebeccapurple;
+      color: white;
+      padding: 20px;
+      width: 200px;
+      height: 100vh;
+    }
+
+    .sidebar h2 {
+      margin-top: 0;
+    }
+
+    .sidebar a {
+      color: white;
+      text-decoration: none;
+      display: block;
+      margin: 10px 0;
+    }
+
+    .main {
+      flex-grow: 1;
+      padding: 20px;
+      background-color: #ecf0f1;
+    }
+
+    .section {
+      background-color: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+
+    input, textarea, button, select {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      background-color: rebeccapurple;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #5a2d85;
+    }
+
+    .card-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8f8f8;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      cursor: pointer;
+    }
+
+    .card-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-info img {
+      width: 80px;
+      height: auto;
+      border-radius: 4px;
+    }
+
+    .card-info div {
+      display: flex;
+      flex-direction: column;
+    }
+
+    input::-webkit-autofill,
+    input:-webkit-autofill {
+      box-shadow: 0 0 0px 1000px white inset !important;
+      -webkit-box-shadow: 0 0 0px 1000px white inset !important;
+    }
+
+    .shimmer {
+      background: linear-gradient(
+        to right,
+        rebeccapurple 4%,
+        #ffffff 25%,
+        rebeccapurple 36%
+      );
+      background-size: 200% auto;
+      color: white;
+      background-clip: text;
+      text-fill-color: transparent;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 2s linear infinite;
+      font-weight: bold;
+    }
+
+    @keyframes shimmer {
+      to {
+        background-position: 200% center;
+      }
+    }
+
+  </style>
+
+<script>
+  document.getElementById("update-card-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const cardData = {
+      name: document.getElementById("cardName").value.trim(),
+      quantity: parseInt(document.getElementById("quantity").value),
+      set: document.getElementById("set").value.trim(),
+      condition: document.getElementById("condition").value,
+      foil: document.getElementById("foil").checked
+    };
+
+    try {
+      const response = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(cardData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add card: ${response.status}`);
+      }
+
+      const result = await response.json();
+      alert("✅ Card added/updated successfully!");
+      console.log("✅ Server Response:", result);
+
+      // Optionally reset the form
+      document.getElementById("update-card-form").reset();
+    } catch (error) {
+      alert("❌ Error adding card.");
+      console.error("❌ Add Card Error:", error);
+    }
+  });
+</script>
+
+<!-- 🔐 Login Logic -->
+<script>
+  document.getElementById("admin-login-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    const passwordInput = document.getElementById("admin-password-input");
+    const errorMessage = document.getElementById("login-error");
+    const loginOverlay = document.getElementById("admin-login");
+
+    const password = passwordInput.value.trim();
+
+    // 🔐 Replace with secure logic or backend validation
+    if (password === "yourSecretPassword") {
+      loginOverlay.style.display = "none";
+      errorMessage.textContent = "";
+      console.log("✅ Admin logged in.");
+      // window.location.href = "/admin_dashboard.html"; // Optional redirect
+    } else {
+      errorMessage.textContent = "❌ Incorrect password";
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+  });
+</script>
+</head>
+<body>
+  <!-- 🔐 Login Logic
+  <div id="admin-login" style="
+  position: fixed;
+  inset: 0;
+  background: #ecf0f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+">
+  <div style="
+    background: white;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    width: 320px;
+    text-align: center;
+  ">
+    <h2 style="color: rebeccapurple; margin-bottom: 20px;">Admin Login</h2>
+
+    <form id="admin-login-form" style="margin-bottom: 20px;">
+      <input 
+        type="password"
+        id="admin-password-input"
+        placeholder="Enter password"
+        style="
+          padding: 10px;
+          font-size: 16px;
+          width: 93%;
+          margin-bottom: 15px;
+          border-radius: 6px;
+          border: 1px solid #ccc;
+        "
+        required
+      />
+      <button
+        type="submit"
+        style="
+          padding: 10px 20px;
+          font-size: 16px;
+          background-color: rebeccapurple;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+        "
+      >
+        Login
+      </button>
+    </form>
+
+    <p id="login-error" style="color: crimson; margin-top: 10px;"></p>
+  </div>
+</div>
+
+<script>
+  document.getElementById("admin-login-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    const passwordInput = document.getElementById("admin-password-input");
+    const errorMessage = document.getElementById("login-error");
+    const loginOverlay = document.getElementById("admin-login");
+
+    const password = passwordInput.value.trim();
+
+    // 🔐 Replace with secure logic or backend validation
+    if (password === "yourSecretPassword") {
+      loginOverlay.style.display = "none";
+      errorMessage.textContent = "";
+      console.log("✅ Admin logged in.");
+      // window.location.href = "/admin_dashboard.html"; // Optional redirect
+    } else {
+      errorMessage.textContent = "❌ Incorrect password";
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+  });
+</script> -->
+
+  <!-- Existing HTML remains unchanged below this line -->
+
+  <div class="sidebar">
+    <h2>Geega Admin</h2>
+    <a href="#">Dashboard</a>
+    <a href="#">Users</a>
+    <a href="#">Inventory</a>
+    <a href="#">Announcements</a>
+    <a href="#">Logout</a>
+  </div>
+
+  <div class="main">
+    <h1>Welcome, Admin!</h1>
+
+    <div class="section">
+      <h2>User Management</h2>
+      <div id="user-list">
+        <p>Loading users...</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Add Inventory</h2>
+
+      <!-- 🔍 Scryfall Search -->
+      <h3>Search Magic Card</h3>
+      <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
+      <div id="search-results" style="margin-top: 10px;"></div>
+
+      <hr style="margin: 20px 0;">
+
+      <!-- Add / Update Card Form -->
+      <form id="update-card-form">
+        <label for="cardName">Card Name</label>
+        <input type="text" id="cardName" name="cardName" required>
+
+        <label for="quantity">Quantity</label>
+        <input type="number" id="quantity" name="quantity" min="0" required>
+
+        <label for="set">Set</label>
+        <input type="text" id="set" name="set" required>
+
+        <label for="condition">Condition</label>
+        <select id="condition" name="condition" required>
+          <option value="">Select Condition</option>
+          <option value="NM">Near Mint</option>
+          <option value="LP">Lightly Played</option>
+          <option value="MP">Moderately Played</option>
+          <option value="HP">Heavily Played</option>
+          <option value="DMG">Damaged</option>
+        </select>
+
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+          <input
+            type="checkbox"
+            id="foil"
+            name="foil"
+            style="width: 20px; height: 20px; margin: 0; margin-top: 5px; margin-bottom: 5px;"
+          >
+          <label
+            for="foil"
+            class="shimmer"
+            style="margin: 0; margin-top: 5px; font-size: 1.1rem;"
+          >
+            Foil
+          </label>
+        </div>
+
+        <button type="submit">Add / Update Card</button>
+      </form>
+
+      <hr style="margin: 20px 0;">
+
+      <!-- Delete Card Form -->
+      <h3>Delete Card from Inventory</h3>
+      <form id="delete-card-form">
+        <label for="deleteCardName">Card Name</label>
+        <input type="text" id="deleteCardName" name="deleteCardName" required>
+
+        <label for="deleteSet">Set</label>
+        <input type="text" id="deleteSet" name="deleteSet" required>
+
+        <button type="submit" style="background-color: crimson;">Delete Card</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2>Post Announcement</h2>
+      <form id="announcement-form">
+        <label for="announcement">Message</label>
+        <textarea id="announcement" rows="4" required></textarea>
+    
+        <label for="announcement-type">Send via:</label>
+        <select id="announcement-type" required>
+          <option value="email">Email Only</option>
+          <option value="sms">SMS Only</option>
+          <option value="both">Both Email & SMS</option>
+        </select>
+    
+        <button type="submit">Post Announcement</button>
+      </form>
+    </div>
+
+  <script>
+    async function loadUsers() {
+      const userList = document.getElementById('user-list');
+      try {
+        const res = await fetch('https://geega-games-website-production.up.railway.app/api/users');
+        if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+        const users = await res.json();
+
+        if (!Array.isArray(users) || users.length === 0) {
+          userList.innerHTML = "<p>No users found.</p>";
+          return;
+        }
+
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th style="text-align:left;">Name</th>
+              <th style="text-align:left;">Email</th>
+              <th style="text-align:left;">Phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(user => `
+              <tr>
+                <td>${user.firstName || ''} ${user.lastName || ''}</td>
+                <td>${user.email || ''}</td>
+                <td>${user.phone || ''}</td>
+              </tr>`).join('')}
+          </tbody>
+        `;
+        userList.innerHTML = '';
+        userList.appendChild(table);
+      } catch (error) {
+        userList.innerHTML = "<p>❌ Error loading users.</p>";
+        console.error('❌ Fetch or render error:', error);
+      }
+    }
+
+    loadUsers();
+
+    let debounceTimeout;
+
+    document.getElementById('search-input').addEventListener('input', function () {
+      clearTimeout(debounceTimeout);
+      const query = this.value.trim();
+      if (query.length === 0) {
+        document.getElementById('search-results').innerHTML = '';
+        return;
+      }
+      debounceTimeout = setTimeout(() => {
+        searchScryfall(query);
+      }, 300);
+    });
+
+    async function searchScryfall(query) {
+  const resultsDiv = document.getElementById('search-results');
+  resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+
+  try {
+    // First get the canonical card using fuzzy match
+    const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
+    if (!searchRes.ok) throw new Error('No matching card found');
+
+    const baseCard = await searchRes.json();
+
+    // Now fetch all printings of that card
+    const printRes = await fetch(baseCard.prints_search_uri);
+    const printData = await printRes.json();
+
+    // Sort: prioritize variant cards first, but include regulars
+    const sorted = [...printData.data].sort((a, b) => {
+      const aScore = (a.full_art || a.frame_effects?.length) ? 1 : 0;
+      const bScore = (b.full_art || b.frame_effects?.length) ? 1 : 0;
+      return bScore - aScore; // show variants first
+    });
+
+    const topResults = sorted.slice(0, 10);
+    resultsDiv.innerHTML = '';
+
+    topResults.forEach(card => {
       const cardImage = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
       if (!cardImage) return;
 
@@ -53,3 +507,4 @@ topResults.forEach(card => {
   </script>
 </body>
 </html>
+

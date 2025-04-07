@@ -123,6 +123,7 @@ app.post('/signup', async (req, res) => {
 
 // ✅ Get All Users (Admin Dashboard) — sorted by newest
 app.get('/api/users', async (req, res) => {
+  res.send('Inventory API is live!');
   try {
     const users = await User.find().sort({ createdAt: -1 }); // 👈 newest first
     res.json(users);
@@ -135,7 +136,6 @@ app.get('/api/users', async (req, res) => {
 // ✅ Add Card to Inventory
 app.post('/api/inventory', async (req, res) => {
   console.log('📥 Received inventory POST:', req.body); // for debugging
-   in
 
   try {
     const { cardName, quantity, set, condition, foil } = req.body;
@@ -153,6 +153,7 @@ app.post('/api/inventory', async (req, res) => {
     });
 
     await card.save();
+    console.log('✅ Card saved to DB:'
     res.status(201).json({ message: '🃏 Card added to inventory!' });
   } catch (err) {
     console.error('❌ Error adding card to inventory:', err);

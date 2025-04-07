@@ -134,7 +134,6 @@ app.get('/api/users', async (req, res) => {
 
 // ✅ Add Card to Inventory
 app.post('/api/inventory', async (req, res) => {
-  res.send('Inventory API is live!');
   console.log('📥 Received inventory POST:', req.body); // for debugging
   try {
     const { cardName, quantity, set, condition, foil } = req.body;
@@ -152,11 +151,11 @@ app.post('/api/inventory', async (req, res) => {
     });
 
     await card.save();
-    console.log('✅ Card saved to DB:')
-    res.status(201).json({ message: '🃏 Card added to inventory!' });
+    console.log('✅ Card saved to DB:');
+    return res.status(201).json({ message: '🃏 Card added to inventory!' });
   } catch (err) {
     console.error('❌ Error adding card to inventory:', err);
-    res.status(500).json({ message: 'Internal server error.' });
+    return res.status(500).json({ message: 'Internal server error.' });
   }
 });
 

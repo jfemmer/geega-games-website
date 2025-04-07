@@ -136,7 +136,6 @@ app.get('/api/users', async (req, res) => {
 app.post('/api/inventory', async (req, res) => {
   console.log('📥 Received inventory POST:', req.body); // for debugging
    res.send('Inventory API is live!');
-  in
 
   try {
     const { cardName, quantity, set, condition, foil } = req.body;

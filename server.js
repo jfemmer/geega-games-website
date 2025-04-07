@@ -136,7 +136,6 @@ app.get('/api/users', async (req, res) => {
 // ✅ Add Card to Inventory
 app.post('/api/inventory', async (req, res) => {
   console.log('📥 Received inventory POST:', req.body); // for debugging
-
   try {
     const { cardName, quantity, set, condition, foil } = req.body;
 

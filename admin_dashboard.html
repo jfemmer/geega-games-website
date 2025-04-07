@@ -130,7 +130,7 @@
     e.preventDefault();
 
     const cardData = {
-      name: document.getElementById("cardName").value.trim(),
+      cardName: document.getElementById("cardName").value.trim(),
       quantity: parseInt(document.getElementById("quantity").value),
       set: document.getElementById("set").value.trim(),
       condition: document.getElementById("condition").value,
@@ -162,7 +162,7 @@
     }
   });
 </script>
-
+  
 <!-- 🔐 Login Logic -->
 <script>
   document.getElementById("admin-login-form").addEventListener("submit", function (e) {

@@ -152,7 +152,7 @@ app.post('/api/inventory', async (req, res) => {
     });
 
     await card.save();
-    console.log('✅ Card saved to DB:'
+    console.log('✅ Card saved to DB:')
     res.status(201).json({ message: '🃏 Card added to inventory!' });
   } catch (err) {
     console.error('❌ Error adding card to inventory:', err);

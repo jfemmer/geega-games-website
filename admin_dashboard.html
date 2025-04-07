@@ -126,11 +126,7 @@
   </style>
 
 <script>
-  document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("update-card-form");
-  if (!form) return console.error("❌ update-card-form not found!");
-  
-  form.addEventListener("submit", function (e) {
+  document.getElementById("update-card-form").addEventListener("submit", async function (e) {
     e.preventDefault();
 
     const cardData = {
@@ -141,24 +137,30 @@
       foil: document.getElementById("foil").checked
     };
 
-    fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(cardData)
-    })
-      .then(res => res.json())
-      .then(data => {
-        alert("✅ Card added/updated!");
-        form.reset();
-      })
-      .catch(err => {
-        console.error("❌ Error adding card:", err);
-        alert("❌ Something went wrong!");
+    try {
+      const response = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(cardData)
       });
+
+      if (!response.ok) {
+        throw new Error(Failed to add card: ${response.status});
+      }
+
+      const result = await response.json();
+      alert("✅ Card added/updated successfully!");
+      console.log("✅ Server Response:", result);
+
+      // Optionally reset the form
+      document.getElementById("update-card-form").reset();
+    } catch (error) {
+      alert("❌ Error adding card.");
+      console.error("❌ Add Card Error:", error);
+    }
   });
-});
 </script>
   
 <!-- 🔐 Login Logic -->

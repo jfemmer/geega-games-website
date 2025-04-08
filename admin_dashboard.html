@@ -414,97 +414,117 @@
 
     loadUsers();
 
-    let debounceTimeout;
+  let debounceTimeout;
 
-    document.getElementById('search-input').addEventListener('input', function () {
-      clearTimeout(debounceTimeout);
-      const query = this.value.trim();
-      if (query.length === 0) {
-        document.getElementById('search-results').innerHTML = '';
-        return;
-      }
-      debounceTimeout = setTimeout(() => {
-        searchScryfall(query);
-      }, 300);
-    });
+  document.getElementById('search-input').addEventListener('input', function () {
+    clearTimeout(debounceTimeout);
+    const query = this.value.trim();
+    const resultsDiv = document.getElementById('search-results');
+    if (query.length === 0) {
+      resultsDiv.innerHTML = '';
+      return;
+    }
 
-    async function searchScryfall(query) {
-  const resultsDiv = document.getElementById('search-results');
-  resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+    debounceTimeout = setTimeout(() => {
+      searchScryfall(query);
+    }, 300);
+  });
 
-  try {
-    // First get the canonical card using fuzzy match
-    const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
-    if (!searchRes.ok) throw new Error('No matching card found');
+  async function searchScryfall(query) {
+    const resultsDiv = document.getElementById('search-results');
+    resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
 
-    const baseCard = await searchRes.json();
+    try {
+      const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
+      if (!searchRes.ok) throw new Error('No matching card found');
 
-    // Now fetch all printings of that card
-    const printRes = await fetch(baseCard.prints_search_uri);
-    const printData = await printRes.json();
+      const baseCard = await searchRes.json();
+      const printRes = await fetch(baseCard.prints_search_uri);
+      const printData = await printRes.json();
 
-    // Sort: prioritize variant cards first, but include regulars
-    const sorted = [...printData.data].sort((a, b) => {
-      const aScore = (a.full_art || a.frame_effects?.length) ? 1 : 0;
-      const bScore = (b.full_art || b.frame_effects?.length) ? 1 : 0;
-      return bScore - aScore; // show variants first
-    });
-
-    const topResults = sorted.slice(0, 10);
-    resultsDiv.innerHTML = '';
-
-    topResults.forEach(card => {
-      const cardImage = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
-      if (!cardImage) return;
-
-      const cardName = card.name;
-      const cardSet = card.set.toUpperCase();
-      const typeLine = card.type_line || "Unknown";
-
-      let variantLabel = '';
-      if (card.frame_effects?.includes('showcase')) {
-        variantLabel = '(Showcase)';
-      } else if (card.frame_effects?.includes('extendedart')) {
-        variantLabel = '(Extended Art)';
-      } else if (card.frame_effects?.includes('borderless')) {
-        variantLabel = '(Borderless)';
-      } else if (card.full_art) {
-        variantLabel = '(Full Art)';
-      }
-
-      const cardDiv = document.createElement('div');
-      cardDiv.className = 'card-item';
-
-      cardDiv.innerHTML = `
-        <div class="card-info">
-          <img src="${cardImage}" alt="${cardName}">
-          <div>
-            <strong>${cardName} ${variantLabel}</strong>
-            <span>Set: ${cardSet}</span><br>
-            <span>${typeLine}</span>
-          </div>
-        </div>
-      `;
-
-      cardDiv.addEventListener('mousedown', e => e.preventDefault());
-
-      cardDiv.addEventListener('click', e => {
-        e.preventDefault();
-        document.getElementById('cardName').value = `${cardName} ${variantLabel}`.trim();
-        document.getElementById('set').value = card.set_name;
-        document.getElementById('search-input').value = '';
-        document.getElementById('quantity').value = 1;
-        resultsDiv.innerHTML = '';
-        document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
+      const sorted = [...printData.data].sort((a, b) => {
+        const aScore = (a.full_art || a.frame_effects?.length) ? 1 : 0;
+        const bScore = (b.full_art || b.frame_effects?.length) ? 1 : 0;
+        return bScore - aScore;
       });
 
-      resultsDiv.appendChild(cardDiv);
-    });
-  } catch (err) {
-    console.error('Error searching Scryfall:', err);
-    resultsDiv.innerHTML = `<p>No results found for "<strong>${query}</strong>".</p>`;
+      const topResults = sorted.slice(0, 10);
+      resultsDiv.innerHTML = '';
+
+      topResults.forEach(card => {
+        const cardImage = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
+        if (!cardImage) return;
+
+        const cardName = card.name;
+        const cardSet = card.set.toUpperCase();
+        const typeLine = card.type_line || "Unknown";
+
+        let variantLabel = '';
+
+        const frameEffectPriority = [
+          { key: 'serialized', label: '(Serialized)' },
+          { key: 'oil_slicked', label: '(Oil Slick)' },
+          { key: 'shatteredglass', label: '(Shattered Glass)' },
+          { key: 'showcase', label: '(Showcase)' },
+          { key: 'extendedart', label: '(Extended Art)' },
+          { key: 'borderless', label: '(Borderless)' },
+          { key: 'inverted', label: '(Inverted)' },
+          { key: 'lesson', label: '(Lesson)' },
+          { key: 'nyxtouched', label: '(Nyx-touched)' },
+          { key: 'companion', label: '(Companion)' },
+          { key: 'devoid', label: '(Devoid)' },
+          { key: 'colorshifted', label: '(Color Shifted)' },
+          { key: 'snow', label: '(Snow Frame)' },
+          { key: 'promo-stamped', label: '(Promo Stamped)' },
+        ];
+
+        const effects = card.frame_effects || [];
+        for (const effect of frameEffectPriority) {
+          if (effects.includes(effect.key)) {
+            variantLabel = effect.label;
+            break;
+          }
+        }
+
+        if (!variantLabel && card.full_art) {
+          variantLabel = '(Full Art)';
+        }
+
+        const displayName = variantLabel ? `${cardName} ${variantLabel}` : cardName;
+
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card-item';
+
+        cardDiv.innerHTML = `
+          <div class="card-info">
+            <img src="${cardImage}" alt="${displayName}">
+            <div>
+              <strong>${displayName}</strong>
+              <span>Set: ${cardSet}</span><br>
+              <span>${typeLine}</span>
+            </div>
+          </div>
+        `;
+
+        cardDiv.addEventListener('mousedown', e => e.preventDefault());
+
+        cardDiv.addEventListener('click', e => {
+          e.preventDefault();
+          document.getElementById('cardName').value = displayName;
+          document.getElementById('set').value = card.set_name;
+          document.getElementById('search-input').value = '';
+          document.getElementById('quantity').value = 1;
+          resultsDiv.innerHTML = '';
+          document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        resultsDiv.appendChild(cardDiv);
+      });
+    } catch (err) {
+      console.error('Error searching Scryfall:', err);
+      resultsDiv.innerHTML = `<p>No results found for "<strong>${query}</strong>".</p>`;
+    }
   }
-}
-  </script>
+</script>
 </body>
 </html>

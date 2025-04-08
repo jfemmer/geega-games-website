@@ -124,51 +124,11 @@
     }
 
   </style>
-
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("update-card-form");
-  if (!form) {
-    console.warn("Form not found");
-    return;
-  }
-
-  form.addEventListener("submit", async function (e) {
-    e.preventDefault();
-
-    const cardData = {
-      cardName: document.getElementById("cardName").value.trim(),
-      quantity: parseInt(document.getElementById("quantity").value),
-      set: document.getElementById("set").value.trim(),
-      condition: document.getElementById("condition").value,
-      foil: document.getElementById("foil").checked,
-      imageUrl: document.getElementById("imageUrl").value  // ✅ Include image URL
-    };
-
-    try {
-      const response = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cardData)
-      });
-
-      if (!response.ok) throw new Error(`Failed to add card: ${response.status}`);
-      const result = await response.json();
-      alert("✅ Card added/updated successfully!");
-      console.log("✅ Server Response:", result);
-      form.reset();
-    } catch (error) {
-      alert("❌ Error adding card.");
-      console.error("❌ Add Card Error:", error);
-    }
-  });
-});
-</script>
   
-<!-- 🔐 Login Logic -->
+<!-- 🔐 Login Logic
 <script>
-  document.getElementById("admin-login-form").addEventListener("submit", function (e) {
-    e.preventDefault();
+  //document.getElementById("admin-login-form").addEventListener("submit", function (e) {
+   // e.preventDefault();
 
     const passwordInput = document.getElementById("admin-password-input");
     const errorMessage = document.getElementById("login-error");
@@ -188,7 +148,7 @@
       passwordInput.focus();
     }
   });
-</script>
+</script>-->
 </head>
 <body>
   <!-- 🔐 Login Logic
@@ -301,51 +261,39 @@
 
       <hr style="margin: 20px 0;">
 
-      <!-- Add / Update Card Form -->
       <form id="update-card-form">
-  <label for="cardName">Card Name</label>
-  <input type="text" id="cardName" name="cardName" required>
-
-  <label for="quantity">Quantity</label>
-  <input type="number" id="quantity" name="quantity" min="0" required>
-
-  <label for="set">Set</label>
-  <input type="text" id="set" name="set" required>
-
-  <label for="condition">Condition</label>
-  <select id="condition" name="condition" required>
-    <option value="">Select Condition</option>
-    <option value="NM">Near Mint</option>
-    <option value="LP">Lightly Played</option>
-    <option value="MP">Moderately Played</option>
-    <option value="HP">Heavily Played</option>
-    <option value="DMG">Damaged</option>
-  </select>
-
-  <!-- ✅ Hidden field for Scryfall image URL -->
-  <input type="hidden" id="imageUrl" name="imageUrl">
-</form>
-
+        <label for="cardName">Card Name</label>
+        <input type="text" id="cardName" name="cardName" required>
+      
+        <label for="quantity">Quantity</label>
+        <input type="number" id="quantity" name="quantity" min="0" required>
+      
+        <label for="set">Set</label>
+        <input type="text" id="set" name="set" required>
+      
+        <label for="condition">Condition</label>
+        <select id="condition" name="condition" required>
+          <option value="">Select Condition</option>
+          <option value="NM">Near Mint</option>
+          <option value="LP">Lightly Played</option>
+          <option value="MP">Moderately Played</option>
+          <option value="HP">Heavily Played</option>
+          <option value="DMG">Damaged</option>
+        </select>
+      
+        <input type="hidden" id="imageUrl" name="imageUrl">
+      
         <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
-          <input
-            type="checkbox"
-            id="foil"
-            name="foil"
-            style="width: 20px; height: 20px; margin: 0; margin-top: 5px; margin-bottom: 5px;"
-          >
-          <label
-            for="foil"
-            class="shimmer"
-            style="margin: 0; margin-top: 5px; font-size: 1.1rem;"
-          >
+          <input type="checkbox" id="foil" name="foil"
+            style="width: 20px; height: 20px; margin: 0; margin-top: 5px; margin-bottom: 5px;">
+          <label for="foil" class="shimmer" style="margin: 0; margin-top: 5px; font-size: 1.1rem;">
             Foil
           </label>
         </div>
-
+      
+        <!-- ✅ Button moved here -->
         <button type="submit">Add / Update Card</button>
       </form>
-
-      <hr style="margin: 20px 0;">
 
       <!-- Delete Card Form -->
       <h3>Delete Card from Inventory</h3>
@@ -513,15 +461,16 @@
 
         cardDiv.addEventListener('mousedown', e => e.preventDefault());
 
-        cardDiv.addEventListener('click', e => {
-          e.preventDefault();
-          document.getElementById('cardName').value = displayName;
-          document.getElementById('set').value = card.set_name;
-          document.getElementById('search-input').value = '';
-          document.getElementById('quantity').value = 1;
-          resultsDiv.innerHTML = '';
-          document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
-        });
+           cardDiv.addEventListener('click', e => {
+              e.preventDefault();
+              document.getElementById('cardName').value = displayName;
+              document.getElementById('set').value = card.set_name;
+              document.getElementById('search-input').value = '';
+              document.getElementById('quantity').value = 1;
+              document.getElementById('imageUrl').value = cardImage; // ✅ Set image URL here
+              resultsDiv.innerHTML = '';
+              document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
+            });
 
         resultsDiv.appendChild(cardDiv);
       });
@@ -531,5 +480,45 @@
     }
   }
 </script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("update-card-form");
+  if (!form) {
+    console.warn("Form not found");
+    return;
+  }
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const cardData = {
+      cardName: document.getElementById("cardName").value.trim(),
+      quantity: parseInt(document.getElementById("quantity").value),
+      set: document.getElementById("set").value.trim(),
+      condition: document.getElementById("condition").value,
+      foil: document.getElementById("foil").checked,
+      imageUrl: document.getElementById("imageUrl").value  // ✅ Include image URL
+    };
+
+    try {
+      const response = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cardData)
+      });
+
+      if (!response.ok) throw new Error(`Failed to add card: ${response.status}`);
+      const result = await response.json();
+      alert("✅ Card added/updated successfully!");
+      console.log("✅ Server Response:", result);
+      form.reset();
+    } catch (error) {
+      alert("❌ Error adding card.");
+      console.error("❌ Add Card Error:", error);
+    }
+  });
+});
+</script>
+  
 </body>
 </html>

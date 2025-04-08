@@ -127,42 +127,42 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    const form = document.getElementById("update-card-form");
-    if (!form) return;
+  const form = document.getElementById("update-card-form");
+  if (!form) {
+    console.warn("Form not found");
+    return;
+  }
 
-    form.addEventListener("submit", async function (e) {
-      e.preventDefault(); // ✅ Prevent default GET submission
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
 
-      const cardData = {
-        cardName: document.getElementById("cardName").value.trim(),
-        quantity: parseInt(document.getElementById("quantity").value),
-        set: document.getElementById("set").value.trim(),
-        condition: document.getElementById("condition").value,
-        foil: document.getElementById("foil").checked,
-        imageUrl: document.getElementById("imageUrl").value.trim(), // 👈 Add this
-      };
+    const cardData = {
+      cardName: document.getElementById("cardName").value.trim(),
+      quantity: parseInt(document.getElementById("quantity").value),
+      set: document.getElementById("set").value.trim(),
+      condition: document.getElementById("condition").value,
+      foil: document.getElementById("foil").checked,
+      imageUrl: document.getElementById("imageUrl").value  // ✅ Include image URL
+    };
 
-      try {
-        const response = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(cardData)
-        });
+    try {
+      const response = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cardData)
+      });
 
-        if (!response.ok) {
-          throw new Error(`Failed to add card: ${response.status}`);
-        }
-
-        const result = await response.json();
-        alert("✅ Card added/updated successfully!");
-        console.log("✅ Server Response:", result);
-        form.reset();
-      } catch (error) {
-        alert("❌ Error adding card.");
-        console.error("❌ Add Card Error:", error);
-      }
-    });
+      if (!response.ok) throw new Error(`Failed to add card: ${response.status}`);
+      const result = await response.json();
+      alert("✅ Card added/updated successfully!");
+      console.log("✅ Server Response:", result);
+      form.reset();
+    } catch (error) {
+      alert("❌ Error adding card.");
+      console.error("❌ Add Card Error:", error);
+    }
   });
+});
 </script>
   
 <!-- 🔐 Login Logic -->

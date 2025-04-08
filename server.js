@@ -61,12 +61,12 @@ const User = mongoose.model('User', userSchema);
 
 // ✅ Inventory Schema & Model (Card Inventory)
 const inventorySchema = new mongoose.Schema({
-  cardName: String,
-  quantity: Number,
-  set: String,
-  condition: String,
-  foil: Boolean,
-  imageUrl: String, // ✅ Add this if it's not already in your schema
+  cardName: { type: String, required: true },
+  quantity: { type: Number, required: true },
+  set: { type: String, required: true },
+  condition: { type: String, required: true },
+  foil: { type: Boolean, default: false },
+  imageUrl: { type: String }, // ✅ Add this
   addedAt: { type: Date, default: Date.now }
 });
 
@@ -133,13 +133,9 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-
-
-const axios = require('axios');
+const axios = require('axios'); // Make sure you have axios installed (npm install axios)
 
 app.post('/api/inventory', async (req, res) => {
-  console.log('📥 Received inventory POST:', req.body);
-
   try {
     const { cardName, quantity, set, condition, foil } = req.body;
 
@@ -147,55 +143,40 @@ app.post('/api/inventory', async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
-    // 🖼️ Function to fetch image URL from Scryfall
-    const fetchImageURL = async (name, setCode) => {
-      const cleanedName = name.split('(')[0].trim();
-      const loweredName = name.toLowerCase();
-      let query = `${cleanedName} set:${setCode.toLowerCase()}`;
+    // 🔍 Fetch image from Scryfall
+    let imageUrl = '';
+    try {
+      const response = await axios.get(`https://api.scryfall.com/cards/named`, {
+        params: {
+          fuzzy: cardName,
+          set: set.toLowerCase()
+        }
+      });
 
-      if (loweredName.includes('borderless')) query += ' is:borderless';
-      if (loweredName.includes('showcase')) query += ' frame:showcase';
-      if (loweredName.includes('extended')) query += ' frame:extendedart';
-      if (loweredName.includes('oil slick')) query += ' frame:oil_slicked';
-      if (loweredName.includes('serialized')) query += ' frame:serialized';
+      const data = response.data;
+      imageUrl = data.image_uris?.normal || data.card_faces?.[0]?.image_uris?.normal || '';
+    } catch (error) {
+      console.warn(`⚠️ Scryfall fetch failed for "${cardName}" (${set}):`, error.message);
+    }
 
-      const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`;
-
-      try {
-        const response = await axios.get(url);
-        const cardData = response.data.data[0];
-
-        if (cardData.image_uris) return cardData.image_uris.normal;
-        if (cardData.card_faces?.[0]?.image_uris) return cardData.card_faces[0].image_uris.normal;
-      } catch (error) {
-        console.error('🛑 Scryfall image fetch failed:', error.message);
-        return null;
-      }
-
-      return null;
-    };
-
-    // 🔎 Fetch the Scryfall image URL
-    const imageUrl = await fetchImageURL(cardName, set);
-
-    // Save card to MongoDB
     const card = new CardInventory({
       cardName,
       quantity,
       set,
       condition,
       foil: !!foil,
-      imageUrl // Add to DB
+      imageUrl // ✅ Add the image URL to MongoDB
     });
 
     await card.save();
-
-    res.status(201).json({ message: '🃏 Card added with image!', imageUrl });
+    console.log(`✅ Saved ${cardName} (${set}) to inventory with image.`);
+    res.status(201).json({ message: 'Card added to inventory!', card });
   } catch (err) {
     console.error('❌ Error adding card to inventory:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
+
 // ✅ Start Server
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);

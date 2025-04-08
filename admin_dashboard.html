@@ -303,28 +303,28 @@
 
       <!-- Add / Update Card Form -->
       <form id="update-card-form">
-        <label for="cardName">Card Name</label>
-        <input type="text" id="cardName" name="cardName" required>
-      
-        <label for="quantity">Quantity</label>
-        <input type="number" id="quantity" name="quantity" min="0" required>
-      
-        <label for="set">Set</label>
-        <input type="text" id="set" name="set" required>
-      
-        <label for="condition">Condition</label>
-        <select id="condition" name="condition" required>
-          <option value="">Select Condition</option>
-          <option value="NM">Near Mint</option>
-          <option value="LP">Lightly Played</option>
-          <option value="MP">Moderately Played</option>
-          <option value="HP">Heavily Played</option>
-          <option value="DMG">Damaged</option>
-        </select>
-      
-        <!-- ✅ Hidden field for Scryfall image URL -->
-        <input type="hidden" id="imageUrl" name="imageUrl">
-      </form>
+  <label for="cardName">Card Name</label>
+  <input type="text" id="cardName" name="cardName" required>
+
+  <label for="quantity">Quantity</label>
+  <input type="number" id="quantity" name="quantity" min="0" required>
+
+  <label for="set">Set</label>
+  <input type="text" id="set" name="set" required>
+
+  <label for="condition">Condition</label>
+  <select id="condition" name="condition" required>
+    <option value="">Select Condition</option>
+    <option value="NM">Near Mint</option>
+    <option value="LP">Lightly Played</option>
+    <option value="MP">Moderately Played</option>
+    <option value="HP">Heavily Played</option>
+    <option value="DMG">Damaged</option>
+  </select>
+
+  <!-- ✅ Hidden field for Scryfall image URL -->
+  <input type="hidden" id="imageUrl" name="imageUrl">
+</form>
 
         <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
           <input
@@ -533,4 +533,3 @@
 </script>
 </body>
 </html>
-

@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
+const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
@@ -9,6 +10,34 @@ const app = express();
 // ✅ Middleware
 app.use(cors());
 app.use(express.json());
+
+// ✅ Scryfall Image Fetch Helper
+const fetchScryfallImageUrl = async (name, set, options = {}) => {
+  const cleanedName = name.split('(')[0].trim();
+  const loweredName = name.toLowerCase();
+  let query = `${cleanedName} set:${set.toLowerCase()}`;
+
+  // Handle style modifiers
+  if (loweredName.includes('borderless')) query += ' is:borderless';
+  else if (loweredName.includes('showcase')) query += ' frame:showcase';
+  else if (loweredName.includes('extended')) query += ' frame:extendedart';
+
+  // Handle secret lair/rainbow foil
+  if (loweredName.includes('rainbow foil') || set.toLowerCase().startsWith('sl')) {
+    query += ' finish:rainbow_foil';
+  }
+
+  try {
+    const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`;
+    const result = await axios.get(searchUrl);
+    const cardData = result.data.data?.[0];
+    if (!cardData) return '';
+    return cardData.image_uris?.normal || cardData.card_faces?.[0]?.image_uris?.normal || '';
+  } catch (err) {
+    console.warn(`⚠️ Couldn’t fetch image for ${name} (${set}):`, err.message);
+    return '';
+  }
+};
 
 // ✅ Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -66,11 +95,10 @@ const inventorySchema = new mongoose.Schema({
   set: { type: String, required: true },
   condition: { type: String, required: true },
   foil: { type: Boolean, default: false },
-  imageUrl: { type: String }, // ✅ Add this
+  imageUrl: { type: String },
   addedAt: { type: Date, default: Date.now }
 });
 
-// Force collection name: 'Card Inventory'
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
 
 // ✅ Root Test Route
@@ -114,7 +142,6 @@ app.post('/signup', async (req, res) => {
     });
 
     await user.save();
-
     res.status(201).json({ message: '🐶 Welcome to the Pack! 🐶' });
   } catch (err) {
     console.error('❌ Signup error:', err);
@@ -122,10 +149,10 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-// ✅ Get All Users (Admin Dashboard) — sorted by newest
+// ✅ Get All Users
 app.get('/api/users', async (req, res) => {
   try {
-    const users = await User.find().sort({ createdAt: -1 }); // 👈 newest first
+    const users = await User.find().sort({ createdAt: -1 });
     res.json(users);
   } catch (err) {
     console.error('❌ Error fetching users:', err);
@@ -133,8 +160,7 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-const axios = require('axios'); // Make sure you have axios installed (npm install axios)
-
+// ✅ Add Inventory Card (with image fetch)
 app.post('/api/inventory', async (req, res) => {
   try {
     const { cardName, quantity, set, condition, foil } = req.body;
@@ -143,21 +169,8 @@ app.post('/api/inventory', async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
-    // 🔍 Fetch image from Scryfall
-    let imageUrl = '';
-    try {
-      const response = await axios.get(`https://api.scryfall.com/cards/named`, {
-        params: {
-          fuzzy: cardName,
-          set: set.toLowerCase()
-        }
-      });
-
-      const data = response.data;
-      imageUrl = data.image_uris?.normal || data.card_faces?.[0]?.image_uris?.normal || '';
-    } catch (error) {
-      console.warn(`⚠️ Scryfall fetch failed for "${cardName}" (${set}):`, error.message);
-    }
+    const imageUrl = req.body.imageUrl?.trim()
+  || await fetchScryfallImageUrl(cardName, set);
 
     const card = new CardInventory({
       cardName,
@@ -165,7 +178,7 @@ app.post('/api/inventory', async (req, res) => {
       set,
       condition,
       foil: !!foil,
-      imageUrl // ✅ Add the image URL to MongoDB
+      imageUrl
     });
 
     await card.save();
@@ -173,6 +186,17 @@ app.post('/api/inventory', async (req, res) => {
     res.status(201).json({ message: 'Card added to inventory!', card });
   } catch (err) {
     console.error('❌ Error adding card to inventory:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Get All Inventory Cards
+app.get('/api/inventory', async (req, res) => {
+  try {
+    const cards = await CardInventory.find().sort({ cardName: 1 });
+    res.json(cards);
+  } catch (err) {
+    console.error('❌ Error fetching inventory:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });

@@ -61,11 +61,12 @@ const User = mongoose.model('User', userSchema);
 
 // ✅ Inventory Schema & Model (Card Inventory)
 const inventorySchema = new mongoose.Schema({
-  cardName: { type: String, required: true },
-  quantity: { type: Number, required: true },
-  set: { type: String, required: true },
-  condition: { type: String, required: true },
-  foil: { type: Boolean, default: false },
+  cardName: String,
+  quantity: Number,
+  set: String,
+  condition: String,
+  foil: Boolean,
+  imageUrl: String, // ✅ Add this if it's not already in your schema
   addedAt: { type: Date, default: Date.now }
 });
 
@@ -132,9 +133,13 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// ✅ Add Card to Inventory
+
+
+const axios = require('axios');
+
 app.post('/api/inventory', async (req, res) => {
-  console.log('📥 Received inventory POST:', req.body); // for debugging
+  console.log('📥 Received inventory POST:', req.body);
+
   try {
     const { cardName, quantity, set, condition, foil } = req.body;
 
@@ -142,23 +147,55 @@ app.post('/api/inventory', async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
+    // 🖼️ Function to fetch image URL from Scryfall
+    const fetchImageURL = async (name, setCode) => {
+      const cleanedName = name.split('(')[0].trim();
+      const loweredName = name.toLowerCase();
+      let query = `${cleanedName} set:${setCode.toLowerCase()}`;
+
+      if (loweredName.includes('borderless')) query += ' is:borderless';
+      if (loweredName.includes('showcase')) query += ' frame:showcase';
+      if (loweredName.includes('extended')) query += ' frame:extendedart';
+      if (loweredName.includes('oil slick')) query += ' frame:oil_slicked';
+      if (loweredName.includes('serialized')) query += ' frame:serialized';
+
+      const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`;
+
+      try {
+        const response = await axios.get(url);
+        const cardData = response.data.data[0];
+
+        if (cardData.image_uris) return cardData.image_uris.normal;
+        if (cardData.card_faces?.[0]?.image_uris) return cardData.card_faces[0].image_uris.normal;
+      } catch (error) {
+        console.error('🛑 Scryfall image fetch failed:', error.message);
+        return null;
+      }
+
+      return null;
+    };
+
+    // 🔎 Fetch the Scryfall image URL
+    const imageUrl = await fetchImageURL(cardName, set);
+
+    // Save card to MongoDB
     const card = new CardInventory({
       cardName,
       quantity,
       set,
       condition,
       foil: !!foil,
+      imageUrl // Add to DB
     });
 
     await card.save();
-    console.log('✅ Card saved to DB:');
-    return res.status(201).json({ message: '🃏 Card added to inventory!' });
+
+    res.status(201).json({ message: '🃏 Card added with image!', imageUrl });
   } catch (err) {
     console.error('❌ Error adding card to inventory:', err);
-    return res.status(500).json({ message: 'Internal server error.' });
+    res.status(500).json({ message: 'Internal server error.' });
   }
 });
-
 // ✅ Start Server
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);

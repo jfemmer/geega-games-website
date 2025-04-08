@@ -292,7 +292,7 @@
   <div id="card-container"></div>
 
   <script>
-    const jsonFile = 'cards_with_images.json';
+    const apiEndpoint = 'https://geega-games-website-production.up.railway.app/api/inventory'; // ← use Railway/Render backend;
     let cardsData = [];
     let filteredCards = [];
     let currentIndex = 0;
@@ -300,9 +300,10 @@
 
     async function loadCards() {
       try {
-        const response = await fetch(jsonFile);
+        const response = await fetch(apiEndpoint);
         const data = await response.json();
-        cardsData = data.filter(card => card.ImageURL && card.ImageURL.trim() !== '');
+
+        cardsData = data.filter(card => card.imageUrl && card.imageUrl.trim() !== '');
         filteredCards = [...cardsData];
         currentIndex = 0;
         displayNextBatch();
@@ -320,33 +321,33 @@
         cardElement.className = 'card';
 
         const img = document.createElement('img');
-        img.src = card.ImageURL || 'images/placeholder.png';
-        img.alt = card.Name;
+        img.src = card.imageUrl || 'images/placeholder.png';
+        img.alt = card.cardName;
         img.loading = 'lazy';
 
         const title = document.createElement('h3');
-        title.textContent = card.Name;
+        title.textContent = card.cardName;
 
         const set = document.createElement('p');
-        set.textContent = `Set: ${card.Set}`;
+        set.textContent = `Set: ${card.set}`;
 
-        const type = document.createElement('p');
-        type.textContent = `Type: ${card.Unknown || 'Unknown'}`;
+        const condition = document.createElement('p');
+        condition.textContent = `Condition: ${card.condition}`;
 
         const quantity = document.createElement('p');
-        quantity.textContent = `Quantity: ${card.Quantity || 0}`;
+        quantity.textContent = `Quantity: ${card.quantity || 0}`;
 
         cardElement.appendChild(img);
         cardElement.appendChild(title);
         cardElement.appendChild(set);
-        cardElement.appendChild(type);
+        cardElement.appendChild(condition);
         cardElement.appendChild(quantity);
 
         container.appendChild(cardElement);
       });
 
-      currentIndex += cardsPerLoad;
-    }
+  currentIndex += cardsPerLoad;
+}
 
     window.addEventListener('scroll', () => {
       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {

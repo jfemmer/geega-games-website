@@ -233,6 +233,52 @@
     padding-left: 0;
     display: block;
   }
+
+  .foil-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.foil-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  animation: shimmerMove 2s infinite;
+}
+
+@keyframes shimmerMove {
+  0% {
+    left: -150%;
+  }
+  50% {
+    left: 150%;
+  }
+  100% {
+    left: 150%;
+  }
+}
+
+  .image-wrapper {
+  position: relative;
+  border-radius: 8px;
+}
+.image-wrapper img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+
 }
   
 </style>
@@ -320,10 +366,19 @@
         const cardElement = document.createElement('div');
         cardElement.className = 'card';
 
-        const img = document.createElement('img');
-        img.src = card.imageUrl || 'images/placeholder.png';
-        img.alt = card.cardName;
-        img.loading = 'lazy';
+        const imageWrapper = document.createElement('div');
+          imageWrapper.classList.add('image-wrapper');
+          if (card.foil) {
+            imageWrapper.classList.add('foil-shimmer'); // 💫 Add shimmer if foil
+          }
+
+          const img = document.createElement('img');
+          img.src = card.imageUrl || 'images/placeholder.png';
+          img.alt = card.cardName;
+          img.loading = 'lazy';
+
+          imageWrapper.appendChild(img);
+          cardElement.appendChild(imageWrapper);
 
         const title = document.createElement('h3');
         title.textContent = card.cardName;

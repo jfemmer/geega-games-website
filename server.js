@@ -163,40 +163,48 @@ app.get('/api/users', async (req, res) => {
 // ✅ Add Inventory Card (with image fetch)
 app.post('/api/inventory', async (req, res) => {
   try {
-    const { cardName, quantity, set, condition, foil } = req.body;
+    const { cardName, quantity, set, condition, foil, imageUrl } = req.body;
 
     if (!cardName || !quantity || !set || !condition) {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
-    const imageUrl = req.body.imageUrl?.trim()
-  || await fetchScryfallImageUrl(cardName, set);
+    // Look for an existing card with same name + set + foil status
+    const existingCard = await CardInventory.findOne({
+      cardName,
+      set,
+      foil: !!foil
+    });
 
+    if (existingCard) {
+      // 🔁 Update quantity if card already exists
+      existingCard.quantity += parseInt(quantity);
+      await existingCard.save();
+      console.log(`🆙 Updated quantity of ${cardName} (${set}) to ${existingCard.quantity}`);
+      return res.status(200).json({ message: 'Card quantity updated.', card: existingCard });
+    }
+
+    // 🔍 Get image from Scryfall if not provided
+    let finalImageUrl = imageUrl?.trim();
+    if (!finalImageUrl) {
+      finalImageUrl = await fetchScryfallImageUrl(cardName, set);
+    }
+
+    // 🆕 Create new card
     const card = new CardInventory({
       cardName,
-      quantity,
+      quantity: parseInt(quantity),
       set,
       condition,
       foil: !!foil,
-      imageUrl
+      imageUrl: finalImageUrl
     });
 
     await card.save();
-    console.log(`✅ Saved ${cardName} (${set}) to inventory with image.`);
-    res.status(201).json({ message: 'Card added to inventory!', card });
+    console.log(`✅ Added new card ${cardName} (${set}) to inventory`);
+    res.status(201).json({ message: 'Card added to inventory.', card });
   } catch (err) {
-    console.error('❌ Error adding card to inventory:', err);
-    res.status(500).json({ message: 'Internal server error.' });
-  }
-});
-
-// ✅ Get All Inventory Cards
-app.get('/api/inventory', async (req, res) => {
-  try {
-    const cards = await CardInventory.find().sort({ cardName: 1 });
-    res.json(cards);
-  } catch (err) {
-    console.error('❌ Error fetching inventory:', err);
+    console.error('❌ Error adding/updating card:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });

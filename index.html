@@ -237,6 +237,7 @@
   .foil-shimmer {
   position: relative;
   overflow: hidden;
+  border-radius: 8px;
 }
 
 .foil-shimmer::after {
@@ -244,15 +245,18 @@
   position: absolute;
   top: 0;
   left: -150%;
-  width: 100%;
+  width: 150%;
   height: 100%;
   background: linear-gradient(
     120deg,
     rgba(255, 255, 255, 0.1) 0%,
-    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.5) 50%,
     rgba(255, 255, 255, 0.1) 100%
   );
+  transform: skewX(-20deg);
   animation: shimmerMove 2s infinite;
+  pointer-events: none;
+  z-index: 2;
 }
 
 @keyframes shimmerMove {
@@ -267,15 +271,13 @@
   }
 }
 
-  .image-wrapper {
-  position: relative;
-  border-radius: 8px;
-}
 .image-wrapper img {
   width: 100%;
   height: auto;
   display: block;
   border-radius: 8px;
+  position: relative;
+  z-index: 1;
 }
 
 
@@ -359,47 +361,46 @@
     }
 
     function displayNextBatch() {
-      const container = document.getElementById('card-container');
-      const nextCards = filteredCards.slice(currentIndex, currentIndex + cardsPerLoad);
+  const container = document.getElementById('card-container');
+  const nextCards = filteredCards.slice(currentIndex, currentIndex + cardsPerLoad);
 
-      nextCards.forEach(card => {
-        const cardElement = document.createElement('div');
-        cardElement.className = 'card';
+  nextCards.forEach(card => {
+    const cardElement = document.createElement('div');
+    cardElement.className = 'card';
 
-        const imageWrapper = document.createElement('div');
-          imageWrapper.classList.add('image-wrapper');
-          if (card.foil) {
-            imageWrapper.classList.add('foil-shimmer'); // 💫 Add shimmer if foil
-          }
+    const imageWrapper = document.createElement('div');
+    imageWrapper.classList.add('image-wrapper');
+    if (card.foil) {
+      imageWrapper.classList.add('foil-shimmer'); // ✨ Shimmer only if foil
+    }
 
-          const img = document.createElement('img');
-          img.src = card.imageUrl || 'images/placeholder.png';
-          img.alt = card.cardName;
-          img.loading = 'lazy';
+    const img = document.createElement('img');
+    img.src = card.imageUrl || 'images/placeholder.png';
+    img.alt = card.cardName;
+    img.loading = 'lazy';
 
-          imageWrapper.appendChild(img);
-          cardElement.appendChild(imageWrapper);
+    imageWrapper.appendChild(img);
+    cardElement.appendChild(imageWrapper); // ✅ wrap image in shimmer container
 
-        const title = document.createElement('h3');
-        title.textContent = card.cardName;
+    const title = document.createElement('h3');
+    title.textContent = card.foil ? `${card.cardName} (Foil)` : card.cardName;
 
-        const set = document.createElement('p');
-        set.textContent = `Set: ${card.set}`;
+    const set = document.createElement('p');
+    set.textContent = `Set: ${card.set}`;
 
-        const condition = document.createElement('p');
-        condition.textContent = `Condition: ${card.condition}`;
+    const condition = document.createElement('p');
+    condition.textContent = `Condition: ${card.condition}`;
 
-        const quantity = document.createElement('p');
-        quantity.textContent = `Quantity: ${card.quantity || 0}`;
+    const quantity = document.createElement('p');
+    quantity.textContent = `Quantity: ${card.quantity || 0}`;
 
-        cardElement.appendChild(img);
-        cardElement.appendChild(title);
-        cardElement.appendChild(set);
-        cardElement.appendChild(condition);
-        cardElement.appendChild(quantity);
+    cardElement.appendChild(title);
+    cardElement.appendChild(set);
+    cardElement.appendChild(condition);
+    cardElement.appendChild(quantity);
 
-        container.appendChild(cardElement);
-      });
+    container.appendChild(cardElement);
+  });
 
   currentIndex += cardsPerLoad;
 }

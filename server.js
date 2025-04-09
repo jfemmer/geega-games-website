@@ -163,49 +163,46 @@ app.get('/api/users', async (req, res) => {
 // ✅ Add Inventory Card (with image fetch)
 app.post('/api/inventory', async (req, res) => {
   try {
-    let { cardName, quantity, set, condition, foil, imageUrl } = req.body;
-
-    // Normalize inputs
-    cardName = cardName.trim();
-    set = set.trim().toLowerCase();
-    foil = !!foil; // Convert to real boolean
+    const { cardName, quantity, set, condition, foil, imageUrl } = req.body;
 
     if (!cardName || !quantity || !set || !condition) {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
-    // Attempt to find an existing card (normalized match)
+    // Look for an existing card with same name + set + foil status
     const existingCard = await CardInventory.findOne({
-      cardName: { $regex: new RegExp(`^${cardName}$`, 'i') }, // case-insensitive exact match
-      set: set,
-      foil: foil
+      cardName,
+      set,
+      foil: !!foil
     });
 
     if (existingCard) {
+      // 🔁 Update quantity if card already exists
       existingCard.quantity += parseInt(quantity);
       await existingCard.save();
-      console.log(`🔁 Quantity updated for ${cardName} (${set}) to ${existingCard.quantity}`);
+      console.log(`🆙 Updated quantity of ${cardName} (${set}) to ${existingCard.quantity}`);
       return res.status(200).json({ message: 'Card quantity updated.', card: existingCard });
     }
 
-    // Fetch image if none was submitted
-    if (!imageUrl || imageUrl.trim() === '') {
-      imageUrl = await fetchScryfallImageUrl(cardName, set);
+    // 🔍 Get image from Scryfall if not provided
+    let finalImageUrl = imageUrl?.trim();
+    if (!finalImageUrl) {
+      finalImageUrl = await fetchScryfallImageUrl(cardName, set);
     }
 
-    const newCard = new CardInventory({
+    // 🆕 Create new card
+    const card = new CardInventory({
       cardName,
       quantity: parseInt(quantity),
       set,
       condition,
-      foil,
-      imageUrl
+      foil: !!foil,
+      imageUrl: finalImageUrl
     });
 
-    await newCard.save();
+    await card.save();
     console.log(`✅ Added new card ${cardName} (${set}) to inventory`);
-    return res.status(201).json({ message: 'Card added to inventory.', card: newCard });
-
+    res.status(201).json({ message: 'Card added to inventory.', card });
   } catch (err) {
     console.error('❌ Error adding/updating card:', err);
     res.status(500).json({ message: 'Internal server error.' });

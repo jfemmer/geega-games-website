@@ -328,11 +328,11 @@
   </div>
 
   <!-- Sort Dropdown -->
-  <div class="sort-dropdown-container">
-    <select id="sort-dropdown">
-      <option value="">Sort By</option>
-      <option value="asc">Name Ascending (A → Z)</option>
-      <option value="desc">Name Descending (Z → A)</option>
+  <div class="sort-dropdown-container" style="text-align: center; margin-top: 15px;">
+    <select id="sort-dropdown" style="padding: 8px; font-size: 16px;">
+      <option value="">Sort by Name</option>
+      <option value="asc">Name A → Z</option>
+      <option value="desc">Name Z → A</option>
     </select>
   </div>
 
@@ -446,18 +446,20 @@
       displayNextBatch();
     }
 
-    document.getElementById('sort-dropdown').addEventListener('change', (e) => {
-      const value = e.target.value;
-      if (value === 'asc') {
-        filteredCards.sort((a, b) => a.Name.localeCompare(b.Name));
-      } else if (value === 'desc') {
-        filteredCards.sort((a, b) => b.Name.localeCompare(a.Name));
-      }
-      const container = document.getElementById('card-container');
-      container.innerHTML = '';
-      currentIndex = 0;
-      displayNextBatch();
-    });
+    document.getElementById("sort-dropdown").addEventListener("change", (e) => {
+  const value = e.target.value;
+
+  if (value === "asc") {
+    filteredCards.sort((a, b) => a.cardName.localeCompare(b.cardName));
+  } else if (value === "desc") {
+    filteredCards.sort((a, b) => b.cardName.localeCompare(a.cardName));
+  }
+
+  const container = document.getElementById("card-container");
+  container.innerHTML = "";
+  currentIndex = 0;
+  displayNextBatch();
+});
 
     // Hamburger menu toggle
     document.getElementById('hamburger-icon').addEventListener('click', () => {

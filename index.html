@@ -351,7 +351,21 @@
         const response = await fetch(apiEndpoint);
         const data = await response.json();
 
-        cardsData = data.filter(card => card.imageUrl && card.imageUrl.trim() !== '');
+        // Merge entries with same name, set, foil, and condition
+        const mergedMap = new Map();
+
+        data.forEach(card => {
+          const key = `${card.cardName.trim().toLowerCase()}|${card.set.trim().toLowerCase()}|${card.foil ? '1' : '0'}|${card.condition.trim().toLowerCase()}`;
+
+          if (mergedMap.has(key)) {
+            const existing = mergedMap.get(key);
+            existing.quantity += card.quantity;
+          } else {
+            mergedMap.set(key, { ...card }); // Clone to avoid reference issues
+          }
+        });
+
+        cardsData = Array.from(mergedMap.values()).filter(card => card.imageUrl && card.imageUrl.trim() !== '');
         filteredCards = [...cardsData];
         currentIndex = 0;
         displayNextBatch();

@@ -280,31 +280,56 @@
   z-index: 1;
 }
 
+.icon-button {
+      font-size: 22px;
+      color: white;
+      text-decoration: none;
+      border: 2px solid white;
+      border-radius: 50%;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-right: 10px;
+    }
+
+    .icon-button:hover {
+      background-color: white;
+      color: rebeccapurple;
+    }
+
 
 }
   
 </style>
 </head>
 
-<body>
+<body> 
   <!-- HEADER -->
   <header class="top-banner">
     <div class="header-inner">
       <div class="logo-container">
         <img src="images/logo.png" alt="Geega Games Logo" class="site-logo" />
       </div>
-            <div class="account-login-container">
+
+      <div class="account-login-container">
+        <a href="wishlist.html" title="Wishlist" class="icon-button">
+          <i class="fa-solid fa-heart"></i>
+        </a>
+        <a href="cart.html" title="Cart" class="icon-button">
+          <i class="fa-solid fa-cart-shopping"></i>
+        </a>
         <a href="login.html" id="login-button" title="Login">
           <i class="fa-solid fa-user"></i>
         </a>
       </div>
     </div>
 
-      <div class="search-bar-wrapper">
-        <div class="search-bar-container">
-          <input type="text" id="search-input" placeholder="Search for a card..." />
-          <button id="search-button">Search</button>
-        </div>
+    <div class="search-bar-wrapper">
+      <div class="search-bar-container">
+        <input type="text" id="search-input" placeholder="Search for a card..." />
+        <button id="search-button">Search</button>
       </div>
     </div>
   </header>
@@ -335,7 +360,6 @@
       <option value="desc">Name Z → A</option>
     </select>
   </div>
-
   <!-- Card Grid -->
   <div id="card-container"></div>
 
@@ -418,6 +442,26 @@
 
   currentIndex += cardsPerLoad;
 }
+
+async function addToWishlist(card) {
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        alert('You must be logged in to use the wishlist.');
+        return;
+      }
+      try {
+        const response = await fetch(`https://geega-games-website-production.up.railway.app/api/users/${userId}/wishlist`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(card)
+        });
+        if (!response.ok) throw new Error('Wishlist add failed');
+        alert('✅ Card added to wishlist!');
+      } catch (err) {
+        console.error('❌ Wishlist error:', err);
+        alert('❌ Could not add to wishlist.');
+      }
+    }
 
     window.addEventListener('scroll', () => {
       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {

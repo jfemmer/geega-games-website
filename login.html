@@ -1,97 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Login - Geega Games</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        body {
-            background-color: #f5f5f5;
-            font-family: Arial, sans-serif;
-        }
+  <meta charset="UTF-8">
+  <title>Login - Geega Games</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      background-color: #f5f5f5;
+      font-family: Arial, sans-serif;
+    }
 
-        .login-container {
-            width: 400px;
-            margin: 80px auto;
-            background: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
-            text-align: center;
-        }
+    .login-container {
+      width: 400px;
+      margin: 80px auto;
+      background: white;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      text-align: center;
+    }
 
-        .login-container h2 {
-            margin-bottom: 20px;
-            color: rebeccapurple;
-        }
+    .login-container h2 {
+      margin-bottom: 20px;
+      color: rebeccapurple;
+    }
 
-        .login-container input[type="text"],
-        .login-container input[type="password"] {
-            width: 90%;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-        }
+    .login-container input[type="text"],
+    .login-container input[type="password"] {
+      width: 90%;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
 
-        .login-container button {
-            width: 95%;
-            padding: 12px;
-            background-color: rebeccapurple;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            margin-top: 15px;
-            cursor: pointer;
-            font-size: 16px;
-        }
+    .login-container button {
+      width: 95%;
+      padding: 12px;
+      background-color: rebeccapurple;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      margin-top: 15px;
+      cursor: pointer;
+      font-size: 16px;
+    }
 
-        .login-container button:hover {
-            background-color: #663399;
-        }
+    .login-container button:hover {
+      background-color: #663399;
+    }
 
-        .login-container p {
-            margin-top: 20px;
-            font-size: 14px;
-        }
+    .login-container p {
+      margin-top: 20px;
+      font-size: 14px;
+    }
 
-        .login-container a {
-            color: rebeccapurple;
-            text-decoration: none;
-        }
+    .login-container a {
+      color: rebeccapurple;
+      text-decoration: none;
+    }
 
-        .login-container a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    .login-container a:hover {
+      text-decoration: underline;
+    }
+  </style>
 </head>
 <body>
 
 <div class="login-container">
-    <h2>Login to Geega Games</h2>
-    <form id="login-form">
-        <input type="text" id="username" placeholder="Username" required><br>
-        <input type="password" id="password" placeholder="Password" required><br>
-        <button type="submit">Login</button>
-    </form>
-    <p>Don't have an account? <a href="signup.html">Sign Up</a></p> <!-- Updated link -->
+  <h2>Login to Geega Games</h2>
+  <form id="login-form">
+    <input type="text" id="username" placeholder="Username" required><br>
+    <input type="password" id="password" placeholder="Password" required><br>
+    <button type="submit">Login</button>
+  </form>
+  <p>Don't have an account? <a href="signup.html">Sign Up</a></p>
 </div>
 
 <script>
-    // Simple dummy login handler
-    document.getElementById('login-form').addEventListener('submit', function(event) {
-        event.preventDefault();
+  document.getElementById('login-form').addEventListener('submit', async function(event) {
+    event.preventDefault();
 
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
 
-        if (username === "admin" && password === "password") {
-            alert("Login successful! Welcome " + username);
-            window.location.href = "index.html";  // Redirect back to main page
-        } else {
-            alert("Invalid credentials! Try 'admin' / 'password' for demo.");
-        }
-    });
+    try {
+      const res = await fetch('https://geega-games-website-production.up.railway.app/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "Login failed.");
+        return;
+      }
+
+      localStorage.setItem('userId', data.userId); // 🔐 Store the logged-in user's ID
+      alert("🎉 Login successful!");
+      window.location.href = "index.html"; // Redirect to homepage
+
+    } catch (err) {
+      console.error("❌ Login error:", err);
+      alert("Something went wrong. Please try again.");
+    }
+  });
 </script>
 
 </body>

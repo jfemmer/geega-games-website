@@ -87,6 +87,13 @@
       width: 80px;
       height: auto;
       border-radius: 4px;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .card-info img:hover {
+      transform: scale(2.5);
+      z-index: 10;
+      position: relative;
     }
 
     .card-info div {
@@ -325,6 +332,39 @@
       </form>
     </div>
 
+    <div class="section">
+      <h2>Add Employee</h2>
+      <form id="add-employee-form">
+        <label for="employeeRole">Role</label>
+        <select id="employeeRole" name="employeeRole" required>
+          <option value="">Select Role</option>
+          <option value="Admin">Admin</option>
+          <option value="Buyback Buddy">Buyback Buddy</option>
+          <option value="Card Slinger">Card Slinger</option>
+          <option value="Event Coordinator">Event Coordinator</option>
+          <option value="Inventory Management">Inventory Management</option>
+          <option value="Manager">Manager</option>
+        </select>
+    
+        <label for="employeeFirstName">First Name</label>
+        <input type="text" id="employeeFirstName" name="employeeFirstName" required>
+    
+        <label for="employeeLastName">Last Name</label>
+        <input type="text" id="employeeLastName" name="employeeLastName" required>
+    
+        <label for="employeePhone">Phone</label>
+        <input type="tel" id="employeePhone" name="employeePhone" required>
+    
+        <label for="employeeEmail">Email</label>
+        <input type="email" id="employeeEmail" name="employeeEmail" required>
+    
+        <label for="emergencyContact">Emergency Contact</label>
+        <input type="text" id="emergencyContact" name="emergencyContact" required>
+    
+        <button type="submit">Add Employee</button>
+      </form>
+    </div>
+
   <script>
     async function loadUsers() {
       const userList = document.getElementById('user-list');
@@ -515,6 +555,41 @@
     } catch (error) {
       alert("❌ Error adding card.");
       console.error("❌ Add Card Error:", error);
+    }
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const employeeForm = document.getElementById("add-employee-form");
+  if (!employeeForm) return;
+
+  employeeForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const employeeData = {
+      role: document.getElementById("employeeRole").value.trim(),
+      firstName: document.getElementById("employeeFirstName").value.trim(),
+      lastName: document.getElementById("employeeLastName").value.trim(),
+      phone: document.getElementById("employeePhone").value.trim(),
+      email: document.getElementById("employeeEmail").value.trim(),
+      emergencyContact: document.getElementById("emergencyContact").value.trim()
+    };
+
+    try {
+      const res = await fetch("https://geega-games-website-production.up.railway.app/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(employeeData)
+      });
+
+      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      const result = await res.json();
+      alert("✅ Employee added!");
+      employeeForm.reset();
+      console.log("✅ Employee response:", result);
+    } catch (err) {
+      console.error("❌ Error adding employee:", err);
+      alert("❌ Error adding employee.");
     }
   });
 });

@@ -218,6 +218,25 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
+app.delete('/api/inventory', async (req, res) => {
+  try {
+    const { cardName, set } = req.body;
+    if (!cardName || !set) {
+      return res.status(400).json({ message: 'Card name and set are required.' });
+    }
+
+    const deleted = await CardInventory.findOneAndDelete({ cardName, set });
+    if (!deleted) {
+      return res.status(404).json({ message: 'Card not found in inventory.' });
+    }
+
+    res.status(200).json({ message: 'Card deleted successfully.' });
+  } catch (err) {
+    console.error('❌ Delete card error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
 // ✅ Add Employee
 app.post('/api/employees', async (req, res) => {
   const { role, firstName, lastName, phone, email, emergencyContact } = req.body;

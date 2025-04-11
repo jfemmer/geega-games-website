@@ -1,4 +1,4 @@
-const express = require('express'); 
+const express = require('express');  
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
@@ -17,12 +17,10 @@ const fetchScryfallImageUrl = async (name, set, options = {}) => {
   const loweredName = name.toLowerCase();
   let query = `${cleanedName} set:${set.toLowerCase()}`;
 
-  // Handle style modifiers
   if (loweredName.includes('borderless')) query += ' is:borderless';
   else if (loweredName.includes('showcase')) query += ' frame:showcase';
   else if (loweredName.includes('extended')) query += ' frame:extendedart';
 
-  // Handle secret lair/rainbow foil
   if (loweredName.includes('rainbow foil') || set.toLowerCase().startsWith('sl')) {
     query += ' finish:rainbow_foil';
   }
@@ -42,23 +40,21 @@ const fetchScryfallImageUrl = async (name, set, options = {}) => {
 // ✅ Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
 const INVENTORY_DB_URI = process.env.INVENTORY_DB_URI;
+const EMPLOYEE_DB_URI = process.env.EMPLOYEE_DB_URI;
 const port = process.env.PORT || 3000;
 
-if (!MONGODB_URI || !INVENTORY_DB_URI) {
+if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI) {
   console.error('❌ One or more MongoDB URIs are missing in environment variables!');
   process.exit(1);
 }
 
 // ✅ Connect to MongoDB Atlas - Users
-mongoose.connect(MONGODB_URI, {
+db1 = mongoose.createConnection(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-})
-.then(() => console.log('✅ Connected to MongoDB Atlas (geegaUsers)'))
-.catch((err) => {
-  console.error('❌ MongoDB connection error:', err.message);
-  process.exit(1);
 });
+db1.on('connected', () => console.log('✅ Connected to MongoDB Atlas (geegaUsers)'));
+db1.on('error', (err) => console.error('❌ MongoDB connection error (Users):', err.message));
 
 // ✅ Second Connection for Inventory DB
 const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI, {
@@ -70,6 +66,18 @@ inventoryConnection.on('connected', () => {
 });
 inventoryConnection.on('error', (err) => {
   console.error('❌ Inventory DB connection error:', err.message);
+});
+
+// ✅ Third Connection for Employee DB
+const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+employeeConnection.on('connected', () => {
+  console.log('✅ Connected to MongoDB Atlas (geegaEmployee)');
+});
+employeeConnection.on('error', (err) => {
+  console.error('❌ Employee DB connection error:', err.message);
 });
 
 // ✅ User Schema & Model
@@ -85,8 +93,7 @@ const userSchema = new mongoose.Schema({
   zip:      String,
   createdAt: { type: Date, default: Date.now }
 });
-
-const User = mongoose.model('User', userSchema);
+const User = db1.model('User', userSchema);
 
 // ✅ Inventory Schema & Model (Card Inventory)
 const inventorySchema = new mongoose.Schema({
@@ -98,8 +105,19 @@ const inventorySchema = new mongoose.Schema({
   imageUrl: { type: String },
   addedAt: { type: Date, default: Date.now }
 });
-
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
+
+// ✅ Employee Schema & Model
+const employeeSchema = new mongoose.Schema({
+  role: { type: String, required: true },
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  phone: { type: String, required: true },
+  email: { type: String, required: true },
+  emergencyContact: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+const Employee = employeeConnection.model('Employee', employeeSchema, 'Employees');
 
 // ✅ Root Test Route
 app.get('/', (req, res) => {
@@ -160,7 +178,7 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// ✅ Add Inventory Card (with image fetch)
+// ✅ Add Inventory Card
 app.post('/api/inventory', async (req, res) => {
   try {
     const { cardName, quantity, set, condition, foil } = req.body;
@@ -169,8 +187,7 @@ app.post('/api/inventory', async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
-    const imageUrl = req.body.imageUrl?.trim()
-  || await fetchScryfallImageUrl(cardName, set);
+    const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
 
     const card = new CardInventory({
       cardName,
@@ -197,6 +214,24 @@ app.get('/api/inventory', async (req, res) => {
     res.json(cards);
   } catch (err) {
     console.error('❌ Error fetching inventory:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Add Employee
+app.post('/api/employees', async (req, res) => {
+  const { role, firstName, lastName, phone, email, emergencyContact } = req.body;
+
+  if (!role || !firstName || !lastName || !phone || !email || !emergencyContact) {
+    return res.status(400).json({ message: 'Missing required fields.' });
+  }
+
+  try {
+    const employee = new Employee({ role, firstName, lastName, phone, email, emergencyContact });
+    await employee.save();
+    res.status(201).json({ message: 'Employee added!' });
+  } catch (err) {
+    console.error('❌ Failed to save employee:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });

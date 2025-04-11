@@ -440,7 +440,9 @@
       const container = document.getElementById('card-container');
       container.innerHTML = '';
       filteredCards = cardsData.filter(card =>
-        card.Name.toLowerCase().includes(query)
+        card.cardName.toLowerCase().includes(query) ||
+        card.set.toLowerCase().includes(query) ||
+        (card.condition && card.condition.toLowerCase().includes(query))
       );
       currentIndex = 0;
       displayNextBatch();

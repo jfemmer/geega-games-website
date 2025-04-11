@@ -1,0 +1,88 @@
+<!-- wishlist.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Your Wishlist | Geega Games</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert('You need to be logged in to view your wishlist.');
+      window.location.href = 'login.html';
+    }
+  </script>
+  <style>
+    .wishlist-container, .cart-container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .wishlist-container h2, .cart-container h2 {
+      text-align: center;
+      color: rebeccapurple;
+    }
+    .wishlist-item, .cart-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .wishlist-item img, .cart-item img {
+      height: 80px;
+      border-radius: 6px;
+    }
+    .wishlist-item button, .cart-item button {
+      padding: 6px 12px;
+      border: none;
+      background-color: crimson;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .wishlist-item button:hover, .cart-item button:hover {
+      background-color: darkred;
+    }
+  </style>
+</head>
+<body>
+  <div class="wishlist-container">
+    <h2>Your Wishlist</h2>
+    <div id="wishlist-items"></div>
+  </div>
+  
+  <script>
+    const wishlist = JSON.parse(localStorage.getItem(`wishlist_${userId}`) || '[]');
+    const container = document.getElementById('wishlist-items');
+
+    if (wishlist.length === 0) {
+      container.innerHTML = '<p style="text-align:center">No items in wishlist.</p>';
+    } else {
+      wishlist.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'wishlist-item';
+        div.innerHTML = `
+          <img src="${item.imageUrl}" alt="${item.cardName}" />
+          <div>
+            <strong>${item.cardName}</strong><br>
+            <small>Set: ${item.set}</small>
+          </div>
+          <button onclick="removeFromWishlist('${item.cardName}', '${item.set}')">Remove</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function removeFromWishlist(cardName, set) {
+      const updated = wishlist.filter(card => !(card.cardName === cardName && card.set === set));
+      localStorage.setItem(`wishlist_${userId}`, JSON.stringify(updated));
+      location.reload();
+    }
+  </script>
+</body>
+</html>
+

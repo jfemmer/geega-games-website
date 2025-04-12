@@ -356,21 +356,22 @@
           resultsDiv.innerHTML = '';
   
           filtered.slice(0, 10).forEach(card => {
-            const displayName = card.cardName;
+            const displayName = card.cardName + (card.foil ? " (Foil)" : "");
             const displaySet = card.set.toUpperCase();
             const cardImage = card.imageUrl || '';
   
             const cardDiv = document.createElement('div');
             cardDiv.className = 'card-item';
             cardDiv.innerHTML = `
-              <div class="card-info">
-                <img src="${cardImage}" alt="${displayName}" style="width: 80px; height: auto; border-radius: 4px;">
-                <div>
-                  <strong>${displayName}</strong>
-                  <span>Set: ${displaySet}</span>
+              cardDiv.innerHTML = `
+                <div class="card-info">
+                  <img src="${cardImage}" alt="${displayName}" style="width: 80px; height: auto; border-radius: 4px;">
+                  <div>
+                    <strong>${displayName}</strong>
+                    <span>Set: ${displaySet}</span>
+                  </div>
                 </div>
-              </div>
-            `;
+              `;
   
             cardDiv.addEventListener('click', () => {
               document.getElementById('deleteCardName').value = displayName;

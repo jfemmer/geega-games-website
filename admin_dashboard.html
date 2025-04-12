@@ -347,47 +347,39 @@
             card.cardName.toLowerCase().includes(query) ||
             card.set.toLowerCase().includes(query)
           );
-  
-          if (filtered.length === 0) {
-            resultsDiv.innerHTML = `<p>No matches in inventory for "${query}".</p>`;
-            return;
-          }
-  
-          resultsDiv.innerHTML = '';
-  
-          filtered.slice(0, 10).forEach(card => {
-            const displayName = card.cardName + (card.foil ? " (Foil)" : "");
-            const displaySet = card.set.toUpperCase();
-            const cardImage = card.imageUrl || '';
-  
-            const cardDiv = document.createElement('div');
-            cardDiv.className = 'card-item';
-            cardDiv.innerHTML = `
-              cardDiv.innerHTML = `
-                <div class="card-info">
-                  <img src="${cardImage}" alt="${displayName}" style="width: 80px; height: auto; border-radius: 4px;">
-                  <div>
-                    <strong>${displayName}</strong>
-                    <span>Set: ${displaySet}</span>
-                  </div>
-                </div>
-              `;
-  
-            cardDiv.addEventListener('click', () => {
-              document.getElementById('deleteCardName').value = displayName;
-              document.getElementById('deleteSet').value = card.set;
-              document.getElementById('delete-search-input').value = `${displayName} (${displaySet})`;
-              resultsDiv.innerHTML = '';
-            });
-  
-            resultsDiv.appendChild(cardDiv);
-          });
-        } catch (err) {
-          console.error('❌ Inventory search error:', err);
-          resultsDiv.innerHTML = '<p>❌ Could not search inventory.</p>';
-        }
+      if (filtered.length === 0) {
+        resultsDiv.innerHTML = `<p>No matches in inventory for "${query}".</p>`;
+        return;
       }
-  
+      
+      resultsDiv.innerHTML = '';
+      
+      filtered.slice(0, 10).forEach(card => {
+        const displayName = card.cardName + (card.foil ? " (Foil)" : "");
+        const displaySet = card.set.toUpperCase();
+        const cardImage = card.imageUrl || '';
+      
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card-item';
+        cardDiv.innerHTML = `
+          <div class="card-info">
+            <img src="${cardImage}" alt="${displayName}" style="width: 80px; height: auto; border-radius: 4px;">
+            <div>
+              <strong>${displayName}</strong>
+              <span>Set: ${displaySet}</span>
+            </div>
+          </div>
+        `;
+      
+        cardDiv.addEventListener('click', () => {
+          document.getElementById('deleteCardName').value = displayName;
+          document.getElementById('deleteSet').value = card.set;
+          document.getElementById('delete-search-input').value = `${displayName} (${displaySet})`;
+          resultsDiv.innerHTML = '';
+        });
+      
+        resultsDiv.appendChild(cardDiv);
+      });
       document.getElementById('delete-card-form').addEventListener('submit', async function (e) {
         e.preventDefault();
   

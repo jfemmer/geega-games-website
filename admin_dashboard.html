@@ -317,48 +317,49 @@
       </div>
     </div>
   
-    <script>
-      let deleteDebounceTimeout;
-  
-      document.getElementById('delete-search-input').addEventListener('input', function () {
-        clearTimeout(deleteDebounceTimeout);
-        const query = this.value.trim().toLowerCase();
-        const resultsDiv = document.getElementById('delete-search-results');
-        if (query.length === 0) {
-          resultsDiv.innerHTML = '';
-          return;
-        }
-  
-        deleteDebounceTimeout = setTimeout(() => {
-          searchInventoryCards(query);
-        }, 300);
-      });
-  
-      async function searchInventoryCards(query) {
-        const resultsDiv = document.getElementById('delete-search-results');
-        resultsDiv.innerHTML = `<p>Searching inventory for "<strong>${query}</strong>"...</p>`;
-  
-        try {
-          const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory");
-          if (!res.ok) throw new Error("Error fetching inventory");
-  
-          const cards = await res.json();
-          const filtered = cards.filter(card =>
-            card.cardName.toLowerCase().includes(query) ||
-            card.set.toLowerCase().includes(query)
-          );
+   <script>
+  let deleteDebounceTimeout;
+
+  document.getElementById('delete-search-input').addEventListener('input', function () {
+    clearTimeout(deleteDebounceTimeout);
+    const query = this.value.trim().toLowerCase();
+    const resultsDiv = document.getElementById('delete-search-results');
+    if (query.length === 0) {
+      resultsDiv.innerHTML = '';
+      return;
+    }
+
+    deleteDebounceTimeout = setTimeout(() => {
+      searchInventoryCards(query);
+    }, 300);
+  });
+
+  async function searchInventoryCards(query) {
+    const resultsDiv = document.getElementById('delete-search-results');
+    resultsDiv.innerHTML = `<p>Searching inventory for "<strong>${query}</strong>"...</p>`;
+
+    try {
+      const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory");
+      if (!res.ok) throw new Error("Error fetching inventory");
+
+      const cards = await res.json();
+      const filtered = cards.filter(card =>
+        card.cardName.toLowerCase().includes(query) ||
+        card.set.toLowerCase().includes(query)
+      );
+
       if (filtered.length === 0) {
         resultsDiv.innerHTML = `<p>No matches in inventory for "${query}".</p>`;
         return;
       }
-      
+
       resultsDiv.innerHTML = '';
-      
+
       filtered.slice(0, 10).forEach(card => {
         const displayName = card.cardName + (card.foil ? " (Foil)" : "");
         const displaySet = card.set.toUpperCase();
         const cardImage = card.imageUrl || '';
-      
+
         const cardDiv = document.createElement('div');
         cardDiv.className = 'card-item';
         cardDiv.innerHTML = `
@@ -370,40 +371,48 @@
             </div>
           </div>
         `;
-      
+
         cardDiv.addEventListener('click', () => {
           document.getElementById('deleteCardName').value = displayName;
           document.getElementById('deleteSet').value = card.set;
           document.getElementById('delete-search-input').value = `${displayName} (${displaySet})`;
           resultsDiv.innerHTML = '';
         });
-      
+
         resultsDiv.appendChild(cardDiv);
       });
-      document.getElementById('delete-card-form').addEventListener('submit', async function (e) {
-        e.preventDefault();
-  
-        const cardName = document.getElementById('deleteCardName').value.trim();
-        const cardSet = document.getElementById('deleteSet').value.trim();
-  
-        if (!cardName || !cardSet) return alert("Missing card name or set.");
-  
-        try {
-          const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cardName, set: cardSet })
-          });
-  
-          if (!res.ok) throw new Error(`Delete failed with status ${res.status}`);
-          alert("✅ Card deleted from inventory!");
-          document.getElementById('delete-card-form').reset();
-        } catch (err) {
-          console.error("❌ Delete Error:", err);
-          alert("❌ Error deleting card.");
-        }
+
+    } catch (err) {
+      console.error('❌ Inventory search error:', err);
+      resultsDiv.innerHTML = '<p>❌ Could not search inventory.</p>';
+    }
+  }
+
+  // 🔥 Moved outside the async function!
+  document.getElementById('delete-card-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const cardName = document.getElementById('deleteCardName').value.trim();
+    const cardSet = document.getElementById('deleteSet').value.trim();
+
+    if (!cardName || !cardSet) return alert("Missing card name or set.");
+
+    try {
+      const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardName, set: cardSet })
       });
-    </script>
+
+      if (!res.ok) throw new Error(`Delete failed with status ${res.status}`);
+      alert("✅ Card deleted from inventory!");
+      document.getElementById('delete-card-form').reset();
+    } catch (err) {
+      console.error("❌ Delete Error:", err);
+      alert("❌ Error deleting card.");
+    }
+  });
+</script>
 
     <div class="section">
       <h2>Post Announcement</h2>

@@ -9,278 +9,246 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
   <style>
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #f5f5f5;
-  }
-
-  header.top-banner {
-    background-color: rebeccapurple;
-    color: white;
-    padding: 8px 10px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    position: relative;
-  }
-
-  .header-inner {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-.logo-container {
-  margin-left: 0;
-  padding-left: 0;
-}
-
-.logo-container img {
-  height: 100px;
-  max-width: 100%;
-  display: block;
-  margin-left: 0;
-  padding-left: 0;
-}
-
-  .search-bar-wrapper {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    margin: 4px 0;
-  }
-
-  .search-bar-container {
-    display: flex;
-    width: 100%;
-    max-width: 500px;
-  }
-
-  .search-bar-container input {
-    flex: 1;
-    padding: 10px;
-    font-size: 16px;
-    border: none;
-    border-radius: 6px 0 0 6px;
-  }
-
-  .search-bar-container button {
-    padding: 10px 16px;
-    font-size: 16px;
-    border: none;
-    background-color: white;
-    color: rebeccapurple;
-    border-radius: 0 6px 6px 0;
-    cursor: pointer;
-  }
-
-  .account-login-container {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px;
-  }
-
-  .account-login-container a#login-button {
-    font-size: 22px;
-    color: white;
-    text-decoration: none;
-    border: 2px solid white;
-    border-radius: 50%;
-    width: 42px;
-    height: 42px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-right: 15px;
-  }
-
-  /* Navigation Bar (Below Header) */
-  .nav-bar {
-    background-color: #6a0dad;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 15px;
-  }
-
-  .hamburger-menu {
-    position: relative;
-  }
-
-  #hamburger-icon {
-    font-size: 28px;
-    color: white;
-    cursor: pointer;
-  }
-
-  .dropdown-menu {
-    display: none;
-    position: absolute;
-    top: 40px;
-    left: 0;
-    background-color: white;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    overflow: hidden;
-    min-width: 160px;
-    z-index: 100;
-  }
-
-  .dropdown-menu a {
-    display: block;
-    padding: 12px 16px;
-    text-decoration: none;
-    color: rebeccapurple;
-    font-weight: bold;
-    white-space: nowrap;
-  }
-
-  .dropdown-menu a:hover {
-    background-color: #eee;
-  }
-
-  .request-button {
-    color: white;
-    border: 2px solid white;
-    border-radius: 12px;
-    padding: 6px 12px;
-    font-size: 14px;
-    font-weight: bold;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease-in-out;
-    background: transparent;
-    white-space: nowrap;
-  }
-
-  .request-button i {
-    margin-right: 6px;
-  }
-
-  .request-button:hover {
-    background-color: white;
-    color: rebeccapurple;
-  }
-
-  /* Other Layout */
-  .sort-dropdown-container {
-    text-align: center;
-    margin-top: 15px;
-  }
-
-  #sort-dropdown {
-    padding: 8px;
-    font-size: 16px;
-  }
-
-  #card-container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 20px;
-    padding: 20px;
-  }
-
-  .card {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    max-width: 220px;
-    text-align: center;
-  }
-
-  .card img {
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-    margin-bottom: 10px;
-  }
-
-  @media (min-width: 768px) {
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+    }
+  
+    header.top-banner {
+      background-color: rebeccapurple;
+      color: white;
+      padding: 8px 10px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      position: relative;
+    }
+  
     .header-inner {
+      display: flex;
       flex-direction: row;
+      align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
     }
-
+  
+    .logo-container {
+      margin-left: 0;
+      padding-left: 0;
+    }
+  
+    .logo-container img {
+      height: 100px;
+      max-width: 100%;
+      display: block;
+      margin-left: 0;
+      padding-left: 0;
+    }
+  
     .search-bar-wrapper {
-      flex: 1;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin: 4px 0;
     }
-    
-  header.top-banner {
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  .header-inner {
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  .logo-container {
-    padding-left: 0;
-    margin-left: 0;
-  }
-
-  .logo-container img {
-    margin-left: 0;
-    padding-left: 0;
-    display: block;
-  }
-
-  .foil-shimmer {
-  position: relative;
-  overflow: hidden;
-  border-radius: 8px;
-}
-
-.foil-shimmer::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -150%;
-  width: 150%;
-  height: 100%;
-  background: linear-gradient(
-    120deg,
-    rgba(255, 255, 255, 0.1) 0%,
-    rgba(255, 255, 255, 0.5) 50%,
-    rgba(255, 255, 255, 0.1) 100%
-  );
-  transform: skewX(-20deg);
-  animation: shimmerMove 2s infinite;
-  pointer-events: none;
-  z-index: 2;
-}
-
-@keyframes shimmerMove {
-  0% {
-    left: -150%;
-  }
-  50% {
-    left: 150%;
-  }
-  100% {
-    left: 150%;
-  }
-}
-
-.image-wrapper img {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 8px;
-  position: relative;
-  z-index: 1;
-}
-
-.icon-button {
+  
+    .search-bar-container {
+      display: flex;
+      width: 100%;
+      max-width: 500px;
+    }
+  
+    .search-bar-container input {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px 0 0 6px;
+    }
+  
+    .search-bar-container button {
+      padding: 10px 16px;
+      font-size: 16px;
+      border: none;
+      background-color: white;
+      color: rebeccapurple;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+    }
+  
+    .account-login-container {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+  
+    .account-login-container a#login-button {
+      font-size: 22px;
+      color: white;
+      text-decoration: none;
+      border: 2px solid white;
+      border-radius: 50%;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-right: 15px;
+    }
+  
+    /* Navigation Bar */
+    .nav-bar {
+      background-color: #6a0dad;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 15px;
+    }
+  
+    .hamburger-menu {
+      position: relative;
+    }
+  
+    #hamburger-icon {
+      font-size: 28px;
+      color: white;
+      cursor: pointer;
+    }
+  
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      top: 40px;
+      left: 0;
+      background-color: white;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      overflow: hidden;
+      min-width: 160px;
+      z-index: 100;
+    }
+  
+    .dropdown-menu a {
+      display: block;
+      padding: 12px 16px;
+      text-decoration: none;
+      color: rebeccapurple;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+  
+    .dropdown-menu a:hover {
+      background-color: #eee;
+    }
+  
+    .request-button {
+      color: white;
+      border: 2px solid white;
+      border-radius: 12px;
+      padding: 6px 12px;
+      font-size: 14px;
+      font-weight: bold;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease-in-out;
+      background: transparent;
+      white-space: nowrap;
+    }
+  
+    .request-button i {
+      margin-right: 6px;
+    }
+  
+    .request-button:hover {
+      background-color: white;
+      color: rebeccapurple;
+    }
+  
+    .sort-dropdown-container {
+      text-align: center;
+      margin-top: 15px;
+    }
+  
+    #sort-dropdown {
+      padding: 8px;
+      font-size: 16px;
+    }
+  
+    #card-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+    }
+  
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      max-width: 220px;
+      text-align: center;
+    }
+  
+    .card img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+  
+    .foil-shimmer {
+      position: relative;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+  
+    .foil-shimmer::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -150%;
+      width: 150%;
+      height: 100%;
+      background: linear-gradient(
+        120deg,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0.5) 50%,
+        rgba(255, 255, 255, 0.1) 100%
+      );
+      transform: skewX(-20deg);
+      animation: shimmerMove 2s infinite;
+      pointer-events: none;
+      z-index: 2;
+    }
+  
+    @keyframes shimmerMove {
+      0% {
+        left: -150%;
+      }
+      50% {
+        left: 150%;
+      }
+      100% {
+        left: 150%;
+      }
+    }
+  
+    .image-wrapper img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px;
+      position: relative;
+      z-index: 1;
+    }
+  
+    .icon-button {
       font-size: 22px;
       color: white;
       text-decoration: none;
@@ -293,16 +261,47 @@
       align-items: center;
       margin-right: 10px;
     }
-
+  
     .icon-button:hover {
       background-color: white;
       color: rebeccapurple;
     }
-
-
-}
   
-</style>
+    /* Custom Card Styling */
+    .card-title {
+      font-size: 16px;
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
+  
+    .card-text {
+      margin-bottom: 12px;
+    }
+  
+    .card-condition {
+      font-size: 14px;
+      color: #555;
+    }
+  
+    @media (min-width: 768px) {
+      .header-inner {
+        flex-direction: row;
+        justify-content: space-between;
+      }
+  
+      .search-bar-wrapper {
+        flex: 1;
+      }
+  
+      header.top-banner,
+      .header-inner,
+      .logo-container,
+      .logo-container img {
+        padding-left: 0;
+        margin-left: 0;
+      }
+    }
+  </style>
 </head>
 
 <body> 
@@ -370,6 +369,17 @@
     let currentIndex = 0;
     const cardsPerLoad = 50;
 
+    function formatCondition(abbr) {
+      const conditionMap = {
+        NM: "Near Mint",
+        LP: "Lightly Played",
+        MP: "Moderately Played",
+        HP: "Heavily Played",
+        DMG: "Damaged",
+      };
+      return conditionMap[abbr.toUpperCase()] || abbr;
+    }
+
     async function loadCards() {
       try {
         const response = await fetch(apiEndpoint);
@@ -422,12 +432,15 @@
 
     const title = document.createElement('h3');
     title.textContent = card.foil ? `${card.cardName} (Foil)` : card.cardName;
+    title.classList.add('card-title');
 
     const set = document.createElement('p');
     set.textContent = `Set: ${card.set}`;
+    set.classList.add('card-text');
 
     const condition = document.createElement('p');
-    condition.textContent = `Condition: ${card.condition}`;
+    condition.textContent = `Condition: ${formatCondition(card.condition)}`;
+    condition.classList.add('card-condition');
 
     const quantity = document.createElement('p');
     quantity.textContent = `Quantity: ${card.quantity || 0}`;

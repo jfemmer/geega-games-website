@@ -351,12 +351,25 @@
     </a>
   </div>
 
-  <!-- Sort Dropdown -->
-  <div class="sort-dropdown-container" style="text-align: center; margin-top: 15px;">
-    <select id="sort-dropdown" style="padding: 8px; font-size: 16px;">
-      <option value="">Sort by Name</option>
+  <div style="text-align: center; margin-top: 15px;">
+    <!-- Sort Dropdown -->
+    <label for="sort-dropdown">Sort by Name:</label>
+    <select id="sort-dropdown" style="margin-right: 20px; padding: 8px; font-size: 16px;">
+      <option value="">None</option>
       <option value="asc">Name A → Z</option>
       <option value="desc">Name Z → A</option>
+    </select>
+  
+    <!-- Color Filter Dropdown -->
+    <label for="color-filter">Filter by Color:</label>
+    <select id="color-filter" style="padding: 8px; font-size: 16px;">
+      <option value="">All Colors</option>
+      <option value="W">White</option>
+      <option value="U">Blue</option>
+      <option value="B">Black</option>
+      <option value="R">Red</option>
+      <option value="G">Green</option>
+      <option value="C">Colorless</option>
     </select>
   </div>
   <!-- Card Grid -->

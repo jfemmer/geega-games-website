@@ -41,8 +41,6 @@
       height: 100px;
       max-width: 100%;
       display: block;
-      margin-left: 0;
-      padding-left: 0;
     }
   
     .search-bar-wrapper {
@@ -97,7 +95,6 @@
       margin-right: 15px;
     }
   
-    /* Navigation Bar */
     .nav-bar {
       background-color: #6a0dad;
       color: white;
@@ -168,14 +165,42 @@
       color: rebeccapurple;
     }
   
-    .sort-dropdown-container {
-      text-align: center;
-      margin-top: 15px;
+    .filter-sort-container {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin: 20px 0;
+      flex-wrap: wrap;
     }
   
-    #sort-dropdown {
-      padding: 8px;
+    .dropdown-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  
+    .dropdown-block label {
+      margin-bottom: 6px;
+      font-weight: bold;
+      color: rebeccapurple;
+    }
+  
+    .styled-dropdown {
+      padding: 8px 12px;
       font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background-color: white;
+      color: rebeccapurple;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      margin-bottom: 10px;
+    }
+  
+    .styled-dropdown option {
+      background-color: white;
+      color: rebeccapurple;
     }
   
     #card-container {
@@ -228,15 +253,9 @@
     }
   
     @keyframes shimmerMove {
-      0% {
-        left: -150%;
-      }
-      50% {
-        left: 150%;
-      }
-      100% {
-        left: 150%;
-      }
+      0% { left: -150%; }
+      50% { left: 150%; }
+      100% { left: 150%; }
     }
   
     .image-wrapper img {
@@ -267,7 +286,6 @@
       color: rebeccapurple;
     }
   
-    /* Custom Card Styling */
     .card-title {
       font-size: 16px;
       margin-bottom: 12px;
@@ -291,14 +309,6 @@
   
       .search-bar-wrapper {
         flex: 1;
-      }
-  
-      header.top-banner,
-      .header-inner,
-      .logo-container,
-      .logo-container img {
-        padding-left: 0;
-        margin-left: 0;
       }
     }
   </style>
@@ -351,27 +361,29 @@
     </a>
   </div>
 
-  <div style="text-align: center; margin-top: 15px;">
-    <!-- Sort Dropdown -->
-    <label for="sort-dropdown">Sort by Name:</label>
-    <select id="sort-dropdown" style="margin-right: 20px; padding: 8px; font-size: 16px;">
-      <option value="asc">Name A → Z</option>
-      <option value="desc">Name Z → A</option>
-    </select>
+  <div class="filter-sort-container">
+    <div class="dropdown-block">
+      <label for="sort-dropdown">Sort by Name:</label>
+      <select id="sort-dropdown" class="styled-dropdown">
+        <option value="asc">Name A → Z</option>
+        <option value="desc">Name Z → A</option>
+      </select>
+    </div>
   
-    <!-- Color Filter Dropdown -->
-    <label for="color-filter">Filter by Color:</label>
-    <select id="color-filter" style="padding: 8px; font-size: 16px;">
-      <option value="">All Colors</option>
-      <option value="W">White</option>
-      <option value="U">Blue</option>
-      <option value="B">Black</option>
-      <option value="R">Red</option>
-      <option value="G">Green</option>
-      <option value="C">Colorless</option>
-      <option value="M">Multicolor</option>
-      <option value="L">Land</option>
-    </select>
+    <div class="dropdown-block">
+      <label for="color-filter">Filter by Color:</label>
+      <select id="color-filter" class="styled-dropdown">
+        <option value="">All Colors</option>
+        <option value="W">White</option>
+        <option value="U">Blue</option>
+        <option value="B">Black</option>
+        <option value="R">Red</option>
+        <option value="G">Green</option>
+        <option value="C">Colorless</option>
+        <option value="M">Multicolor</option>
+        <option value="L">Land</option>
+      </select>
+    </div>
   </div>
   <!-- Card Grid -->
   <div id="card-container"></div>
@@ -588,3 +600,4 @@ document.getElementById("color-filter").addEventListener("change", (e) => {
 </body>
 
 </html>
+

@@ -587,6 +587,27 @@ document.getElementById("color-filter").addEventListener("change", (e) => {
   displayNextBatch();
 });
 
+  document.getElementById("creature-type-filter").addEventListener("change", (e) => {
+  const selectedType = e.target.value;
+
+  filteredCards = cardsData.filter(card => {
+    if (!selectedType) return true;
+
+    if (card.cardType?.toLowerCase().includes("creature")) {
+      const types = card.cardType.split('—')[1]; // get the subtype line
+      return types?.toLowerCase().includes(selectedType.toLowerCase());
+    }
+
+    return false;
+  });
+
+  const container = document.getElementById("card-container");
+  container.innerHTML = "";
+  currentIndex = 0;
+  displayNextBatch();
+});
+
+    
     // Hamburger menu toggle
     document.getElementById('hamburger-icon').addEventListener('click', () => {
       const menu = document.getElementById('dropdown-menu');

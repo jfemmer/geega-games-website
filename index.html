@@ -355,7 +355,6 @@
     <!-- Sort Dropdown -->
     <label for="sort-dropdown">Sort by Name:</label>
     <select id="sort-dropdown" style="margin-right: 20px; padding: 8px; font-size: 16px;">
-      <option value="">None</option>
       <option value="asc">Name A → Z</option>
       <option value="desc">Name Z → A</option>
     </select>
@@ -370,6 +369,8 @@
       <option value="R">Red</option>
       <option value="G">Green</option>
       <option value="C">Colorless</option>
+      <option value="M">Multicolor</option>
+      <option value="L">Land</option>
     </select>
   </div>
   <!-- Card Grid -->
@@ -526,6 +527,40 @@ async function addToWishlist(card) {
   } else if (value === "desc") {
     filteredCards.sort((a, b) => b.cardName.localeCompare(a.cardName));
   }
+
+  const container = document.getElementById("card-container");
+  container.innerHTML = "";
+  currentIndex = 0;
+  displayNextBatch();
+});
+
+document.getElementById("color-filter").addEventListener("change", (e) => {
+  const selectedColor = e.target.value;
+
+  filteredCards = cardsData.filter(card => {
+    if (!selectedColor) return true;
+
+    if (selectedColor === "C") {
+      // ✅ Show only cards that are labeled Colorless AND have "artifact" in type
+      return Array.isArray(card.colors) &&
+             card.colors.length === 1 &&
+             card.colors[0].toLowerCase() === "colorless" &&
+             card.cardType?.toLowerCase().includes("artifact");
+    }
+
+    if (selectedColor === "M") {
+      return Array.isArray(card.colors) &&
+             card.colors.length === 1 &&
+             card.colors[0] === "Multicolor";
+    }
+
+    if (selectedColor === "L") {
+      return card.cardType?.toLowerCase().includes("land");
+    }
+
+    return Array.isArray(card.colors) &&
+           card.colors.includes(selectedColor);
+  });
 
   const container = document.getElementById("card-container");
   container.innerHTML = "";

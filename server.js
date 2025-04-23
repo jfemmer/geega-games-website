@@ -103,6 +103,7 @@ const inventorySchema = new mongoose.Schema({
   condition: { type: String, required: true },
   foil: { type: Boolean, default: false },
   imageUrl: { type: String },
+  colors: [String], // ✅ NEW FIELD FOR FILTERING
   addedAt: { type: Date, default: Date.now }
 });
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
@@ -189,13 +190,23 @@ app.post('/api/inventory', async (req, res) => {
 
     const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
 
+    // 🆕 Get Scryfall colors
+    let colors = [];
+    try {
+      const response = await axios.get(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}&set=${set.toLowerCase()}`);
+      colors = response.data.colors || [];
+    } catch (err) {
+      console.warn(`⚠️ Couldn’t fetch colors for ${cardName}:`, err.message);
+    }
+    
     const card = new CardInventory({
       cardName,
       quantity,
       set,
       condition,
       foil: !!foil,
-      imageUrl
+      imageUrl,
+      colors // 🆕 Save it
     });
 
     await card.save();
@@ -219,22 +230,23 @@ app.get('/api/inventory', async (req, res) => {
 });
 
 app.delete('/api/inventory', async (req, res) => {
-  try {
-    const { cardName, set } = req.body;
-    if (!cardName || !set) {
-      return res.status(400).json({ message: 'Card name and set are required.' });
-    }
+  const { cardName, set } = req.body;
+  console.log("🛠️ DELETE request received:");
+  console.log("cardName:", cardName);
+  console.log("set:", set);
 
-    const deleted = await CardInventory.findOneAndDelete({ cardName, set });
-    if (!deleted) {
-      return res.status(404).json({ message: 'Card not found in inventory.' });
-    }
+  const cleanedName = cardName.replace(/\s*\(Foil\)/gi, '').trim();
+  const cleanedSet = set.trim();
 
-    res.status(200).json({ message: 'Card deleted successfully.' });
-  } catch (err) {
-    console.error('❌ Delete card error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
+  const found = await CardInventory.findOne({ cardName: cleanedName, set: cleanedSet });
+  console.log("🔍 Found document:", found);
+
+  if (!found) {
+    return res.status(404).json({ message: 'Card not found in inventory.' });
   }
+
+  await CardInventory.deleteOne({ _id: found._id });
+  res.status(200).json({ message: 'Card deleted successfully.' });
 });
 
 // ✅ Add Employee

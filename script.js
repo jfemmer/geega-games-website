@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sortDropdown = document.getElementById('sort-dropdown');
     const searchButton = document.getElementById('search-button');
     const searchInput = document.getElementById('search-input');
+    const creatureFilter = document.getElementById('creature-filter');
     const myListButton = document.getElementById('my-list-button');
     const customListModal = document.getElementById('custom-list-modal');
     const closeModalButton = document.querySelector('.close-button');
@@ -13,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === AUTO LOAD CARDS ON PAGE LOAD ===
     fetchAndDisplayJSON();
+    loadCreatureTypes();
 
     // === SORT DROPDOWN ===
     sortDropdown.addEventListener('change', (e) => {
@@ -43,6 +45,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // === CREATURE TYPE FILTER ===
+    creatureFilter.addEventListener('change', () => {
+        const selectedType = creatureFilter.value.toLowerCase();
+
+        const filtered = selectedType
+            ? allCardsData.filter(card =>
+                Array.isArray(card.creatureTypes) &&
+                card.creatureTypes.some(type => type.toLowerCase() === selectedType))
+            : allCardsData;
+
+        cardContainer.innerHTML = '';
+        filtered.forEach(card => displayCard(card));
+    });
+
     // === TRIGGER SEARCH FUNCTION ===
     function triggerSearch() {
         const searchTerm = searchInput.value.trim();
@@ -69,13 +85,28 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(error => console.error('Error fetching JSON:', error));
     }
 
+    // === LOAD CREATURE TYPES FROM BACKEND ===
+    function loadCreatureTypes() {
+        fetch('https://geega-games-website-production.up.railway.app/api/inventory/creature-types')
+            .then(res => res.json())
+            .then(types => {
+                types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type;
+                    option.textContent = type;
+                    creatureFilter.appendChild(option);
+                });
+            })
+            .catch(err => console.error('❌ Failed to load creature types:', err));
+    }
+
     // === DISPLAY CARD ===
     function displayCard(cardData) {
         const cardDiv = document.createElement('div');
         cardDiv.className = 'card';
 
         const img = document.createElement('img');
-        img.src = cardData.image || 'https://via.placeholder.com/250x350?text=No+Image'; // If you want to preload URLs, add "image" in your JSON
+        img.src = cardData.image || 'https://via.placeholder.com/250x350?text=No+Image';
 
         const nameText = document.createElement('h3');
         nameText.textContent = cardData.Name;
@@ -157,14 +188,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // === CUSTOM LIST MODAL OPEN ===
-    myListButton.addEventListener('click', () => {
-        customListModal.style.display = 'block';
-    });
+    if (myListButton) {
+        myListButton.addEventListener('click', () => {
+            customListModal.style.display = 'block';
+        });
+    }
 
     // === CUSTOM LIST MODAL CLOSE ===
-    closeModalButton.addEventListener('click', () => {
-        customListModal.style.display = 'none';
-    });
+    if (closeModalButton) {
+        closeModalButton.addEventListener('click', () => {
+            customListModal.style.display = 'none';
+        });
+    }
 
     // === CLOSE MODAL IF CLICKING OUTSIDE ===
     window.addEventListener('click', (event) => {

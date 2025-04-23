@@ -315,13 +315,12 @@
 </head>
 
 <body> 
-  <!-- HEADER -->
   <header class="top-banner">
     <div class="header-inner">
       <div class="logo-container">
         <img src="images/logo.png" alt="Geega Games Logo" class="site-logo" />
       </div>
-
+  
       <div class="account-login-container">
         <a href="wishlist.html" title="Wishlist" class="icon-button">
           <i class="fa-solid fa-heart"></i>
@@ -334,7 +333,7 @@
         </a>
       </div>
     </div>
-
+  
     <div class="search-bar-wrapper">
       <div class="search-bar-container">
         <input type="text" id="search-input" placeholder="Search for a card..." />
@@ -342,7 +341,7 @@
       </div>
     </div>
   </header>
-
+  
   <!-- SECOND NAV BAR -->
   <div class="nav-bar">
     <!-- Hamburger -->
@@ -354,13 +353,14 @@
         <a href="login.html">Login</a>
       </div>
     </div>
-
+  
     <!-- Request Button -->
     <a href="request.html" class="request-button">
       <i class="fa-solid fa-plus"></i> Request a Card
     </a>
   </div>
-
+  
+  <!-- FILTERS -->
   <div class="filter-sort-container">
     <div class="dropdown-block">
       <label for="sort-dropdown">Sort by Name:</label>
@@ -384,15 +384,18 @@
         <option value="L">Land</option>
       </select>
     </div>
+  
+    <div class="dropdown-block">
+      <label for="creature-filter">Filter by Creature Type:</label>
+      <select id="creature-filter" class="styled-dropdown">
+        <option value="">All Types</option>
+        <!-- Options will be populated dynamically -->
+      </select>
+    </div>
   </div>
-  <div class="dropdown-block">
-  <label for="creature-type-filter">Filter by Creature Type:</label>
-  <select id="creature-type-filter" class="styled-dropdown">
-    <option value="">All Types</option>
-    <!-- Options will be dynamically populated -->
-  </select>
-</div>
+  
   <!-- Card Grid -->
+  <div id="card-container"></div>
   <div id="card-container"></div>
 
   <script>
@@ -587,18 +590,13 @@ document.getElementById("color-filter").addEventListener("change", (e) => {
   displayNextBatch();
 });
 
-  document.getElementById("creature-type-filter").addEventListener("change", (e) => {
-  const selectedType = e.target.value;
+document.getElementById("creature-filter").addEventListener("change", (e) => {
+  const selectedType = e.target.value.toLowerCase();
 
   filteredCards = cardsData.filter(card => {
     if (!selectedType) return true;
-
-    if (card.cardType?.toLowerCase().includes("creature")) {
-      const types = card.cardType.split('—')[1]; // get the subtype line
-      return types?.toLowerCase().includes(selectedType.toLowerCase());
-    }
-
-    return false;
+    return Array.isArray(card.creatureTypes) &&
+           card.creatureTypes.some(type => type.toLowerCase() === selectedType);
   });
 
   const container = document.getElementById("card-container");
@@ -607,7 +605,6 @@ document.getElementById("color-filter").addEventListener("change", (e) => {
   displayNextBatch();
 });
 
-    
     // Hamburger menu toggle
     document.getElementById('hamburger-icon').addEventListener('click', () => {
       const menu = document.getElementById('dropdown-menu');
@@ -623,9 +620,26 @@ document.getElementById("color-filter").addEventListener("change", (e) => {
       }
     });
 
-    loadCards();
+    async function loadCreatureTypes() {
+  try {
+    const response = await fetch('https://geega-games-website-production.up.railway.app/api/inventory/creature-types');
+    const types = await response.json();
+    const dropdown = document.getElementById("creature-filter");
+
+    types.forEach(type => {
+      const option = document.createElement("option");
+      option.value = type;
+      option.textContent = type;
+      dropdown.appendChild(option);
+    });
+  } catch (err) {
+    console.error("❌ Failed to load creature types:", err);
+  }
+}
+
+loadCards();
+loadCreatureTypes();
   </script>
 </body>
 
 </html>
-

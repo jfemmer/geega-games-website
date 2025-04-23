@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -314,7 +314,7 @@
   </style>
 </head>
 
-<body> 
+<body>  
   <header class="top-banner">
     <div class="header-inner">
       <div class="logo-container">
@@ -396,236 +396,125 @@
   
   <!-- Card Grid -->
   <div id="card-container"></div>
-  <div id="card-container"></div>
 
-  <script>
-    const apiEndpoint = 'https://geega-games-website-production.up.railway.app/api/inventory'; // ← use Railway/Render backend;
-    let cardsData = [];
-    let filteredCards = [];
-    let currentIndex = 0;
-    const cardsPerLoad = 50;
+<script>
+const apiEndpoint = 'https://geega-games-website-production.up.railway.app/api/inventory';
+let cardsData = [], filteredCards = [], currentIndex = 0;
+const cardsPerLoad = 50;
 
-    function formatCondition(abbr) {
-      const conditionMap = {
-        NM: "Near Mint",
-        LP: "Lightly Played",
-        MP: "Moderately Played",
-        HP: "Heavily Played",
-        DMG: "Damaged",
-      };
-      return conditionMap[abbr.toUpperCase()] || abbr;
-    }
+function formatCondition(abbr) {
+  const conditionMap = { NM: "Near Mint", LP: "Lightly Played", MP: "Moderately Played", HP: "Heavily Played", DMG: "Damaged" };
+  return conditionMap[abbr.toUpperCase()] || abbr;
+}
 
-    async function loadCards() {
-      try {
-        const response = await fetch(apiEndpoint);
-        const data = await response.json();
+async function loadCards() {
+  try {
+    const res = await fetch(apiEndpoint);
+    const data = await res.json();
+    const mergedMap = new Map();
 
-        // Merge entries with same name, set, foil, and condition
-        const mergedMap = new Map();
+    data.forEach(card => {
+      const key = `${card.cardName.trim().toLowerCase()}|${card.set.trim().toLowerCase()}|${card.foil ? '1' : '0'}|${card.condition.trim().toLowerCase()}`;
+      if (mergedMap.has(key)) mergedMap.get(key).quantity += card.quantity;
+      else mergedMap.set(key, { ...card });
+    });
 
-        data.forEach(card => {
-          const key = `${card.cardName.trim().toLowerCase()}|${card.set.trim().toLowerCase()}|${card.foil ? '1' : '0'}|${card.condition.trim().toLowerCase()}`;
+    cardsData = Array.from(mergedMap.values()).filter(c => c.imageUrl);
+    applyFilters();
+  } catch (e) {
+    console.error('❌ Load error:', e);
+  }
+}
 
-          if (mergedMap.has(key)) {
-            const existing = mergedMap.get(key);
-            existing.quantity += card.quantity;
-          } else {
-            mergedMap.set(key, { ...card }); // Clone to avoid reference issues
-          }
-        });
-
-        cardsData = Array.from(mergedMap.values()).filter(card => card.imageUrl && card.imageUrl.trim() !== '');
-        filteredCards = [...cardsData];
-        currentIndex = 0;
-        displayNextBatch();
-      } catch (error) {
-        console.error('Error loading card data:', error);
-      }
-    }
-
-    function displayNextBatch() {
+function displayNextBatch() {
   const container = document.getElementById('card-container');
-  const nextCards = filteredCards.slice(currentIndex, currentIndex + cardsPerLoad);
-
-  nextCards.forEach(card => {
-    const cardElement = document.createElement('div');
-    cardElement.className = 'card';
-
-    const imageWrapper = document.createElement('div');
-    imageWrapper.classList.add('image-wrapper');
-    if (card.foil) {
-      imageWrapper.classList.add('foil-shimmer'); // ✨ Shimmer only if foil
-    }
-
-    const img = document.createElement('img');
-    img.src = card.imageUrl || 'images/placeholder.png';
-    img.alt = card.cardName;
-    img.loading = 'lazy';
-
-    imageWrapper.appendChild(img);
-    cardElement.appendChild(imageWrapper); // ✅ wrap image in shimmer container
-
-    const title = document.createElement('h3');
-    title.textContent = card.foil ? `${card.cardName} (Foil)` : card.cardName;
-    title.classList.add('card-title');
-
-    const set = document.createElement('p');
-    set.textContent = `Set: ${card.set}`;
-    set.classList.add('card-text');
-
-    const condition = document.createElement('p');
-    condition.textContent = `Condition: ${formatCondition(card.condition)}`;
-    condition.classList.add('card-condition');
-
-    const quantity = document.createElement('p');
-    quantity.textContent = `Quantity: ${card.quantity || 0}`;
-
-    cardElement.appendChild(title);
-    cardElement.appendChild(set);
-    cardElement.appendChild(condition);
-    cardElement.appendChild(quantity);
-
-    container.appendChild(cardElement);
+  const batch = filteredCards.slice(currentIndex, currentIndex + cardsPerLoad);
+  batch.forEach(card => {
+    const cardDiv = document.createElement('div');
+    cardDiv.className = 'card';
+    cardDiv.innerHTML = `
+      <div class="image-wrapper ${card.foil ? 'foil-shimmer' : ''}">
+        <img src="${card.imageUrl}" alt="${card.cardName}" loading="lazy" />
+      </div>
+      <h3 class="card-title">${card.foil ? card.cardName + ' (Foil)' : card.cardName}</h3>
+      <p class="card-text">Set: ${card.set}</p>
+      <p class="card-condition">Condition: ${formatCondition(card.condition)}</p>
+      <p>Quantity: ${card.quantity}</p>
+    `;
+    container.appendChild(cardDiv);
   });
-
   currentIndex += cardsPerLoad;
 }
 
-async function addToWishlist(card) {
-      const userId = localStorage.getItem('userId');
-      if (!userId) {
-        alert('You must be logged in to use the wishlist.');
-        return;
-      }
-      try {
-        const response = await fetch(`https://geega-games-website-production.up.railway.app/api/users/${userId}/wishlist`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(card)
-        });
-        if (!response.ok) throw new Error('Wishlist add failed');
-        alert('✅ Card added to wishlist!');
-      } catch (err) {
-        console.error('❌ Wishlist error:', err);
-        alert('❌ Could not add to wishlist.');
-      }
-    }
-
-    window.addEventListener('scroll', () => {
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
-        displayNextBatch();
-      }
-    });
-
-    document.getElementById('search-button').addEventListener('click', () => {
-      searchCards();
-    });
-
-    document.getElementById('search-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        searchCards();
-      }
-    });
-
-    function searchCards() {
-      const query = document.getElementById('search-input').value.toLowerCase();
-      const container = document.getElementById('card-container');
-      container.innerHTML = '';
-      filteredCards = cardsData.filter(card =>
-        card.cardName.toLowerCase().includes(query) ||
-        card.set.toLowerCase().includes(query) ||
-        (card.condition && card.condition.toLowerCase().includes(query))
-      );
-      currentIndex = 0;
-      displayNextBatch();
-    }
-
-    document.getElementById("sort-dropdown").addEventListener("change", (e) => {
-  const value = e.target.value;
-
-  if (value === "asc") {
-    filteredCards.sort((a, b) => a.cardName.localeCompare(b.cardName));
-  } else if (value === "desc") {
-    filteredCards.sort((a, b) => b.cardName.localeCompare(a.cardName));
-  }
-
-  const container = document.getElementById("card-container");
-  container.innerHTML = "";
-  currentIndex = 0;
-  displayNextBatch();
-});
-
-document.getElementById("color-filter").addEventListener("change", (e) => {
-  const selectedColor = e.target.value;
+function applyFilters() {
+  const color = document.getElementById('color-filter').value;
+  const creature = document.getElementById('creature-filter').value.toLowerCase();
 
   filteredCards = cardsData.filter(card => {
-    if (!selectedColor) return true;
+    const matchesColor = !color ||
+      (color === 'C' && card.colors?.[0] === 'Colorless' && card.cardType?.toLowerCase().includes('artifact')) ||
+      (color === 'M' && card.colors?.[0] === 'Multicolor') ||
+      (color === 'L' && card.cardType?.toLowerCase().includes('land')) ||
+      (Array.isArray(card.colors) && card.colors.includes(color));
 
-    if (selectedColor === "C") {
-      // ✅ Show only cards that are labeled Colorless AND have "artifact" in type
-      return Array.isArray(card.colors) &&
-             card.colors.length === 1 &&
-             card.colors[0].toLowerCase() === "colorless" &&
-             card.cardType?.toLowerCase().includes("artifact");
-    }
+    const matchesType = !creature || (Array.isArray(card.creatureTypes) && card.creatureTypes.some(type => type.toLowerCase() === creature));
 
-    if (selectedColor === "M") {
-      return Array.isArray(card.colors) &&
-             card.colors.length === 1 &&
-             card.colors[0] === "Multicolor";
-    }
-
-    if (selectedColor === "L") {
-      return card.cardType?.toLowerCase().includes("land");
-    }
-
-    return Array.isArray(card.colors) &&
-           card.colors.includes(selectedColor);
+    return matchesColor && matchesType;
   });
 
-  const container = document.getElementById("card-container");
-  container.innerHTML = "";
+  document.getElementById('card-container').innerHTML = '';
+  currentIndex = 0;
+  displayNextBatch();
+}
+
+// Event listeners
+['color-filter', 'creature-filter'].forEach(id => {
+  document.getElementById(id).addEventListener('change', applyFilters);
+});
+
+document.getElementById("sort-dropdown").addEventListener("change", e => {
+  const dir = e.target.value;
+  filteredCards.sort((a, b) => dir === "asc" ? a.cardName.localeCompare(b.cardName) : b.cardName.localeCompare(a.cardName));
+  document.getElementById("card-container").innerHTML = "";
   currentIndex = 0;
   displayNextBatch();
 });
 
-document.getElementById("creature-filter").addEventListener("change", (e) => {
-  const selectedType = e.target.value.toLowerCase();
+document.getElementById('search-button').addEventListener('click', searchCards);
+document.getElementById('search-input').addEventListener('keypress', e => e.key === 'Enter' && searchCards());
 
-  filteredCards = cardsData.filter(card => {
-    if (!selectedType) return true;
-    return Array.isArray(card.creatureTypes) &&
-           card.creatureTypes.some(type => type.toLowerCase() === selectedType);
-  });
-
-  const container = document.getElementById("card-container");
-  container.innerHTML = "";
+function searchCards() {
+  const query = document.getElementById('search-input').value.toLowerCase();
+  filteredCards = cardsData.filter(c =>
+    c.cardName.toLowerCase().includes(query) ||
+    c.set.toLowerCase().includes(query) ||
+    c.condition?.toLowerCase().includes(query)
+  );
+  document.getElementById('card-container').innerHTML = '';
   currentIndex = 0;
   displayNextBatch();
+}
+
+window.addEventListener('scroll', () => {
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) displayNextBatch();
 });
 
-    // Hamburger menu toggle
-    document.getElementById('hamburger-icon').addEventListener('click', () => {
-      const menu = document.getElementById('dropdown-menu');
-      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-    });
+document.getElementById('hamburger-icon').addEventListener('click', () => {
+  const menu = document.getElementById('dropdown-menu');
+  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+});
 
-    // Close dropdown when clicking outside
-    document.addEventListener('click', (event) => {
-      const menu = document.getElementById('dropdown-menu');
-      const icon = document.getElementById('hamburger-icon');
-      if (!menu.contains(event.target) && event.target !== icon) {
-        menu.style.display = 'none';
-      }
-    });
+document.addEventListener('click', e => {
+  const menu = document.getElementById('dropdown-menu');
+  const icon = document.getElementById('hamburger-icon');
+  if (!menu.contains(e.target) && e.target !== icon) menu.style.display = 'none';
+});
 
-    async function loadCreatureTypes() {
+async function loadCreatureTypes() {
   try {
-    const response = await fetch('https://geega-games-website-production.up.railway.app/api/inventory/creature-types');
-    const types = await response.json();
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/inventory/creature-types');
+    const types = await res.json();
     const dropdown = document.getElementById("creature-filter");
-
     types.forEach(type => {
       const option = document.createElement("option");
       option.value = type;
@@ -633,13 +522,13 @@ document.getElementById("creature-filter").addEventListener("change", (e) => {
       dropdown.appendChild(option);
     });
   } catch (err) {
-    console.error("❌ Failed to load creature types:", err);
+    console.error("❌ Creature type load error:", err);
   }
 }
 
 loadCards();
 loadCreatureTypes();
-  </script>
+</script>
 </body>
 
 </html>

@@ -103,7 +103,8 @@ const inventorySchema = new mongoose.Schema({
   condition: { type: String, required: true },
   foil: { type: Boolean, default: false },
   imageUrl: { type: String },
-  colors: [String], // ✅ NEW FIELD FOR FILTERING
+  colors: [String],
+  creatureTypes: [String], // 🆕 New field
   addedAt: { type: Date, default: Date.now }
 });
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
@@ -190,15 +191,26 @@ app.post('/api/inventory', async (req, res) => {
 
     const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
 
-    // 🆕 Get Scryfall colors
+    // 🧠 Fetch colors + creature types from Scryfall
     let colors = [];
+    let creatureTypes = [];
     try {
       const response = await axios.get(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}&set=${set.toLowerCase()}`);
-      colors = response.data.colors || [];
+      const data = response.data;
+
+      colors = data.colors || [];
+
+      const typeLine = data.type_line || '';
+      if (typeLine.includes('Creature')) {
+        const parts = typeLine.split('—');
+        if (parts[1]) {
+          creatureTypes = parts[1].trim().split(' ');
+        }
+      }
     } catch (err) {
-      console.warn(`⚠️ Couldn’t fetch colors for ${cardName}:`, err.message);
+      console.warn(`⚠️ Couldn’t fetch Scryfall info for ${cardName}:`, err.message);
     }
-    
+
     const card = new CardInventory({
       cardName,
       quantity,
@@ -206,7 +218,8 @@ app.post('/api/inventory', async (req, res) => {
       condition,
       foil: !!foil,
       imageUrl,
-      colors // 🆕 Save it
+      colors,
+      creatureTypes, // ✅ Add to DB
     });
 
     await card.save();
@@ -226,6 +239,17 @@ app.get('/api/inventory', async (req, res) => {
   } catch (err) {
     console.error('❌ Error fetching inventory:', err);
     res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+app.get('/api/inventory/creature-types', async (req, res) => {
+  try {
+    const types = await CardInventory.distinct('creatureTypes');
+    const flattened = [...new Set(types.flat().filter(Boolean))];
+    res.json(flattened.sort());
+  } catch (err) {
+    console.error('Failed to fetch creature types', err);
+    res.status(500).json({ error: 'Failed to fetch creature types' });
   }
 });
 

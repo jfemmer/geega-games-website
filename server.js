@@ -1,5 +1,4 @@
-// ✨ Updated server.js with /api/prices endpoint for real-time price lookups
-const express = require('express');
+const express = require('express');  
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
@@ -12,6 +11,32 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ✅ Scryfall Image Fetch Helper
+const fetchScryfallImageUrl = async (name, set, options = {}) => {
+  const cleanedName = name.split('(')[0].trim();
+  const loweredName = name.toLowerCase();
+  let query = `${cleanedName} set:${set.toLowerCase()}`;
+
+  if (loweredName.includes('borderless')) query += ' is:borderless';
+  else if (loweredName.includes('showcase')) query += ' frame:showcase';
+  else if (loweredName.includes('extended')) query += ' frame:extendedart';
+
+  if (loweredName.includes('rainbow foil') || set.toLowerCase().startsWith('sl')) {
+    query += ' finish:rainbow_foil';
+  }
+
+  try {
+    const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`;
+    const result = await axios.get(searchUrl);
+    const cardData = result.data.data?.[0];
+    if (!cardData) return '';
+    return cardData.image_uris?.normal || cardData.card_faces?.[0]?.image_uris?.normal || '';
+  } catch (err) {
+    console.warn(`⚠️ Couldn’t fetch image for ${name} (${set}):`, err.message);
+    return '';
+  }
+};
+
 // ✅ Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
 const INVENTORY_DB_URI = process.env.INVENTORY_DB_URI;
@@ -23,12 +48,39 @@ if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI) {
   process.exit(1);
 }
 
-// ✅ DB Connections
-const db1 = mongoose.createConnection(MONGODB_URI);
-const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI);
-const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI);
+// ✅ Connect to MongoDB Atlas - Users
+db1 = mongoose.createConnection(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+db1.on('connected', () => console.log('✅ Connected to MongoDB Atlas (geegaUsers)'));
+db1.on('error', (err) => console.error('❌ MongoDB connection error (Users):', err.message));
 
-// ✅ Schemas
+// ✅ Second Connection for Inventory DB
+const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+inventoryConnection.on('connected', () => {
+  console.log('✅ Connected to MongoDB Atlas (geegaInventory)');
+});
+inventoryConnection.on('error', (err) => {
+  console.error('❌ Inventory DB connection error:', err.message);
+});
+
+// ✅ Third Connection for Employee DB
+const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+employeeConnection.on('connected', () => {
+  console.log('✅ Connected to MongoDB Atlas (geegaEmployee)');
+});
+employeeConnection.on('error', (err) => {
+  console.error('❌ Employee DB connection error:', err.message);
+});
+
+// ✅ User Schema & Model
 const userSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
@@ -43,84 +95,217 @@ const userSchema = new mongoose.Schema({
 });
 const User = db1.model('User', userSchema);
 
+// ✅ Inventory Schema & Model (Card Inventory)
 const inventorySchema = new mongoose.Schema({
-  cardName: String,
-  quantity: Number,
-  set: String,
-  condition: String,
-  foil: Boolean,
-  imageUrl: String,
+  cardName: { type: String, required: true },
+  quantity: { type: Number, required: true },
+  set: { type: String, required: true },
+  condition: { type: String, required: true },
+  foil: { type: Boolean, default: false },
+  imageUrl: { type: String },
   colors: [String],
   cardType: String,
   creatureTypes: [String],
-  addedAt: { type: Date, default: Date.now },
-  price: String,
-  foilPrice: String
+  price: Number,
+  addedAt: { type: Date, default: Date.now }
 });
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
 
+// ✅ Employee Schema & Model
 const employeeSchema = new mongoose.Schema({
-  role: String,
-  firstName: String,
-  lastName: String,
-  phone: String,
-  email: String,
-  emergencyContact: String,
+  role: { type: String, required: true },
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  phone: { type: String, required: true },
+  email: { type: String, required: true },
+  emergencyContact: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });
 const Employee = employeeConnection.model('Employee', employeeSchema, 'Employees');
 
-// ✅ Routes
+// ✅ Root Test Route
 app.get('/', (req, res) => {
   res.send('🧙‍♂️ Welcome to the Geega Games API!');
 });
 
-app.post('/signup', async (req, res) => {
-  const { firstName, lastName, username, email, password, phone, address, state, zip } = req.body;
-  if (!username || !email || !password) return res.status(400).json({ message: 'Missing fields' });
-
-  const existing = await User.findOne({ $or: [{ email }, { username }] });
-  if (existing) return res.status(409).json({ message: 'User already exists' });
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = new User({ firstName, lastName, username, email, password: hashedPassword, phone, address, state, zip });
-  await user.save();
-  res.status(201).json({ message: '✅ User created' });
+app.get('/api/version-check', (req, res) => {
+  res.send('✅ This is the latest version of the server.js file!');
 });
 
+// ✅ Signup Route
+app.post('/signup', async (req, res) => {
+  try {
+    const {
+      firstName, lastName, username, email, password,
+      phone, address, state, zip
+    } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'Username, email, and password are required.' });
+    }
+
+    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    if (existing) {
+      return res.status(409).json({ message: 'User already exists.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new User({
+      firstName,
+      lastName,
+      username,
+      email,
+      password: hashedPassword,
+      phone,
+      address,
+      state,
+      zip
+    });
+
+    await user.save();
+    res.status(201).json({ message: '🐶 Welcome to the Pack! 🐶' });
+  } catch (err) {
+    console.error('❌ Signup error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Login Route
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ message: 'User not found.' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ message: 'Invalid password.' });
+
+    res.json({
+      message: 'Login successful',
+      userId: user._id,
+      username: user.username
+    });
+  } catch (err) {
+    console.error('❌ Login error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Get All Users
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await User.find().sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    console.error('❌ Error fetching users:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Add Inventory Card
+app.post('/api/inventory', async (req, res) => {
+  try {
+    const { cardName, quantity, set, condition, foil, price } = req.body;
+
+    if (!cardName || !quantity || !set || !condition) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
+
+    const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
+
+    const card = new CardInventory({
+      cardName,
+      quantity,
+      set,
+      condition,
+      foil: !!foil,
+      imageUrl,
+      price
+    });
+
+    await card.save();
+    console.log(`✅ Saved ${cardName} (${set}) to inventory with image.`);
+    res.status(201).json({ message: 'Card added to inventory!', card });
+  } catch (err) {
+    console.error('❌ Error adding card to inventory:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Get All Inventory Cards
 app.get('/api/inventory', async (req, res) => {
   try {
     const cards = await CardInventory.find().sort({ cardName: 1 });
     res.json(cards);
   } catch (err) {
-    res.status(500).json({ message: '❌ Could not load inventory' });
+    console.error('❌ Error fetching inventory:', err);
+    res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-app.get('/api/inventory/creature-types', async (req, res) => {
+// ✅ Get Card Price by Name/Set/Foil
+app.post('/api/inventory/price', async (req, res) => {
+  const { cardName, set, foil } = req.body;
+
+  if (!cardName || !set) {
+    return res.status(400).json({ message: "Missing cardName or set." });
+  }
+
   try {
-    const types = await CardInventory.distinct('creatureTypes');
-    const flattened = [...new Set(types.flat().filter(Boolean))];
-    res.json(flattened.sort());
+    const match = await CardInventory.findOne({
+      cardName: new RegExp(`^${cardName}$`, 'i'),
+      set: new RegExp(`^${set}$`, 'i'),
+      foil: !!foil
+    });
+
+    if (!match) {
+      return res.status(404).json({ message: "Card not found." });
+    }
+
+    res.json({ price: match.price || null });
   } catch (err) {
-    console.error('Failed to fetch creature types', err);
-    res.status(500).json({ error: 'Failed to fetch creature types' });
+    console.error("❌ Inventory price lookup error:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
-// ✅ Real-time Scryfall Price Endpoint
-app.get('/api/prices', async (req, res) => {
-  const { name, set, foil } = req.query;
-  if (!name || !set) return res.status(400).json({ error: 'Missing name or set' });
+// ✅ Delete Inventory Card
+app.delete('/api/inventory', async (req, res) => {
+  try {
+    const { cardName, set } = req.body;
+    if (!cardName || !set) {
+      return res.status(400).json({ message: 'Card name and set are required.' });
+    }
+
+    const deleted = await CardInventory.findOneAndDelete({ cardName, set });
+    if (!deleted) {
+      return res.status(404).json({ message: 'Card not found in inventory.' });
+    }
+
+    res.status(200).json({ message: 'Card deleted successfully.' });
+  } catch (err) {
+    console.error('❌ Delete card error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// ✅ Add Employee
+app.post('/api/employees', async (req, res) => {
+  const { role, firstName, lastName, phone, email, emergencyContact } = req.body;
+
+  if (!role || !firstName || !lastName || !phone || !email || !emergencyContact) {
+    return res.status(400).json({ message: 'Missing required fields.' });
+  }
 
   try {
-    const query = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&set=${set.toLowerCase()}`;
-    const response = await axios.get(query);
-    const price = foil === 'true' ? response.data.prices.usd_foil : response.data.prices.usd;
-    res.json({ price });
+    const employee = new Employee({ role, firstName, lastName, phone, email, emergencyContact });
+    await employee.save();
+    res.status(201).json({ message: 'Employee added!' });
   } catch (err) {
-    console.error('❌ Price fetch failed:', err.message);
-    res.status(500).json({ error: 'Failed to fetch price' });
+    console.error('❌ Failed to save employee:', err);
+    res.status(500).json({ message: 'Internal server error.' });
   }
 });
 

@@ -407,18 +407,23 @@
       return conditionMap[abbr.toUpperCase()] || abbr;
     }
     
-    async function getScryfallPrice(cardName, set, foil = false) {
-      const cleanedName = cardName.replace(/\(.*?\)/g, '').split('//')[0].trim();
-      const query = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cleanedName)}&set=${set.toLowerCase()}`;
-      try {
-        const res = await fetch(query);
-        const data = await res.json();
-        return foil ? data.prices.usd_foil : data.prices.usd;
-      } catch (err) {
-        console.error(`❌ Failed to fetch price for ${cardName} (${set})`, err);
-        return null;
-      }
-    }
+    async function getInventoryPrice(cardName, set, foil = false) {
+  try {
+    const response = await fetch(`https://geega-games-website-production.up.railway.app/api/inventory/price`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardName, set, foil })
+    });
+
+    if (!response.ok) throw new Error(`❌ Inventory price fetch failed: ${response.status}`);
+    const data = await response.json();
+
+    return data.price || null;
+  } catch (err) {
+    console.error(`❌ Failed to fetch price from inventory for ${cardName} (${set})`, err);
+    return null;
+  }
+}
     
     async function loadCards() {
       try {
@@ -563,4 +568,3 @@
 </body>
 
 </html>
-

@@ -474,7 +474,7 @@
         price.textContent = 'Price: loading...';
     
         // 🤑 Fetch real-time price
-        const fetchedPrice = await getScryfallPrice(card.cardName, card.set, card.foil);
+        const fetchedPrice = await getInventoryPrice(card.cardName, card.set, card.foil);
         price.textContent = `Price: $${fetchedPrice || 'N/A'}`;
     
         cardDiv.append(imageWrapper, title, set, condition, quantity, price);

@@ -132,6 +132,18 @@ app.get('/api/version-check', (req, res) => {
   res.send('✅ This is the latest version of the server.js file!');
 });
 
+// ✅ Creature Types Endpoint
+app.get('/api/inventory/creature-types', async (req, res) => {
+  try {
+    const types = await CardInventory.distinct('creatureTypes');
+    const flat = [...new Set(types.flat().filter(Boolean))];
+    res.json(flat.sort());
+  } catch (err) {
+    console.error('❌ Creature type route error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ✅ Signup Route
 app.post('/signup', async (req, res) => {
   try {
@@ -250,24 +262,24 @@ app.post('/api/inventory/price', async (req, res) => {
   const { cardName, set, foil } = req.body;
 
   if (!cardName || !set) {
-    return res.status(400).json({ message: "Missing cardName or set." });
+    return res.status(400).json({ error: 'Missing cardName or set' });
   }
 
   try {
     const match = await CardInventory.findOne({
-      cardName: new RegExp(`^${cardName}$`, 'i'),
-      set: new RegExp(`^${set}$`, 'i'),
+      cardName,
+      set,
       foil: !!foil
     });
 
-    if (!match) {
-      return res.status(404).json({ message: "Card not found." });
+    if (!match || !match.price) {
+      return res.status(404).json({ error: 'Price not found' });
     }
 
-    res.json({ price: match.price || null });
+    res.json({ price: match.price });
   } catch (err) {
-    console.error("❌ Inventory price lookup error:", err);
-    res.status(500).json({ message: "Internal server error." });
+    console.error('❌ Price route error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

@@ -312,6 +312,7 @@
           <div id="delete-search-results" style="margin-top: 10px;"></div>
           <input type="hidden" id="deleteCardName" name="deleteCardName" required>
           <input type="hidden" id="deleteSet" name="deleteSet" required>
+          <input type="hidden" id="deleteFoil" name="deleteFoil" required>
           <button type="submit" style="background-color: crimson;">Delete Card</button>
         </form>
       </div>
@@ -373,8 +374,9 @@
         `;
 
         cardDiv.addEventListener('click', () => {
-          document.getElementById('deleteCardName').value = displayName;
+          document.getElementById('deleteCardName').value = card.cardName;
           document.getElementById('deleteSet').value = card.set;
+          document.getElementById('deleteFoil').value = card.foil;
           document.getElementById('delete-search-input').value = `${displayName} (${displaySet})`;
           resultsDiv.innerHTML = '';
         });
@@ -390,28 +392,31 @@
 
   // 🔥 Moved outside the async function!
   document.getElementById('delete-card-form').addEventListener('submit', async function (e) {
-    e.preventDefault();
+  e.preventDefault();
 
-    const cardName = document.getElementById('deleteCardName').value.trim();
-    const cardSet = document.getElementById('deleteSet').value.trim();
+  const cardName = document.getElementById('deleteCardName').value.trim();
+  const cardSet = document.getElementById('deleteSet').value.trim();
+  const isFoil = document.getElementById('deleteFoil').value === 'true';
 
-    if (!cardName || !cardSet) return alert("Missing card name or set.");
+  console.log({ cardName, cardSet, isFoil }); // 🛠️ Add this line to debug what you are sending!
 
-    try {
-      const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardName, set: cardSet })
-      });
+  if (!cardName || !cardSet) return alert("Missing card name or set.");
 
-      if (!res.ok) throw new Error(`Delete failed with status ${res.status}`);
-      alert("✅ Card deleted from inventory!");
-      document.getElementById('delete-card-form').reset();
-    } catch (err) {
-      console.error("❌ Delete Error:", err);
-      alert("❌ Error deleting card.");
-    }
-  });
+  try {
+    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardName, set: cardSet, foil: isFoil })
+    });
+
+    if (!res.ok) throw new Error(`Delete failed with status ${res.status}`);
+    alert("✅ Card deleted from inventory!");
+    document.getElementById('delete-card-form').reset();
+  } catch (err) {
+    console.error("❌ Delete Error:", err);
+    alert("❌ Error deleting card.");
+  }
+});
 </script>
 
     <div class="section">

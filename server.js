@@ -1,4 +1,5 @@
-const express = require('express');  
+// server.js
+const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
@@ -48,254 +49,169 @@ if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI) {
   process.exit(1);
 }
 
-// ✅ Connect to MongoDB Atlas - Users
-db1 = mongoose.createConnection(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
-db1.on('connected', () => console.log('✅ Connected to MongoDB Atlas (geegaUsers)'));
-db1.on('error', (err) => console.error('❌ MongoDB connection error (Users):', err.message));
+// ✅ Connect to MongoDB
+const db1 = mongoose.createConnection(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
-// ✅ Second Connection for Inventory DB
-const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
-inventoryConnection.on('connected', () => {
-  console.log('✅ Connected to MongoDB Atlas (geegaInventory)');
-});
-inventoryConnection.on('error', (err) => {
-  console.error('❌ Inventory DB connection error:', err.message);
+// ✅ Connection Logs
+[db1, inventoryConnection, employeeConnection].forEach((db, i) => {
+  db.on('connected', () => console.log(`✅ Connected to MongoDB database #${i+1}`));
+  db.on('error', (err) => console.error(`❌ MongoDB connection error #${i+1}:`, err.message));
 });
 
-// ✅ Third Connection for Employee DB
-const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
-employeeConnection.on('connected', () => {
-  console.log('✅ Connected to MongoDB Atlas (geegaEmployee)');
-});
-employeeConnection.on('error', (err) => {
-  console.error('❌ Employee DB connection error:', err.message);
-});
-
-// ✅ User Schema & Model
+// ✅ Schemas and Models
 const userSchema = new mongoose.Schema({
-  firstName: String,
-  lastName: String,
-  username: { type: String, required: true, unique: true },
-  email:    { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  phone:    String,
-  address:  String,
-  state:    String,
-  zip:      String,
-  createdAt: { type: Date, default: Date.now }
+  firstName: String, lastName: String, username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true }, password: { type: String, required: true },
+  phone: String, address: String, state: String, zip: String, createdAt: { type: Date, default: Date.now }
 });
 const User = db1.model('User', userSchema);
 
-// ✅ Inventory Schema & Model (Card Inventory)
 const inventorySchema = new mongoose.Schema({
-  cardName: { type: String, required: true },
-  quantity: { type: Number, required: true },
-  set: { type: String, required: true },
-  condition: { type: String, required: true },
-  foil: { type: Boolean, default: false },
-  imageUrl: { type: String },
-  colors: [String],
-  cardType: String,
-  creatureTypes: [String],
-  price: Number,
-  addedAt: { type: Date, default: Date.now }
+  cardName: { type: String, required: true }, quantity: { type: Number, required: true },
+  set: { type: String, required: true }, condition: { type: String, required: true },
+  foil: { type: Boolean, default: false }, imageUrl: String, colors: [String],
+  cardType: String, creatureTypes: [String], price: Number, addedAt: { type: Date, default: Date.now }
 });
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
 
-// ✅ Employee Schema & Model
 const employeeSchema = new mongoose.Schema({
-  role: { type: String, required: true },
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
-  phone: { type: String, required: true },
-  email: { type: String, required: true },
-  emergencyContact: { type: String, required: true },
+  role: { type: String, required: true }, firstName: { type: String, required: true },
+  lastName: { type: String, required: true }, phone: { type: String, required: true },
+  email: { type: String, required: true }, emergencyContact: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });
 const Employee = employeeConnection.model('Employee', employeeSchema, 'Employees');
 
-// ✅ Root Test Route
-app.get('/', (req, res) => {
-  res.send('🧙‍♂️ Welcome to the Geega Games API!');
-});
+// ✅ Routes
 
-app.get('/api/version-check', (req, res) => {
-  res.send('✅ This is the latest version of the server.js file!');
-});
+// Root
+app.get('/', (req, res) => res.send('🧙‍♂️ Welcome to the Geega Games API!'));
 
-// ✅ Creature Types Endpoint
+// Version Check
+app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js version'));
+
+// Creature Types
 app.get('/api/inventory/creature-types', async (req, res) => {
   try {
     const types = await CardInventory.distinct('creatureTypes');
-    const flat = [...new Set(types.flat().filter(Boolean))];
-    res.json(flat.sort());
+    res.json([...new Set(types.flat().filter(Boolean))].sort());
   } catch (err) {
-    console.error('❌ Creature type route error:', err);
+    console.error('❌ Creature types error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// ✅ Signup Route
+// Signup
 app.post('/signup', async (req, res) => {
   try {
-    const {
-      firstName, lastName, username, email, password,
-      phone, address, state, zip
-    } = req.body;
-
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: 'Username, email, and password are required.' });
-    }
+    const { firstName, lastName, username, email, password, phone, address, state, zip } = req.body;
+    if (!username || !email || !password) return res.status(400).json({ message: 'Missing required fields.' });
 
     const existing = await User.findOne({ $or: [{ email }, { username }] });
-    if (existing) {
-      return res.status(409).json({ message: 'User already exists.' });
-    }
+    if (existing) return res.status(409).json({ message: 'User already exists.' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    await new User({ firstName, lastName, username, email, password: hashedPassword, phone, address, state, zip }).save();
 
-    const user = new User({
-      firstName,
-      lastName,
-      username,
-      email,
-      password: hashedPassword,
-      phone,
-      address,
-      state,
-      zip
-    });
-
-    await user.save();
-    res.status(201).json({ message: '🐶 Welcome to the Pack! 🐶' });
+    res.status(201).json({ message: '🐶 Welcome to the Pack!' });
   } catch (err) {
     console.error('❌ Signup error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-// ✅ Login Route
+// Login
 app.post('/api/login', async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: 'User not found.' });
+    if (!user || !(await bcrypt.compare(password, user.password)))
+      return res.status(401).json({ message: 'Invalid credentials.' });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: 'Invalid password.' });
-
-    res.json({
-      message: 'Login successful',
-      userId: user._id,
-      username: user.username
-    });
+    res.json({ message: 'Login successful', userId: user._id, username: user.username });
   } catch (err) {
     console.error('❌ Login error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-// ✅ Get All Users
+// Get All Users
 app.get('/api/users', async (req, res) => {
   try {
-    const users = await User.find().sort({ createdAt: -1 });
-    res.json(users);
+    res.json(await User.find().sort({ createdAt: -1 }));
   } catch (err) {
-    console.error('❌ Error fetching users:', err);
+    console.error('❌ Fetch users error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-// ✅ Add Inventory Card
+// Add Inventory Card
 app.post('/api/inventory', async (req, res) => {
   try {
     const { cardName, quantity, set, condition, foil, price } = req.body;
-
-    if (!cardName || !quantity || !set || !condition) {
-      return res.status(400).json({ message: 'Missing required fields.' });
-    }
+    if (!cardName || !quantity || !set || !condition) return res.status(400).json({ message: 'Missing fields.' });
 
     const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
+    await new CardInventory({ cardName, quantity, set, condition, foil: !!foil, imageUrl, price }).save();
 
-    const card = new CardInventory({
-      cardName,
-      quantity,
-      set,
-      condition,
-      foil: !!foil,
-      imageUrl,
-      price
-    });
-
-    await card.save();
-    console.log(`✅ Saved ${cardName} (${set}) to inventory with image.`);
-    res.status(201).json({ message: 'Card added to inventory!', card });
+    res.status(201).json({ message: 'Card added to inventory!' });
   } catch (err) {
-    console.error('❌ Error adding card to inventory:', err);
+    console.error('❌ Add inventory error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-// ✅ Get All Inventory Cards
+// Get All Inventory
 app.get('/api/inventory', async (req, res) => {
   try {
-    const cards = await CardInventory.find().sort({ cardName: 1 });
-    res.json(cards);
+    res.json(await CardInventory.find().sort({ cardName: 1 }));
   } catch (err) {
-    console.error('❌ Error fetching inventory:', err);
+    console.error('❌ Fetch inventory error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-// ✅ Get Card Price by Name/Set/Foil
+// Get Single Price
 app.post('/api/inventory/price', async (req, res) => {
   const { cardName, set, foil } = req.body;
-
-  if (!cardName || !set) {
-    return res.status(400).json({ error: 'Missing cardName or set' });
-  }
-
   try {
-    const match = await CardInventory.findOne({
-      cardName,
-      set,
-      foil: !!foil
-    });
-
-    if (!match || !match.price) {
-      return res.status(404).json({ error: 'Price not found' });
-    }
-
-    res.json({ price: match.price });
+    const card = await CardInventory.findOne({ cardName, set, foil: !!foil });
+    if (!card || card.price == null) return res.status(404).json({ error: 'Price not found' });
+    res.json({ price: card.price });
   } catch (err) {
-    console.error('❌ Price route error:', err);
+    console.error('❌ Single price error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// ✅ Delete Inventory Card
+// ✅ NEW: Batch Fetch Prices
+app.post('/api/inventory/prices', async (req, res) => {
+  try {
+    const { cards } = req.body;
+    if (!Array.isArray(cards)) return res.status(400).json({ error: 'Cards array required.' });
+
+    const prices = {};
+    for (const { cardName, set, foil } of cards) {
+      if (!cardName || !set) continue;
+      const match = await CardInventory.findOne({ cardName, set, foil: !!foil });
+      if (match && match.price != null) prices[`${cardName}|${set}|${foil ? '1' : '0'}`] = match.price;
+    }
+
+    res.json(prices);
+  } catch (err) {
+    console.error('❌ Batch prices error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete Inventory Card
 app.delete('/api/inventory', async (req, res) => {
   try {
-    const { cardName, set } = req.body;
-    if (!cardName || !set) {
-      return res.status(400).json({ message: 'Card name and set are required.' });
-    }
-
-    const deleted = await CardInventory.findOneAndDelete({ cardName, set });
-    if (!deleted) {
-      return res.status(404).json({ message: 'Card not found in inventory.' });
-    }
-
+    const { cardName, set, foil } = req.body;
+    const deleted = await CardInventory.findOneAndDelete({ cardName, set, foil: !!foil });
+    if (!deleted) return res.status(404).json({ message: 'Card not found.' });
     res.status(200).json({ message: 'Card deleted successfully.' });
   } catch (err) {
     console.error('❌ Delete card error:', err);
@@ -303,25 +219,17 @@ app.delete('/api/inventory', async (req, res) => {
   }
 });
 
-// ✅ Add Employee
+// Add Employee
 app.post('/api/employees', async (req, res) => {
   const { role, firstName, lastName, phone, email, emergencyContact } = req.body;
-
-  if (!role || !firstName || !lastName || !phone || !email || !emergencyContact) {
-    return res.status(400).json({ message: 'Missing required fields.' });
-  }
-
   try {
-    const employee = new Employee({ role, firstName, lastName, phone, email, emergencyContact });
-    await employee.save();
+    await new Employee({ role, firstName, lastName, phone, email, emergencyContact }).save();
     res.status(201).json({ message: 'Employee added!' });
   } catch (err) {
-    console.error('❌ Failed to save employee:', err);
+    console.error('❌ Employee error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-// ✅ Start Server
-app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
-});
+// Start Server
+app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

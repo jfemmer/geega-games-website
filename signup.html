@@ -160,7 +160,9 @@
       return;
     }
 
-    const addressInput = document.getElementById('address').value.trim();
+    // ✅ fallback: if #address is still empty, use raw input from autocomplete
+    const addressInput = document.getElementById('address').value.trim() ||
+                         document.querySelector('#autocomplete input')?.value.trim() || '';
 
     const newUser = {
       firstName: document.getElementById('first-name').value.trim(),
@@ -174,6 +176,8 @@
       state: document.getElementById('state').value.trim(),
       zip: document.getElementById('zip').value.trim()
     };
+
+    console.log("Submitting:", newUser); // ✅ Debugging
 
     signupButton.disabled = true;
     signupButton.textContent = "Creating Account...";
@@ -217,17 +221,17 @@
     }
   }
 
-  // ✅ Parse city, state, zip, and address from Place Autocomplete
+  // ✅ Autocomplete place handler
   window.addEventListener('load', () => {
     const autocompleteEl = document.getElementById('autocomplete');
     if (!autocompleteEl || typeof google === 'undefined') return;
 
     autocompleteEl.addEventListener('gmp-placechange', () => {
-      const addressInput = document.querySelector('#autocomplete input')?.value || '';
+      const rawInput = document.querySelector('#autocomplete input')?.value || '';
       const service = new google.maps.places.PlacesService(document.createElement('div'));
 
       service.findPlaceFromQuery({
-        query: addressInput,
+        query: rawInput,
         fields: ['address_components']
       }, (results, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
@@ -239,8 +243,11 @@
 
           const streetNumber = map.street_number || '';
           const route = map.route || '';
-          document.getElementById('address').value = `${streetNumber} ${route}`.trim();
-          document.getElementById('city').value = map.locality || '';
+          const fallbackAddress = rawInput;
+          const finalAddress = `${streetNumber} ${route}`.trim() || fallbackAddress;
+
+          document.getElementById('address').value = finalAddress;
+          document.getElementById('city').value = map.locality || map.sublocality || '';
           document.getElementById('state').value = map.administrative_area_level_1 || '';
           document.getElementById('zip').value = map.postal_code || '';
         }

@@ -398,177 +398,224 @@
   <div id="card-container"></div>
 
   <script>
+    let renderSessionToken = 0;
     const apiEndpoint = 'https://geega-games-website-production.up.railway.app/api/inventory';
     let cardsData = [], filteredCards = [], currentIndex = 0;
     const cardsPerLoad = 50;
-    
+
     function formatCondition(abbr) {
-      const conditionMap = { NM: "Near Mint", LP: "Lightly Played", MP: "Moderately Played", HP: "Heavily Played", DMG: "Damaged" };
-      return conditionMap[abbr.toUpperCase()] || abbr;
+      const map = { NM: "Near Mint", LP: "Lightly Played", MP: "Moderately Played", HP: "Heavily Played", DMG: "Damaged" };
+      return map[abbr.toUpperCase()] || abbr;
     }
-    
+
     async function getInventoryPrice(cardName, set, foil = false) {
-  try {
-    const response = await fetch(`https://geega-games-website-production.up.railway.app/api/inventory/price`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardName, set, foil })
-    });
-
-    if (response.status === 404) {
-      console.info(`ℹ️ Price not found for ${cardName} (${set})`);
-      return null;
+      try {
+        const res = await fetch(`${apiEndpoint}/price`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cardName, set, foil })
+        });
+        if (res.status === 404) return null;
+        const data = await res.json();
+        return data.price || null;
+      } catch {
+        return null;
+      }
     }
 
-    if (!response.ok) {
-      throw new Error(`❌ Inventory price fetch failed: ${response.status}`);
+    async function renderCard(card) {
+      const container = document.getElementById('card-container');
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'card';
+
+      const imageWrapper = document.createElement('div');
+      imageWrapper.className = `image-wrapper ${card.foil ? 'foil-shimmer' : ''}`;
+      imageWrapper.innerHTML = `<img src="${card.imageUrl}" alt="${card.cardName}" loading="lazy" />`;
+
+      const title = document.createElement('h3');
+      title.className = 'card-title';
+      title.textContent = card.foil ? `${card.cardName} (Foil)` : card.cardName;
+
+      const set = document.createElement('p');
+      set.className = 'card-text';
+      set.textContent = `Set: ${card.set}`;
+
+      const condition = document.createElement('p');
+      condition.className = 'card-condition';
+      condition.textContent = `Condition: ${formatCondition(card.condition)}`;
+
+      const quantity = document.createElement('p');
+      quantity.textContent = `Quantity: ${card.quantity}`;
+
+      const price = document.createElement('p');
+      price.textContent = 'Price: loading...';
+
+      const fetchedPrice = await getInventoryPrice(card.cardName, card.set, card.foil);
+      price.textContent = `Price: $${fetchedPrice || 'N/A'}`;
+
+      cardDiv.append(imageWrapper, title, set, condition, quantity, price);
+      container.appendChild(cardDiv);
     }
 
-    const data = await response.json();
-    return data.price || null;
-  } catch (err) {
-    console.error(`❌ Critical fetch error for ${cardName} (${set}):`, err);
-    return null;
+    async function renderAllCards() {
+  const session = ++renderSessionToken;
+  const container = document.getElementById('card-container');
+  container.innerHTML = '';
+
+  for (const card of filteredCards) {
+    if (session !== renderSessionToken) return;
+
+    const cardDiv = document.createElement('div');
+    cardDiv.className = 'card';
+
+    const imageWrapper = document.createElement('div');
+    imageWrapper.className = `image-wrapper ${card.foil ? 'foil-shimmer' : ''}`;
+    imageWrapper.innerHTML = `<img src="${card.imageUrl}" alt="${card.cardName}" loading="lazy" />`;
+
+    const title = document.createElement('h3');
+    title.className = 'card-title';
+    title.textContent = card.foil ? `${card.cardName} (Foil)` : card.cardName;
+
+    const set = document.createElement('p');
+    set.className = 'card-text';
+    set.textContent = `Set: ${card.set}`;
+
+    const condition = document.createElement('p');
+    condition.className = 'card-condition';
+    condition.textContent = `Condition: ${formatCondition(card.condition)}`;
+
+    const quantity = document.createElement('p');
+    quantity.textContent = `Quantity: ${card.quantity}`;
+
+    const price = document.createElement('p');
+    price.textContent = 'Price: loading...';
+
+    const fetchedPrice = await getInventoryPrice(card.cardName, card.set, card.foil);
+    if (session !== renderSessionToken) return;
+    price.textContent = `Price: $${fetchedPrice || 'N/A'}`;
+
+    cardDiv.append(imageWrapper, title, set, condition, quantity, price);
+    container.appendChild(cardDiv);
   }
 }
-    
+
+function applyFilters() {
+  const color = document.getElementById('color-filter').value;
+  const creature = document.getElementById('creature-filter').value.toLowerCase();
+  const sortDir = document.getElementById('sort-dropdown').value;
+
+  renderSessionToken++; // cancel previous renders
+  const session = renderSessionToken;
+
+  filteredCards = cardsData.filter(card => {
+    const matchesColor = !color ||
+      (color === 'C' && card.colors?.[0] === 'Colorless' && card.cardType?.toLowerCase().includes('artifact')) ||
+      (color === 'M' && card.colors?.[0] === 'Multicolor') ||
+      (color === 'L' && card.cardType?.toLowerCase().includes('land')) ||
+      (Array.isArray(card.colors) && card.colors.includes(color));
+
+    const matchesType = !creature ||
+      (Array.isArray(card.creatureTypes) && card.creatureTypes.some(type => type.toLowerCase() === creature));
+
+    return matchesColor && matchesType;
+  });
+
+  filteredCards.sort((a, b) => {
+    const aTitle = a.foil ? `${a.cardName} (Foil)` : a.cardName;
+    const bTitle = b.foil ? `${b.cardName} (Foil)` : b.cardName;
+    return sortDir === "asc"
+      ? aTitle.localeCompare(bTitle)
+      : bTitle.localeCompare(aTitle);
+  });
+
+  document.getElementById('card-container').innerHTML = '';
+  renderAllCards(); // ⬅️ replaces displayNextBatch
+}
     async function loadCards() {
       try {
         const res = await fetch(apiEndpoint);
         const data = await res.json();
         const mergedMap = new Map();
-    
         data.forEach(card => {
-          const key = `${card.cardName.trim().toLowerCase()}|${card.set.trim().toLowerCase()}|${card.foil ? '1' : '0'}|${card.condition.trim().toLowerCase()}`;
+          const key = `${card.cardName.toLowerCase()}|${card.set.toLowerCase()}|${card.foil}|${card.condition.toLowerCase()}`;
           if (mergedMap.has(key)) mergedMap.get(key).quantity += card.quantity;
           else mergedMap.set(key, { ...card });
         });
-    
         cardsData = Array.from(mergedMap.values()).filter(c => c.imageUrl);
-        applyFilters();
-      } catch (e) {
-        console.error('❌ Load error:', e);
+        applyFilters(); // apply filter + sort on first load
+      } catch (err) {
+        console.error('❌ Error loading inventory:', err);
       }
     }
-    
-    function displayNextBatch() {
-      const container = document.getElementById('card-container');
-      const batch = filteredCards.slice(currentIndex, currentIndex + cardsPerLoad);
-      batch.forEach(async card => {
-        const cardDiv = document.createElement('div');
-        cardDiv.className = 'card';
-    
-        const imageWrapper = document.createElement('div');
-        imageWrapper.className = `image-wrapper ${card.foil ? 'foil-shimmer' : ''}`;
-        imageWrapper.innerHTML = `<img src="${card.imageUrl}" alt="${card.cardName}" loading="lazy" />`;
-    
-        const title = document.createElement('h3');
-        title.className = 'card-title';
-        title.textContent = card.foil ? `${card.cardName} (Foil)` : card.cardName;
-    
-        const set = document.createElement('p');
-        set.className = 'card-text';
-        set.textContent = `Set: ${card.set}`;
-    
-        const condition = document.createElement('p');
-        condition.className = 'card-condition';
-        condition.textContent = `Condition: ${formatCondition(card.condition)}`;
-    
-        const quantity = document.createElement('p');
-        quantity.textContent = `Quantity: ${card.quantity}`;
-    
-        const price = document.createElement('p');
-        price.textContent = 'Price: loading...';
-    
-        // 🤑 Fetch real-time price
-        const fetchedPrice = await getInventoryPrice(card.cardName, card.set, card.foil);
-        price.textContent = `Price: $${fetchedPrice || 'N/A'}`;
-    
-        cardDiv.append(imageWrapper, title, set, condition, quantity, price);
-        container.appendChild(cardDiv);
-      });
-      currentIndex += cardsPerLoad;
-    }
-    
-    function applyFilters() {
-      const color = document.getElementById('color-filter').value;
-      const creature = document.getElementById('creature-filter').value.toLowerCase();
-    
-      filteredCards = cardsData.filter(card => {
-        const matchesColor = !color ||
-          (color === 'C' && card.colors?.[0] === 'Colorless' && card.cardType?.toLowerCase().includes('artifact')) ||
-          (color === 'M' && card.colors?.[0] === 'Multicolor') ||
-          (color === 'L' && card.cardType?.toLowerCase().includes('land')) ||
-          (Array.isArray(card.colors) && card.colors.includes(color));
-    
-        const matchesType = !creature || (Array.isArray(card.creatureTypes) && card.creatureTypes.some(type => type.toLowerCase() === creature));
-    
-        return matchesColor && matchesType;
-      });
-    
-      document.getElementById('card-container').innerHTML = '';
-      currentIndex = 0;
-      displayNextBatch();
-    }
-    
-    ['color-filter', 'creature-filter'].forEach(id => {
-      document.getElementById(id).addEventListener('change', applyFilters);
-    });
-    
-    document.getElementById("sort-dropdown").addEventListener("change", e => {
-      const dir = e.target.value;
-      filteredCards.sort((a, b) => dir === "asc" ? a.cardName.localeCompare(b.cardName) : b.cardName.localeCompare(a.cardName));
-      document.getElementById("card-container").innerHTML = "";
-      currentIndex = 0;
-      displayNextBatch();
-    });
-    
-    document.getElementById('search-button').addEventListener('click', searchCards);
-    document.getElementById('search-input').addEventListener('keypress', e => e.key === 'Enter' && searchCards());
-    
+
+    document.getElementById('sort-dropdown').addEventListener('change', applyFilters);
+    document.getElementById('color-filter').addEventListener('change', applyFilters);
+    document.getElementById('creature-filter').addEventListener('change', applyFilters);
+
     function searchCards() {
-      const query = document.getElementById('search-input').value.toLowerCase();
-      filteredCards = cardsData.filter(c =>
-        c.cardName.toLowerCase().includes(query) ||
-        c.set.toLowerCase().includes(query) ||
-        c.condition?.toLowerCase().includes(query)
-    );
-  
+  const query = document.getElementById('search-input').value.toLowerCase();
+  const sortDir = document.getElementById('sort-dropdown').value;
+
+  renderSessionToken++; // Cancel previous renders
+  const session = renderSessionToken;
+
+  filteredCards = cardsData.filter(c =>
+    c.cardName.toLowerCase().includes(query) ||
+    c.set.toLowerCase().includes(query) ||
+    c.condition?.toLowerCase().includes(query)
+  );
+
+  filteredCards.sort((a, b) => {
+    const aTitle = a.foil ? `${a.cardName} (Foil)` : a.cardName;
+    const bTitle = b.foil ? `${b.cardName} (Foil)` : b.cardName;
+    return sortDir === "asc"
+      ? aTitle.localeCompare(bTitle)
+      : bTitle.localeCompare(aTitle);
+  });
+
   const container = document.getElementById('card-container');
   container.innerHTML = '';
-  currentIndex = 0;
 
   if (filteredCards.length === 0) {
-    const message = document.createElement('p');
-    message.textContent = '❌ Sorry we do not currently have that in our inventory!';
-    message.style.fontSize = '18px';
-    message.style.color = 'rebeccapurple';
-    message.style.marginTop = '20px';
-    message.style.textAlign = 'center';
-    container.appendChild(message);
+    const msg = document.createElement('p');
+    msg.textContent = '❌ Sorry we do not currently have that in our inventory!';
+    msg.style.fontSize = '18px';
+    msg.style.color = 'rebeccapurple';
+    msg.style.marginTop = '20px';
+    msg.style.textAlign = 'center';
+    container.appendChild(msg);
   } else {
-    displayNextBatch();
+    renderAllCards(); // ⬅️ replaces displayNextBatch
   }
 }
-    
-    window.addEventListener('scroll', () => {
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) displayNextBatch();
+
+    document.getElementById('search-button').addEventListener('click', searchCards);
+    document.getElementById('search-input').addEventListener('keypress', e => {
+      if (e.key === 'Enter') searchCards();
     });
-    
+
+    window.addEventListener('scroll', () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+        displayNextBatch();
+      }
+    });
+
     document.getElementById('hamburger-icon').addEventListener('click', () => {
       const menu = document.getElementById('dropdown-menu');
       menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
     });
-    
+
     document.addEventListener('click', e => {
       const menu = document.getElementById('dropdown-menu');
       const icon = document.getElementById('hamburger-icon');
-      if (!menu.contains(e.target) && e.target !== icon) menu.style.display = 'none';
+      if (!menu.contains(e.target) && e.target !== icon) {
+        menu.style.display = 'none';
+      }
     });
-    
+
     async function loadCreatureTypes() {
       try {
-        const res = await fetch('https://geega-games-website-production.up.railway.app/api/inventory/creature-types');
+        const res = await fetch(`${apiEndpoint}/creature-types`);
         const types = await res.json();
         const dropdown = document.getElementById("creature-filter");
         types.forEach(type => {
@@ -581,10 +628,9 @@
         console.error("❌ Creature type load error:", err);
       }
     }
-    
+
     loadCards();
     loadCreatureTypes();
-    </script>
+  </script>
 </body>
-
 </html>

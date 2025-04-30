@@ -11,9 +11,15 @@
   <!-- ✅ Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <!-- ✅ Google Maps Web Components -->
-  <script type="module" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places"></script>
-  <script type="module" src="https://unpkg.com/@googlemaps/extended-component-library/placeautocompleteelement.js"></script>
+  <!-- ✅ Google Extended Component API Loader -->
+  <script type="module">
+    import "@googlemaps/extended-component-library/api-loader.js";
+
+    const loader = document.createElement('gmpx-api-loader');
+    loader.apiKey = "AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM";
+    loader.libraries = "places";
+    document.body.appendChild(loader);
+  </script>
 
   <style>
     body {
@@ -112,11 +118,11 @@
     <p id="error-message" class="error-message"></p>
     <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
-    <!-- ✅ New Google Maps Web Component -->
-    <gmpx-placeautocomplete id="autocomplete" placeholder="Start typing your address"></gmpx-placeautocomplete>
+    <!-- ✅ Updated Autocomplete Component -->
+    <gmpx-placeautocomplete id="autocomplete" placeholder="Start typing your address" required></gmpx-placeautocomplete>
 
-    <!-- ✅ Hidden address fields -->
-    <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" required>
+    <!-- ✅ Autofilled address fields -->
+    <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" readonly required>
     <input type="text" id="city" placeholder="City" autocomplete="address-level2" required>
     <input type="text" id="state" placeholder="State" autocomplete="address-level1" required>
     <input type="text" id="zip" placeholder="Zip Code" autocomplete="postal-code" required>
@@ -159,7 +165,7 @@
     }
 
     const addressInput = document.getElementById('address').value.trim() ||
-                         document.getElementById('autocomplete')?.value.trim() || '';
+                         document.getElementById('autocomplete')?.value?.formattedAddress || '';
 
     const newUser = {
       firstName: document.getElementById('first-name').value.trim(),
@@ -218,13 +224,12 @@
     }
   }
 
-  // ✅ Autofill address fields from new gmpx-placeautocomplete
+  // ✅ Extract address parts from <gmpx-placeautocomplete>
   const autocompleteEl = document.getElementById("autocomplete");
   autocompleteEl.addEventListener("gmpx-placechange", () => {
     const place = autocompleteEl.value;
-
     const get = (type) =>
-      place.addressComponents.find(c => c.types.includes(type))?.longText || "";
+      place.addressComponents?.find(c => c.types.includes(type))?.longText || "";
 
     const streetNumber = get("street_number");
     const route = get("route");

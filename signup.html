@@ -217,7 +217,7 @@
   // ✅ Modern address parser using gmpx-placeautocomplete
   const autocompleteEl = document.getElementById("autocomplete");
   autocompleteEl.addEventListener("gmp-placechange", () => {
-    const place = autocompleteEl.value;
+    const place = event.detail; 
 
     const get = (type) =>
       place.addressComponents?.find(c => c.types.includes(type))?.longText || "";

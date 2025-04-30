@@ -4,6 +4,17 @@
   <meta charset="UTF-8">
   <title>Sign Up - Geega Games</title>
   <link rel="stylesheet" href="style.css">
+
+  <!-- ✅ Google Sign-In -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- ✅ Google Maps (with Places) -->
+  <script
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&loading=async"
+  async
+  defer>
+</script>
+
   <style>
     body {
       background-color: #f5f5f5;
@@ -99,15 +110,36 @@
     <input type="password" id="confirm-password" placeholder="Confirm Password" required>
     <p id="error-message" class="error-message"></p>
     <input type="tel" id="phone" placeholder="Phone Number" required>
+
+    <!-- ✅ Regular address input (autocomplete-ready later) -->
     <input type="text" id="address" placeholder="Street Address" required>
     <input type="text" id="city" placeholder="City" required>
     <input type="text" id="state" placeholder="State" required>
     <input type="text" id="zip" placeholder="Zip Code" required>
+
     <button type="submit" id="signup-button">Sign Up</button>
   </form>
+
   <p>Already have an account? <a href="login.html">Log In</a></p>
+
+  <!-- ✅ Google Sign-In button -->
+  <div id="g_id_onload"
+       data-client_id="633871000162-dfmg4dqnkaooasaddmsjbmcm16aujjn5.apps.googleusercontent.com"
+       data-callback="handleGoogleLogin"
+       data-auto_prompt="false">
+  </div>
+
+  <div class="g_id_signin"
+       data-type="standard"
+       data-size="large"
+       data-theme="outline"
+       data-text="sign_in_with"
+       data-shape="rectangular"
+       data-logo_alignment="left">
+  </div>
 </div>
 
+<!-- ✅ Signup + Google Login -->
 <script>
   const signupForm = document.getElementById('signup-form');
   const errorMessage = document.getElementById('error-message');
@@ -165,7 +197,27 @@
       signupButton.textContent = "Sign Up";
     }
   });
-</script>
 
+  async function handleGoogleLogin(response) {
+    const { credential } = response;
+    try {
+      const res = await fetch('https://geega-games-website-production.up.railway.app/api/google-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: credential })
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        alert("Welcome, " + result.username + "!");
+        window.location.href = "dashboard.html"; // or your next step
+      } else {
+        alert(result.message || "Google sign-in failed.");
+      }
+    } catch (err) {
+      console.error("Google Sign-In error:", err);
+    }
+  }
+</script>
 </body>
 </html>

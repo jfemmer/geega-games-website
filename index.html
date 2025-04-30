@@ -462,9 +462,10 @@
   const container = document.getElementById('card-container');
   container.innerHTML = '';
 
-  for (const card of filteredCards) {
-    if (session !== renderSessionToken) return;
+  // STEP 1: Render all cards immediately
+  const cardElements = [];
 
+  filteredCards.forEach(card => {
     const cardDiv = document.createElement('div');
     cardDiv.className = 'card';
 
@@ -490,13 +491,21 @@
     const price = document.createElement('p');
     price.textContent = 'Price: loading...';
 
-    const fetchedPrice = await getInventoryPrice(card.cardName, card.set, card.foil);
-    if (session !== renderSessionToken) return;
-    price.textContent = `Price: $${fetchedPrice || 'N/A'}`;
-
     cardDiv.append(imageWrapper, title, set, condition, quantity, price);
     container.appendChild(cardDiv);
-  }
+
+    cardElements.push({ card, priceEl: price });
+  });
+
+  // STEP 2: Fetch prices in parallel and update elements
+  await Promise.all(
+    cardElements.map(async ({ card, priceEl }) => {
+      const fetchedPrice = await getInventoryPrice(card.cardName, card.set, card.foil);
+      if (session === renderSessionToken) {
+        priceEl.textContent = `Price: $${fetchedPrice || 'N/A'}`;
+      }
+    })
+  );
 }
 
 function applyFilters() {

@@ -117,8 +117,7 @@
     <gmp-place-autocomplete id="autocomplete" placeholder="Start typing your address" required></gmp-place-autocomplete>
 
     <!-- ✅ Hidden address field (filled automatically) -->
-    <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" readonly required>
-
+    <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" required>
     <input type="text" id="city" placeholder="City" autocomplete="address-level2" required>
     <input type="text" id="state" placeholder="State" autocomplete="address-level1" required>
     <input type="text" id="zip" placeholder="Zip Code" autocomplete="postal-code" required>
@@ -160,9 +159,9 @@
       return;
     }
 
-    // ✅ FORCE address field to match what's typed or selected
-    const rawAutocompleteValue = document.querySelector('#autocomplete input')?.value.trim() || '';
-    document.getElementById('address').value = rawAutocompleteValue;
+    // ✅ Always grab latest values before submission
+    const addressInput = document.getElementById('address').value.trim() ||
+                         document.querySelector('#autocomplete input')?.value.trim() || '';
 
     const newUser = {
       firstName: document.getElementById('first-name').value.trim(),
@@ -171,13 +170,13 @@
       email: document.getElementById('new-email').value.trim(),
       password: password,
       phone: document.getElementById('phone').value.trim(),
-      address: document.getElementById('address').value.trim(),
+      address: addressInput,
       city: document.getElementById('city').value.trim(),
       state: document.getElementById('state').value.trim(),
       zip: document.getElementById('zip').value.trim()
     };
 
-    console.log("📬 Submitting user data:", newUser); // ✅ DEBUG: See full payload
+    console.log("📬 Submitting:", newUser);
 
     signupButton.disabled = true;
     signupButton.textContent = "Creating Account...";
@@ -221,19 +220,15 @@
     }
   }
 
-  // ✅ Autocomplete event handler
+  // ✅ Autocomplete fills all address fields
   window.addEventListener('load', () => {
     const autocompleteEl = document.getElementById('autocomplete');
     if (!autocompleteEl || typeof google === 'undefined') return;
 
     autocompleteEl.addEventListener('gmp-placechange', () => {
       const rawInput = document.querySelector('#autocomplete input')?.value?.trim() || '';
-
-      // ✅ Keep address field in sync when a place is selected
-      document.getElementById('address').value = rawInput;
-
-      // Extract other address parts
       const service = new google.maps.places.PlacesService(document.createElement('div'));
+
       service.findPlaceFromQuery({
         query: rawInput,
         fields: ['address_components']
@@ -245,6 +240,10 @@
             c.types.forEach(t => map[t] = c.long_name);
           });
 
+          // ✅ Construct full street address
+          const street = `${map.street_number || ''} ${map.route || ''}`.trim() || rawInput;
+
+          document.getElementById('address').value = street;
           document.getElementById('city').value = map.locality || map.sublocality || '';
           document.getElementById('state').value = map.administrative_area_level_1 || '';
           document.getElementById('zip').value = map.postal_code || '';
@@ -253,5 +252,6 @@
     });
   });
 </script>
+
 </body>
 </html>

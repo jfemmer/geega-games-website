@@ -12,9 +12,9 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <!-- ✅ Google Maps JavaScript API with Place Autocomplete modules -->
-  <script type="module" async
-          src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&v=beta&modules=places">
-  </script>
+  <script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initAutocomplete">
+</script>
 
   <style>
     body {
@@ -114,7 +114,7 @@
     <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
     <!-- ✅ Autocomplete Component -->
-    <gmp-place-autocomplete id="autocomplete" placeholder="Start typing your address" required></gmp-place-autocomplete>
+    <input id="autocomplete" placeholder="Start typing your address" type="text" required />
 
     <!-- ✅ Hidden address field (filled automatically) -->
     <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" required>
@@ -159,9 +159,8 @@
       return;
     }
 
-    // ✅ Always grab latest values before submission
     const addressInput = document.getElementById('address').value.trim() ||
-                         document.querySelector('#autocomplete input')?.value.trim() || '';
+                         document.getElementById('autocomplete')?.value.trim() || '';
 
     const newUser = {
       firstName: document.getElementById('first-name').value.trim(),
@@ -220,40 +219,41 @@
     }
   }
 
-  // ✅ Autocomplete fills all address fields
-  window.addEventListener('load', () => {
-  const autocompleteEl = document.getElementById('autocomplete');
-  if (!autocompleteEl || typeof google === 'undefined') return;
+  // ✅ Google Places Autocomplete to autofill address fields
+  let autocomplete;
 
-  autocompleteEl.addEventListener('gmp-placechange', () => {
-    const inputEl = document.querySelector('#autocomplete input');
-    const rawInput = inputEl?.value?.trim() || '';
-    const service = new google.maps.places.PlacesService(document.createElement('div'));
-
-    service.findPlaceFromQuery({
-      query: rawInput,
-      fields: ['address_components']
-    }, (results, status) => {
-      if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) return;
-
-      const components = results[0].address_components;
-      const getComponent = (types) =>
-        components.find(c => types.every(t => c.types.includes(t)))?.long_name || '';
-
-      const streetNumber = getComponent(['street_number']);
-      const route = getComponent(['route']);
-      const city = getComponent(['locality']) || getComponent(['sublocality']);
-      const state = getComponent(['administrative_area_level_1']);
-      const zip = getComponent(['postal_code']);
-
-      document.getElementById('address').value = `${streetNumber} ${route}`.trim() || rawInput;
-      document.getElementById('city').value = city;
-      document.getElementById('state').value = state;
-      document.getElementById('zip').value = zip;
+  function initAutocomplete() {
+    const input = document.getElementById("autocomplete");
+    autocomplete = new google.maps.places.Autocomplete(input, {
+      types: ["address"],
+      componentRestrictions: { country: "us" },
+      fields: ["address_component"]
     });
-  });
-});
+
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (!place.address_components) return;
+
+      const get = (type) =>
+        place.address_components.find(c => c.types.includes(type))?.long_name || '';
+
+      const streetNumber = get("street_number");
+      const route = get("route");
+      const city = get("locality") || get("sublocality");
+      const state = get("administrative_area_level_1");
+      const zip = get("postal_code");
+
+      document.getElementById("address").value = `${streetNumber} ${route}`.trim();
+      document.getElementById("city").value = city;
+      document.getElementById("state").value = state;
+      document.getElementById("zip").value = zip;
+    });
+  }
+
+  window.initAutocomplete = initAutocomplete;
 </script>
 
+</body>
+</html>
 </body>
 </html>

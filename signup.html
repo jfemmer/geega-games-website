@@ -11,10 +11,9 @@
   <!-- ✅ Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <!-- ✅ Google Maps JavaScript API with Place Autocomplete modules -->
-  <script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initAutocomplete">
-</script>
+  <!-- ✅ Google Maps Web Components -->
+  <script type="module" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places"></script>
+  <script type="module" src="https://unpkg.com/@googlemaps/extended-component-library/placeautocompleteelement.js"></script>
 
   <style>
     body {
@@ -47,7 +46,7 @@
     }
 
     .signup-container input,
-    gmp-place-autocomplete {
+    gmpx-placeautocomplete {
       width: 90%;
       padding: 10px;
       margin: 10px 0;
@@ -113,10 +112,10 @@
     <p id="error-message" class="error-message"></p>
     <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
-    <!-- ✅ Autocomplete Component -->
-    <input id="autocomplete" placeholder="Start typing your address" type="text" required />
+    <!-- ✅ New Google Maps Web Component -->
+    <gmpx-placeautocomplete id="autocomplete" placeholder="Start typing your address"></gmpx-placeautocomplete>
 
-    <!-- ✅ Hidden address field (filled automatically) -->
+    <!-- ✅ Hidden address fields -->
     <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" required>
     <input type="text" id="city" placeholder="City" autocomplete="address-level2" required>
     <input type="text" id="state" placeholder="State" autocomplete="address-level1" required>
@@ -219,41 +218,26 @@
     }
   }
 
-  // ✅ Google Places Autocomplete to autofill address fields
-  let autocomplete;
+  // ✅ Autofill address fields from new gmpx-placeautocomplete
+  const autocompleteEl = document.getElementById("autocomplete");
+  autocompleteEl.addEventListener("gmpx-placechange", () => {
+    const place = autocompleteEl.value;
 
-  function initAutocomplete() {
-    const input = document.getElementById("autocomplete");
-    autocomplete = new google.maps.places.Autocomplete(input, {
-      types: ["address"],
-      componentRestrictions: { country: "us" },
-      fields: ["address_component"]
-    });
+    const get = (type) =>
+      place.addressComponents.find(c => c.types.includes(type))?.longText || "";
 
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      if (!place.address_components) return;
+    const streetNumber = get("street_number");
+    const route = get("route");
+    const city = get("locality") || get("sublocality");
+    const state = get("administrative_area_level_1");
+    const zip = get("postal_code");
 
-      const get = (type) =>
-        place.address_components.find(c => c.types.includes(type))?.long_name || '';
-
-      const streetNumber = get("street_number");
-      const route = get("route");
-      const city = get("locality") || get("sublocality");
-      const state = get("administrative_area_level_1");
-      const zip = get("postal_code");
-
-      document.getElementById("address").value = `${streetNumber} ${route}`.trim();
-      document.getElementById("city").value = city;
-      document.getElementById("state").value = state;
-      document.getElementById("zip").value = zip;
-    });
-  }
-
-  window.initAutocomplete = initAutocomplete;
+    document.getElementById("address").value = `${streetNumber} ${route}`.trim();
+    document.getElementById("city").value = city;
+    document.getElementById("state").value = state;
+    document.getElementById("zip").value = zip;
+  });
 </script>
 
-</body>
-</html>
 </body>
 </html>

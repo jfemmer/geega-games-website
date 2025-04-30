@@ -213,7 +213,7 @@
     }
   }
 
-  // ✅ Autofill using the correct Google component event
+  // ✅ Autofill from <gmp-place-autocomplete>
   const autocompleteEl = document.getElementById("autocomplete");
 
   autocompleteEl.addEventListener("gmp-placechange", (event) => {
@@ -224,7 +224,7 @@
     }
 
     const get = (type) =>
-      place.addressComponents.find(comp => comp.types.includes(type))?.longText || '';
+      place.addressComponents.find(comp => comp.types.includes(type))?.text || '';
 
     const streetNumber = get("street_number");
     const route = get("route");
@@ -234,7 +234,7 @@
 
     const address = `${streetNumber} ${route}`.trim();
 
-    console.log("📦 Autofilled Address:", { address, city, state, zip });
+    console.log("📦 Autofilled:", { address, city, state, zip });
 
     document.getElementById("address").value = address;
     document.getElementById("city").value = city;

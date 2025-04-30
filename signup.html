@@ -215,12 +215,14 @@
   }
 
   // ✅ Modern address parser using gmpx-placeautocomplete
-  const autocompleteEl = document.getElementById("autocomplete");
-  autocompleteEl.addEventListener("gmp-placechange", () => {
-    const place = event.detail; 
+    const autocompleteEl = document.getElementById("autocomplete");
+
+  autocompleteEl.addEventListener("gmp-placechange", (event) => {
+    const place = event.detail.place;
+    if (!place || !place.addressComponents) return;
 
     const get = (type) =>
-      place.addressComponents?.find(c => c.types.includes(type))?.longText || "";
+      place.addressComponents.find(c => c.types.includes(type))?.longText || "";
 
     const streetNumber = get("street_number");
     const route = get("route");

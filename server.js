@@ -6,9 +6,29 @@ const axios = require('axios');
 const { OAuth2Client } = require('google-auth-library');
 require('dotenv').config();
 
-const app = express();
-app.use(cors());
+const app = express(); // ✅ MUST come before app.use()
+
+const allowedOrigins = [
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+  'https://geega-games.com',
+  'https://geega-games-website-production.up.railway.app'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+  credentials: true
+}));
+
 app.use(express.json());
+
 
 const oauthClient = new OAuth2Client('633871000162-dfmg4dqnkaooasaddmsjbmcm16aujjn5.apps.googleusercontent.com');
 

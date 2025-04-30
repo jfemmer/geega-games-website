@@ -5,13 +5,13 @@
   <title>Sign Up - Geega Games</title>
   <link rel="stylesheet" href="style.css">
 
-  <!-- ✅ JWT Decode (MUST come before usage) -->
+  <!-- ✅ JWT Decode -->
   <script src="https://unpkg.com/jwt-decode/build/jwt-decode.min.js"></script>
 
   <!-- ✅ Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <!-- ✅ Google Maps JavaScript API with GMP Modules (only this one needed) -->
+  <!-- ✅ Google Maps JavaScript API with Place Autocomplete modules -->
   <script type="module"
           src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&v=beta&modules=places">
   </script>
@@ -113,7 +113,7 @@
     <p id="error-message" class="error-message"></p>
     <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
-    <!-- ✅ New Google Maps Autocomplete Component -->
+    <!-- ✅ Autocomplete Component -->
     <gmp-place-autocomplete id="autocomplete" placeholder="Street Address" required></gmp-place-autocomplete>
 
     <input type="text" id="city" placeholder="City" autocomplete="address-level2" required>
@@ -212,15 +212,32 @@
     }
   }
 
-  // ✅ Listener for new autocomplete component
+  // ✅ Parse city, state, and zip from selected address
   window.addEventListener('load', () => {
-    const autocomplete = document.getElementById('autocomplete');
-    if (autocomplete) {
-      autocomplete.addEventListener('gmp-placechange', () => {
-        console.log('Selected address:', autocomplete.value);
-        // Optional: parse city/state/zip from .value if needed
+    const autocompleteEl = document.getElementById('autocomplete');
+    if (!autocompleteEl || typeof google === 'undefined') return;
+
+    autocompleteEl.addEventListener('gmp-placechange', () => {
+      const address = autocompleteEl.value;
+      const service = new google.maps.places.PlacesService(document.createElement('div'));
+
+      service.findPlaceFromQuery({
+        query: address,
+        fields: ['address_components']
+      }, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+          const components = results[0].address_components;
+          const map = {};
+          components.forEach(c => {
+            c.types.forEach(t => map[t] = c.long_name);
+          });
+
+          document.getElementById('city').value = map.locality || '';
+          document.getElementById('state').value = map.administrative_area_level_1 || '';
+          document.getElementById('zip').value = map.postal_code || '';
+        }
       });
-    }
+    });
   });
 </script>
 

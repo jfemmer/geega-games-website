@@ -544,6 +544,9 @@
 
     loadCards();
     loadCreatureTypes();
+
+    document.getElementById('color-filter')?.addEventListener('change', applyFilters);
+    document.getElementById('creature-filter')?.addEventListener('change', applyFilters);
   </script>
 </body>
 

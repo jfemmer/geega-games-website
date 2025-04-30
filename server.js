@@ -1,36 +1,16 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
-const { OAuth2Client } = require('google-auth-library');
 require('dotenv').config();
 
-const app = express(); // ✅ MUST come before app.use()
+const app = express();
 
-const allowedOrigins = [
-  'http://localhost:5500',
-  'http://127.0.0.1:5500',
-  'https://geega-games.com',
-  'https://geega-games-website-production.up.railway.app'
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error('Not allowed by CORS'));
-  },
-  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
-  credentials: true
-}));
-
+// ✅ Middleware
+app.use(cors());
 app.use(express.json());
-
-
-const oauthClient = new OAuth2Client('633871000162-dfmg4dqnkaooasaddmsjbmcm16aujjn5.apps.googleusercontent.com');
 
 // ✅ Scryfall Image Fetch Helper
 const fetchScryfallImageUrl = async (name, set, options = {}) => {
@@ -58,7 +38,7 @@ const fetchScryfallImageUrl = async (name, set, options = {}) => {
   }
 };
 
-// ✅ Environment Variables
+// ✅ Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
 const INVENTORY_DB_URI = process.env.INVENTORY_DB_URI;
 const EMPLOYEE_DB_URI = process.env.EMPLOYEE_DB_URI;
@@ -69,62 +49,50 @@ if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI) {
   process.exit(1);
 }
 
-// ✅ Database Connections
+// ✅ Connect to MongoDB
 const db1 = mongoose.createConnection(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
+// ✅ Connection Logs
 [db1, inventoryConnection, employeeConnection].forEach((db, i) => {
-  db.on('connected', () => console.log(`✅ Connected to MongoDB database #${i + 1}`));
-  db.on('error', (err) => console.error(`❌ MongoDB connection error #${i + 1}:`, err.message));
+  db.on('connected', () => console.log(`✅ Connected to MongoDB database #${i+1}`));
+  db.on('error', (err) => console.error(`❌ MongoDB connection error #${i+1}:`, err.message));
 });
 
-// ✅ Schemas
+// ✅ Schemas and Models
 const userSchema = new mongoose.Schema({
-  firstName: String,
-  lastName: String,
-  username: { type: String, required: true, unique: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  phone: String,
-  address: String,
-  state: String,
-  zip: String,
-  createdAt: { type: Date, default: Date.now }
+  firstName: String, lastName: String, username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true }, password: { type: String, required: true },
+  phone: String, address: String, state: String, zip: String, createdAt: { type: Date, default: Date.now }
 });
 const User = db1.model('User', userSchema);
 
 const inventorySchema = new mongoose.Schema({
-  cardName: { type: String, required: true },
-  quantity: { type: Number, required: true },
-  set: { type: String, required: true },
-  condition: { type: String, required: true },
-  foil: { type: Boolean, default: false },
-  imageUrl: String,
-  colors: [String],
-  cardType: String,
-  creatureTypes: [String],
-  price: Number,
-  addedAt: { type: Date, default: Date.now }
+  cardName: { type: String, required: true }, quantity: { type: Number, required: true },
+  set: { type: String, required: true }, condition: { type: String, required: true },
+  foil: { type: Boolean, default: false }, imageUrl: String, colors: [String],
+  cardType: String, creatureTypes: [String], price: Number, addedAt: { type: Date, default: Date.now }
 });
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
 
 const employeeSchema = new mongoose.Schema({
-  role: { type: String, required: true },
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
-  phone: { type: String, required: true },
-  email: { type: String, required: true },
-  emergencyContact: { type: String, required: true },
+  role: { type: String, required: true }, firstName: { type: String, required: true },
+  lastName: { type: String, required: true }, phone: { type: String, required: true },
+  email: { type: String, required: true }, emergencyContact: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });
 const Employee = employeeConnection.model('Employee', employeeSchema, 'Employees');
 
 // ✅ Routes
+
+// Root
 app.get('/', (req, res) => res.send('🧙‍♂️ Welcome to the Geega Games API!'));
+
+// Version Check
 app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js version'));
 
-// ✅ Creature Types
+// Creature Types
 app.get('/api/inventory/creature-types', async (req, res) => {
   try {
     const types = await CardInventory.distinct('creatureTypes');
@@ -135,7 +103,7 @@ app.get('/api/inventory/creature-types', async (req, res) => {
   }
 });
 
-// ✅ Signup
+// Signup
 app.post('/signup', async (req, res) => {
   try {
     const { firstName, lastName, username, email, password, phone, address, state, zip } = req.body;
@@ -154,47 +122,7 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-// ✅ Google Login
-app.post('/api/google-login', async (req, res) => {
-  const { token } = req.body;
-
-  try {
-    const ticket = await oauthClient.verifyIdToken({
-      idToken: token,
-      audience: '633871000162-dfmg4dqnkaooasaddmsjbmcm16aujjn5.apps.googleusercontent.com'
-    });
-
-    const payload = ticket.getPayload();
-    const { email, name, sub } = payload;
-
-    let user = await User.findOne({ email });
-
-    if (!user) {
-      user = await new User({
-        username: email.split('@')[0],
-        email,
-        firstName: name,
-        lastName: '',
-        password: await bcrypt.hash(sub, 10),
-        phone: '',
-        address: '',
-        state: '',
-        zip: ''
-      }).save();
-    }
-
-    res.status(200).json({
-      message: 'Google login successful',
-      username: user.username,
-      email: user.email
-    });
-  } catch (err) {
-    console.error("Google login error:", err);
-    res.status(401).json({ message: 'Invalid token' });
-  }
-});
-
-// ✅ Login
+// Login
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -209,7 +137,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// ✅ Other Routes
+// Get All Users
 app.get('/api/users', async (req, res) => {
   try {
     res.json(await User.find().sort({ createdAt: -1 }));
@@ -219,6 +147,7 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+// Add Inventory Card
 app.post('/api/inventory', async (req, res) => {
   try {
     const { cardName, quantity, set, condition, foil, price } = req.body;
@@ -234,6 +163,7 @@ app.post('/api/inventory', async (req, res) => {
   }
 });
 
+// Get All Inventory
 app.get('/api/inventory', async (req, res) => {
   try {
     res.json(await CardInventory.find().sort({ cardName: 1 }));
@@ -243,6 +173,40 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
+// Get Single Price
+app.post('/api/inventory/price', async (req, res) => {
+  const { cardName, set, foil } = req.body;
+  try {
+    const card = await CardInventory.findOne({ cardName, set, foil: !!foil });
+    if (!card || card.price == null) return res.status(404).json({ error: 'Price not found' });
+    res.json({ price: card.price });
+  } catch (err) {
+    console.error('❌ Single price error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ✅ NEW: Batch Fetch Prices
+app.post('/api/inventory/prices', async (req, res) => {
+  try {
+    const { cards } = req.body;
+    if (!Array.isArray(cards)) return res.status(400).json({ error: 'Cards array required.' });
+
+    const prices = {};
+    for (const { cardName, set, foil } of cards) {
+      if (!cardName || !set) continue;
+      const match = await CardInventory.findOne({ cardName, set, foil: !!foil });
+      if (match && match.price != null) prices[`${cardName}|${set}|${foil ? '1' : '0'}`] = match.price;
+    }
+
+    res.json(prices);
+  } catch (err) {
+    console.error('❌ Batch prices error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete Inventory Card
 app.delete('/api/inventory', async (req, res) => {
   try {
     const { cardName, set, foil } = req.body;
@@ -255,6 +219,7 @@ app.delete('/api/inventory', async (req, res) => {
   }
 });
 
+// Add Employee
 app.post('/api/employees', async (req, res) => {
   const { role, firstName, lastName, phone, email, emergencyContact } = req.body;
   try {
@@ -266,5 +231,5 @@ app.post('/api/employees', async (req, res) => {
   }
 });
 
-// ✅ Start Server
+// Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

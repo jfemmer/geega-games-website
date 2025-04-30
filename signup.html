@@ -222,35 +222,37 @@
 
   // ✅ Autocomplete fills all address fields
   window.addEventListener('load', () => {
-    const autocompleteEl = document.getElementById('autocomplete');
-    if (!autocompleteEl || typeof google === 'undefined') return;
+  const autocompleteEl = document.getElementById('autocomplete');
+  if (!autocompleteEl || typeof google === 'undefined') return;
 
-    autocompleteEl.addEventListener('gmp-placechange', () => {
-      const rawInput = document.querySelector('#autocomplete input')?.value?.trim() || '';
-      const service = new google.maps.places.PlacesService(document.createElement('div'));
+  autocompleteEl.addEventListener('gmp-placechange', () => {
+    const inputEl = document.querySelector('#autocomplete input');
+    const rawInput = inputEl?.value?.trim() || '';
+    const service = new google.maps.places.PlacesService(document.createElement('div'));
 
-      service.findPlaceFromQuery({
-        query: rawInput,
-        fields: ['address_components']
-      }, (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
-          const components = results[0].address_components;
-          const map = {};
-          components.forEach(c => {
-            c.types.forEach(t => map[t] = c.long_name);
-          });
+    service.findPlaceFromQuery({
+      query: rawInput,
+      fields: ['address_components']
+    }, (results, status) => {
+      if (status !== google.maps.places.PlacesServiceStatus.OK || !results.length) return;
 
-          // ✅ Construct full street address
-          const street = `${map.street_number || ''} ${map.route || ''}`.trim() || rawInput;
+      const components = results[0].address_components;
+      const getComponent = (types) =>
+        components.find(c => types.every(t => c.types.includes(t)))?.long_name || '';
 
-          document.getElementById('address').value = street;
-          document.getElementById('city').value = map.locality || map.sublocality || '';
-          document.getElementById('state').value = map.administrative_area_level_1 || '';
-          document.getElementById('zip').value = map.postal_code || '';
-        }
-      });
+      const streetNumber = getComponent(['street_number']);
+      const route = getComponent(['route']);
+      const city = getComponent(['locality']) || getComponent(['sublocality']);
+      const state = getComponent(['administrative_area_level_1']);
+      const zip = getComponent(['postal_code']);
+
+      document.getElementById('address').value = `${streetNumber} ${route}`.trim() || rawInput;
+      document.getElementById('city').value = city;
+      document.getElementById('state').value = state;
+      document.getElementById('zip').value = zip;
     });
   });
+});
 </script>
 
 </body>

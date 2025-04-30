@@ -5,15 +5,11 @@
   <title>Sign Up - Geega Games</title>
   <link rel="stylesheet" href="style.css">
 
-  <!-- ✅ JWT Decode -->
-  <script src="https://unpkg.com/jwt-decode/build/jwt-decode.min.js"></script>
+<!-- ✅ Google Maps JS API -->
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places"></script>
 
-  <!-- ✅ Google Sign-In -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <!-- ✅ Google Maps + Autocomplete Component Bundle (GitHub-safe) -->
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places"></script>
-  <script async defer src="https://www.gstatic.com/maps-platform/places/web/js/PlaceAutocompleteElement.js"></script>
+<!-- ✅ Autocomplete Web Component Loader -->
+<script async defer src="https://www.gstatic.com/maps-platform/places/web/js/PlaceAutocompleteElement.js"></script>
 
   <style>
     body {
@@ -113,7 +109,7 @@
     <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
     <!-- ✅ Modern Autocomplete Component -->
-    <gmpx-placeautocomplete id="autocomplete" placeholder="Start typing your address" required></gmpx-placeautocomplete>
+    <gmp-place-autocomplete id="autocomplete" placeholder="Start typing your address" required></gmp-place-autocomplete>
 
     <!-- ✅ Hidden address fields to be autofilled -->
     <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" readonly required>
@@ -220,7 +216,7 @@
 
   // ✅ Modern address parser using gmpx-placeautocomplete
   const autocompleteEl = document.getElementById("autocomplete");
-  autocompleteEl.addEventListener("gmpx-placechange", () => {
+  autocompleteEl.addEventListener("gmp-placechange", () => {
     const place = autocompleteEl.value;
 
     const get = (type) =>

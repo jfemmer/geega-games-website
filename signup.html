@@ -11,15 +11,9 @@
   <!-- ✅ Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <!-- ✅ Google Extended Component API Loader -->
-  <script type="module">
-    import "@googlemaps/extended-component-library/api-loader.js";
-
-    const loader = document.createElement('gmpx-api-loader');
-    loader.apiKey = "AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM";
-    loader.libraries = "places";
-    document.body.appendChild(loader);
-  </script>
+  <!-- ✅ Google Maps + Autocomplete Component Bundle (GitHub-safe) -->
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places"></script>
+  <script async defer src="https://www.gstatic.com/maps-platform/places/web/js/PlaceAutocompleteElement.js"></script>
 
   <style>
     body {
@@ -118,10 +112,10 @@
     <p id="error-message" class="error-message"></p>
     <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
-    <!-- ✅ Updated Autocomplete Component -->
+    <!-- ✅ Modern Autocomplete Component -->
     <gmpx-placeautocomplete id="autocomplete" placeholder="Start typing your address" required></gmpx-placeautocomplete>
 
-    <!-- ✅ Autofilled address fields -->
+    <!-- ✅ Hidden address fields to be autofilled -->
     <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" readonly required>
     <input type="text" id="city" placeholder="City" autocomplete="address-level2" required>
     <input type="text" id="state" placeholder="State" autocomplete="address-level1" required>
@@ -211,7 +205,7 @@
     }
   });
 
-  async function handleGoogleLogin(response) {
+  function handleGoogleLogin(response) {
     const { credential } = response;
     try {
       const decoded = jwt_decode(credential);
@@ -224,10 +218,11 @@
     }
   }
 
-  // ✅ Extract address parts from <gmpx-placeautocomplete>
+  // ✅ Modern address parser using gmpx-placeautocomplete
   const autocompleteEl = document.getElementById("autocomplete");
   autocompleteEl.addEventListener("gmpx-placechange", () => {
     const place = autocompleteEl.value;
+
     const get = (type) =>
       place.addressComponents?.find(c => c.types.includes(type))?.longText || "";
 

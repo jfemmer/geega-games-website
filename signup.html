@@ -168,7 +168,7 @@
       email: document.getElementById('new-email').value.trim(),
       password: password,
       phone: document.getElementById('phone').value.trim(),
-      address: document.getElementById('autocomplete').value.trim(),
+      address: document.querySelector('#autocomplete input')?.value.trim() || '',
       city: document.getElementById('city').value.trim(),
       state: document.getElementById('state').value.trim(),
       zip: document.getElementById('zip').value.trim()

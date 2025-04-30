@@ -222,38 +222,37 @@
   }
 
   // ✅ Autocomplete place handler
-  window.addEventListener('load', () => {
-    const autocompleteEl = document.getElementById('autocomplete');
-    if (!autocompleteEl || typeof google === 'undefined') return;
+  // ✅ Autocomplete place handler — always submit the selected text as address
+window.addEventListener('load', () => {
+  const autocompleteEl = document.getElementById('autocomplete');
+  if (!autocompleteEl || typeof google === 'undefined') return;
 
-    autocompleteEl.addEventListener('gmp-placechange', () => {
-      const rawInput = document.querySelector('#autocomplete input')?.value || '';
-      const service = new google.maps.places.PlacesService(document.createElement('div'));
+  autocompleteEl.addEventListener('gmp-placechange', () => {
+    const rawInput = document.querySelector('#autocomplete input')?.value?.trim() || '';
 
-      service.findPlaceFromQuery({
-        query: rawInput,
-        fields: ['address_components']
-      }, (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
-          const components = results[0].address_components;
-          const map = {};
-          components.forEach(c => {
-            c.types.forEach(t => map[t] = c.long_name);
-          });
+    // ✅ Always set this as the submitted street address
+    document.getElementById('address').value = rawInput;
 
-          const streetNumber = map.street_number || '';
-          const route = map.route || '';
-          const fallbackAddress = rawInput;
-          const finalAddress = `${streetNumber} ${route}`.trim() || fallbackAddress;
+    // Optionally extract city, state, and zip
+    const service = new google.maps.places.PlacesService(document.createElement('div'));
+    service.findPlaceFromQuery({
+      query: rawInput,
+      fields: ['address_components']
+    }, (results, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+        const components = results[0].address_components;
+        const map = {};
+        components.forEach(c => {
+          c.types.forEach(t => map[t] = c.long_name);
+        });
 
-          document.getElementById('address').value = finalAddress;
-          document.getElementById('city').value = map.locality || map.sublocality || '';
-          document.getElementById('state').value = map.administrative_area_level_1 || '';
-          document.getElementById('zip').value = map.postal_code || '';
-        }
-      });
+        document.getElementById('city').value = map.locality || map.sublocality || '';
+        document.getElementById('state').value = map.administrative_area_level_1 || '';
+        document.getElementById('zip').value = map.postal_code || '';
+      }
     });
   });
+});
 </script>
 
 </body>

@@ -11,11 +11,10 @@
   <!-- ✅ Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <!-- ✅ Google Maps JS API (still needed for GMP components) -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&loading=async" async defer></script>
-
-  <!-- ✅ Load new Place Autocomplete web component -->
-  <script type="module" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&v=beta&modules=places"></script>
+  <!-- ✅ Google Maps JavaScript API with GMP Modules (only this one needed) -->
+  <script type="module"
+          src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&v=beta&modules=places">
+  </script>
 
   <style>
     body {
@@ -47,7 +46,8 @@
       align-items: center;
     }
 
-    .signup-container input, gmp-place-autocomplete {
+    .signup-container input,
+    gmp-place-autocomplete {
       width: 90%;
       padding: 10px;
       margin: 10px 0;
@@ -212,14 +212,13 @@
     }
   }
 
-  // ✅ Autocomplete Listener (new web component)
+  // ✅ Listener for new autocomplete component
   window.addEventListener('load', () => {
     const autocomplete = document.getElementById('autocomplete');
     if (autocomplete) {
       autocomplete.addEventListener('gmp-placechange', () => {
-        const address = autocomplete.value;
-        console.log('Selected address:', address);
-        // You can optionally parse the address string here into components
+        console.log('Selected address:', autocomplete.value);
+        // Optional: parse city/state/zip from .value if needed
       });
     }
   });

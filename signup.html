@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -11,18 +11,18 @@
   <!-- ✅ Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <!-- ✅ Google Maps Autocomplete -->
-  <script
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&loading=async"
-    async
-    defer>
-  </script>
+  <!-- ✅ Google Maps JS API (still needed for GMP components) -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&loading=async" async defer></script>
+
+  <!-- ✅ Load new Place Autocomplete web component -->
+  <script type="module" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&v=beta&modules=places"></script>
 
   <style>
     body {
       background-color: #f5f5f5;
       font-family: Arial, sans-serif;
     }
+
     .signup-container {
       width: 400px;
       margin: 80px auto;
@@ -34,17 +34,20 @@
       flex-direction: column;
       align-items: center;
     }
+
     .signup-container h2 {
       margin-bottom: 20px;
       color: rebeccapurple;
     }
+
     .signup-container form {
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
-    .signup-container input {
+
+    .signup-container input, gmp-place-autocomplete {
       width: 90%;
       padding: 10px;
       margin: 10px 0;
@@ -52,6 +55,7 @@
       border: 1px solid #ccc;
       font-size: 16px;
     }
+
     .signup-container button {
       width: 95%;
       padding: 12px;
@@ -63,24 +67,30 @@
       cursor: pointer;
       font-size: 16px;
     }
+
     .signup-container button:hover {
       background-color: #663399;
     }
+
     .signup-container button:disabled {
       background-color: #ccc;
       cursor: not-allowed;
     }
+
     .signup-container p {
       margin-top: 20px;
       font-size: 14px;
     }
+
     .signup-container a {
       color: rebeccapurple;
       text-decoration: none;
     }
+
     .signup-container a:hover {
       text-decoration: underline;
     }
+
     .error-message {
       color: red;
       font-size: 14px;
@@ -102,7 +112,10 @@
     <input type="password" id="confirm-password" placeholder="Confirm Password" autocomplete="new-password" required>
     <p id="error-message" class="error-message"></p>
     <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
-    <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" required>
+
+    <!-- ✅ New Google Maps Autocomplete Component -->
+    <gmp-place-autocomplete id="autocomplete" placeholder="Street Address" required></gmp-place-autocomplete>
+
     <input type="text" id="city" placeholder="City" autocomplete="address-level2" required>
     <input type="text" id="state" placeholder="State" autocomplete="address-level1" required>
     <input type="text" id="zip" placeholder="Zip Code" autocomplete="postal-code" required>
@@ -128,7 +141,6 @@
   </div>
 </div>
 
-<!-- ✅ Signup + Google Autofill Script -->
 <script>
   const signupForm = document.getElementById('signup-form');
   const errorMessage = document.getElementById('error-message');
@@ -156,7 +168,7 @@
       email: document.getElementById('new-email').value.trim(),
       password: password,
       phone: document.getElementById('phone').value.trim(),
-      address: document.getElementById('address').value.trim(),
+      address: document.getElementById('autocomplete').value.trim(),
       city: document.getElementById('city').value.trim(),
       state: document.getElementById('state').value.trim(),
       zip: document.getElementById('zip').value.trim()
@@ -200,30 +212,16 @@
     }
   }
 
-  // ✅ Google Maps Autocomplete for address input (optional enhancement)
-  function initAutocomplete() {
-    const input = document.getElementById('address');
-    if (input) {
-      const autocomplete = new google.maps.places.Autocomplete(input, { types: ['address'] });
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (!place.address_components) return;
-        for (const component of place.address_components) {
-          const type = component.types[0];
-          if (type === 'locality') {
-            document.getElementById('city').value = component.long_name;
-          } else if (type === 'administrative_area_level_1') {
-            document.getElementById('state').value = component.short_name;
-          } else if (type === 'postal_code') {
-            document.getElementById('zip').value = component.long_name;
-          }
-        }
+  // ✅ Autocomplete Listener (new web component)
+  window.addEventListener('load', () => {
+    const autocomplete = document.getElementById('autocomplete');
+    if (autocomplete) {
+      autocomplete.addEventListener('gmp-placechange', () => {
+        const address = autocomplete.value;
+        console.log('Selected address:', address);
+        // You can optionally parse the address string here into components
       });
     }
-  }
-  window.initAutocomplete = initAutocomplete;
-  window.addEventListener('load', () => {
-    if (typeof google !== 'undefined') initAutocomplete();
   });
 </script>
 

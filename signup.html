@@ -12,7 +12,7 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <!-- ✅ Google Maps JavaScript API with Place Autocomplete modules -->
-  <script type="module"
+  <script type="module" async
           src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&v=beta&modules=places">
   </script>
 
@@ -114,7 +114,10 @@
     <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
     <!-- ✅ Autocomplete Component -->
-    <gmp-place-autocomplete id="autocomplete" placeholder="Street Address" required></gmp-place-autocomplete>
+    <gmp-place-autocomplete id="autocomplete" placeholder="Start typing your address" required></gmp-place-autocomplete>
+
+    <!-- ✅ Hidden address field (filled automatically) -->
+    <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" readonly required>
 
     <input type="text" id="city" placeholder="City" autocomplete="address-level2" required>
     <input type="text" id="state" placeholder="State" autocomplete="address-level1" required>
@@ -157,9 +160,7 @@
       return;
     }
 
-    errorMessage.textContent = "";
-    signupButton.disabled = true;
-    signupButton.textContent = "Creating Account...";
+    const addressInput = document.getElementById('address').value.trim();
 
     const newUser = {
       firstName: document.getElementById('first-name').value.trim(),
@@ -168,11 +169,15 @@
       email: document.getElementById('new-email').value.trim(),
       password: password,
       phone: document.getElementById('phone').value.trim(),
-      address: document.querySelector('#autocomplete input')?.value.trim() || '',
+      address: addressInput,
       city: document.getElementById('city').value.trim(),
       state: document.getElementById('state').value.trim(),
       zip: document.getElementById('zip').value.trim()
     };
+
+    signupButton.disabled = true;
+    signupButton.textContent = "Creating Account...";
+    errorMessage.textContent = "";
 
     try {
       const response = await fetch('https://geega-games-website-production.up.railway.app/signup', {
@@ -212,17 +217,17 @@
     }
   }
 
-  // ✅ Parse city, state, and zip from selected address
+  // ✅ Parse city, state, zip, and address from Place Autocomplete
   window.addEventListener('load', () => {
     const autocompleteEl = document.getElementById('autocomplete');
     if (!autocompleteEl || typeof google === 'undefined') return;
 
     autocompleteEl.addEventListener('gmp-placechange', () => {
-      const address = autocompleteEl.value;
+      const addressInput = document.querySelector('#autocomplete input')?.value || '';
       const service = new google.maps.places.PlacesService(document.createElement('div'));
 
       service.findPlaceFromQuery({
-        query: address,
+        query: addressInput,
         fields: ['address_components']
       }, (results, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
@@ -232,6 +237,9 @@
             c.types.forEach(t => map[t] = c.long_name);
           });
 
+          const streetNumber = map.street_number || '';
+          const route = map.route || '';
+          document.getElementById('address').value = `${streetNumber} ${route}`.trim();
           document.getElementById('city').value = map.locality || '';
           document.getElementById('state').value = map.administrative_area_level_1 || '';
           document.getElementById('zip').value = map.postal_code || '';

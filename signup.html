@@ -160,9 +160,9 @@
       return;
     }
 
-    // ✅ fallback: if #address is still empty, use raw input from autocomplete
-    const addressInput = document.getElementById('address').value.trim() ||
-                         document.querySelector('#autocomplete input')?.value.trim() || '';
+    // ✅ FORCE address field to match what's typed or selected
+    const rawAutocompleteValue = document.querySelector('#autocomplete input')?.value.trim() || '';
+    document.getElementById('address').value = rawAutocompleteValue;
 
     const newUser = {
       firstName: document.getElementById('first-name').value.trim(),
@@ -171,13 +171,13 @@
       email: document.getElementById('new-email').value.trim(),
       password: password,
       phone: document.getElementById('phone').value.trim(),
-      address: addressInput,
+      address: document.getElementById('address').value.trim(),
       city: document.getElementById('city').value.trim(),
       state: document.getElementById('state').value.trim(),
       zip: document.getElementById('zip').value.trim()
     };
 
-    console.log("Submitting:", newUser); // ✅ Debugging
+    console.log("📬 Submitting user data:", newUser); // ✅ DEBUG: See full payload
 
     signupButton.disabled = true;
     signupButton.textContent = "Creating Account...";
@@ -221,39 +221,37 @@
     }
   }
 
-  // ✅ Autocomplete place handler
-  // ✅ Autocomplete place handler — always submit the selected text as address
-window.addEventListener('load', () => {
-  const autocompleteEl = document.getElementById('autocomplete');
-  if (!autocompleteEl || typeof google === 'undefined') return;
+  // ✅ Autocomplete event handler
+  window.addEventListener('load', () => {
+    const autocompleteEl = document.getElementById('autocomplete');
+    if (!autocompleteEl || typeof google === 'undefined') return;
 
-  autocompleteEl.addEventListener('gmp-placechange', () => {
-    const rawInput = document.querySelector('#autocomplete input')?.value?.trim() || '';
+    autocompleteEl.addEventListener('gmp-placechange', () => {
+      const rawInput = document.querySelector('#autocomplete input')?.value?.trim() || '';
 
-    // ✅ Always set this as the submitted street address
-    document.getElementById('address').value = rawInput;
+      // ✅ Keep address field in sync when a place is selected
+      document.getElementById('address').value = rawInput;
 
-    // Optionally extract city, state, and zip
-    const service = new google.maps.places.PlacesService(document.createElement('div'));
-    service.findPlaceFromQuery({
-      query: rawInput,
-      fields: ['address_components']
-    }, (results, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
-        const components = results[0].address_components;
-        const map = {};
-        components.forEach(c => {
-          c.types.forEach(t => map[t] = c.long_name);
-        });
+      // Extract other address parts
+      const service = new google.maps.places.PlacesService(document.createElement('div'));
+      service.findPlaceFromQuery({
+        query: rawInput,
+        fields: ['address_components']
+      }, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+          const components = results[0].address_components;
+          const map = {};
+          components.forEach(c => {
+            c.types.forEach(t => map[t] = c.long_name);
+          });
 
-        document.getElementById('city').value = map.locality || map.sublocality || '';
-        document.getElementById('state').value = map.administrative_area_level_1 || '';
-        document.getElementById('zip').value = map.postal_code || '';
-      }
+          document.getElementById('city').value = map.locality || map.sublocality || '';
+          document.getElementById('state').value = map.administrative_area_level_1 || '';
+          document.getElementById('zip').value = map.postal_code || '';
+        }
+      });
     });
   });
-});
 </script>
-
 </body>
 </html>

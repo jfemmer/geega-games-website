@@ -9,10 +9,7 @@ require('dotenv').config();
 const app = express();
 
 // ✅ Middleware
-app.use(cors({
-  origin: ['http://localhost:5500', 'https://geega-games-website-production.up.railway.app'],
-  credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
 // ✅ Scryfall Image Fetch Helper
@@ -233,11 +230,6 @@ app.post('/api/employees', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
-
-// Start Server
-app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
-
-
 
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

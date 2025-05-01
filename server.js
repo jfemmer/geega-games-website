@@ -64,7 +64,7 @@ const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI, { useNewUr
 const userSchema = new mongoose.Schema({
   firstName: String, lastName: String, username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true }, password: { type: String, required: true },
-  phone: String, address: String, state: String, zip: String, createdAt: { type: Date, default: Date.now }
+  phone: String, address: String, createdAt: { type: Date, default: Date.now }
 });
 const User = db1.model('User', userSchema);
 
@@ -106,14 +106,28 @@ app.get('/api/inventory/creature-types', async (req, res) => {
 // Signup
 app.post('/signup', async (req, res) => {
   try {
-    const { firstName, lastName, username, email, password, phone, address, state, zip } = req.body;
-    if (!username || !email || !password) return res.status(400).json({ message: 'Missing required fields.' });
+    const { firstName, lastName, username, email, password, phone, address } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
 
     const existing = await User.findOne({ $or: [{ email }, { username }] });
-    if (existing) return res.status(409).json({ message: 'User already exists.' });
+    if (existing) {
+      return res.status(409).json({ message: 'User already exists.' });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await new User({ firstName, lastName, username, email, password: hashedPassword, phone, address, state, zip }).save();
+
+    await new User({
+      firstName,
+      lastName,
+      username,
+      email,
+      password: hashedPassword,
+      phone,
+      address
+    }).save();
 
     res.status(201).json({ message: '🐶 Welcome to the Pack!' });
   } catch (err) {
@@ -232,4 +246,4 @@ app.post('/api/employees', async (req, res) => {
 });
 
 // Start Server
-app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
+app.listen(port, () => console.log(`🚀 Server running on port ${port}`)); 

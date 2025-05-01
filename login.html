@@ -78,37 +78,35 @@
 </div>
 
 <script>
-  document.getElementById('login-form').addEventListener('submit', async function(event) {
-    event.preventDefault();
+  document.getElementById('login-form').addEventListener('submit', async function (event) {
+  event.preventDefault();
 
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value.trim();
 
-    try {
-      const res = await fetch('https://geega-games-website-production.up.railway.app/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
 
-      const data = await res.json();
+    const response = await res.json();
 
-      if (!res.ok) {
-        alert(data.message || "Login failed.");
-        return;
-      }
-
-      localStorage.setItem('token', data.token); // 🔐 Store JWT token
-      alert("🎉 Login successful!");
-      window.location.href = "index.html";
-
-    } catch (err) {
-      console.error("❌ Login error:", err);
-      alert("Something went wrong. Please try again.");
+    if (res.ok) {
+      // ✅ Save login info and redirect
+      localStorage.setItem('username', response.username);
+      localStorage.setItem('userId', response.userId);
+      window.location.href = 'index.html';
+    } else {
+      document.getElementById('error-message').textContent = response.message || 'Login failed.';
     }
-  });
+  } catch (err) {
+    console.error('❌ Login error:', err);
+    document.getElementById('error-message').textContent = 'Server error.';
+  }
+});
 </script>
 
 </body>
 </html>
-

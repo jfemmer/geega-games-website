@@ -127,10 +127,17 @@ app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user || !(await bcrypt.compare(password, user.password)))
-      return res.status(401).json({ message: 'Invalid credentials.' });
 
-    res.json({ message: 'Login successful', userId: user._id, username: user.username });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    res.json({
+      message: 'Login successful',
+      userId: user._id,
+      username: user.username,
+      firstName: user.firstName  // ✅ make sure this is here
+    });
   } catch (err) {
     console.error('❌ Login error:', err);
     res.status(500).json({ message: 'Internal server error.' });

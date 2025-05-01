@@ -6,11 +6,27 @@ const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
 
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+
 const app = express();
 
 // ✅ Middleware
 app.use(cors());
 app.use(express.json());
+
+// ✅ Auth Middleware
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'Missing token' });
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: 'Invalid token' });
+    req.user = user;
+    next();
+  });
+}
 
 // ✅ Scryfall Image Fetch Helper
 const fetchScryfallImageUrl = async (name, set, options = {}) => {
@@ -92,6 +108,17 @@ app.get('/', (req, res) => res.send('🧙‍♂️ Welcome to the Geega Games AP
 // Version Check
 app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js version'));
 
+// Protected User Info
+app.get('/api/protected', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ message: `Hello, ${user.firstName}` });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Creature Types
 app.get('/api/inventory/creature-types', async (req, res) => {
   try {
@@ -130,7 +157,13 @@ app.post('/api/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password)))
       return res.status(401).json({ message: 'Invalid credentials.' });
 
-    res.json({ message: 'Login successful', userId: user._id, username: user.username });
+    const token = jwt.sign(
+      { userId: user._id, username: user.username, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+
+    res.json({ message: 'Login successful', token });
   } catch (err) {
     console.error('❌ Login error:', err);
     res.status(500).json({ message: 'Internal server error.' });
@@ -230,6 +263,8 @@ app.post('/api/employees', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
+
+
 
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

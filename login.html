@@ -70,7 +70,7 @@
 <div class="login-container">
   <h2>Login to Geega Games</h2>
   <form id="login-form">
-    <input type="text" id="username" placeholder="Username" required><br>
+    <input type="text" id="email" placeholder="Email" required><br>
     <input type="password" id="password" placeholder="Password" required><br>
     <button type="submit">Login</button>
   </form>
@@ -81,14 +81,14 @@
   document.getElementById('login-form').addEventListener('submit', async function(event) {
     event.preventDefault();
 
-    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
 
     try {
       const res = await fetch('https://geega-games-website-production.up.railway.app/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ email, password })
       });
 
       const data = await res.json();
@@ -98,9 +98,9 @@
         return;
       }
 
-      localStorage.setItem('userId', data.userId); // 🔐 Store the logged-in user's ID
+      localStorage.setItem('token', data.token); // 🔐 Store JWT token
       alert("🎉 Login successful!");
-      window.location.href = "index.html"; // Redirect to homepage
+      window.location.href = "index.html";
 
     } catch (err) {
       console.error("❌ Login error:", err);
@@ -111,3 +111,4 @@
 
 </body>
 </html>
+

@@ -9,7 +9,10 @@ require('dotenv').config();
 const app = express();
 
 // ✅ Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5500', 'https://geega-games-website-production.up.railway.app'],
+  credentials: true
+}));
 app.use(express.json());
 
 // ✅ Scryfall Image Fetch Helper

@@ -75,25 +75,45 @@
     }
   
     .account-login-container {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 12px;
-    }
-  
-    .account-login-container a#login-button {
-      font-size: 22px;
-      color: white;
-      text-decoration: none;
-      border: 2px solid white;
-      border-radius: 50%;
-      width: 42px;
-      height: 42px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-right: 15px;
-    }
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.account-login-container a#login-button {
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 15px;
+  background-color: transparent;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.account-login-container a#login-button i {
+  font-size: 20px;
+  color: white;
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  transition: color 0.2s ease;
+}
+
+/* ✅ Hover effect */
+.account-login-container a#login-button:hover {
+  background-color: white;
+}
+
+.account-login-container a#login-button:hover i {
+  color: rebeccapurple;
+}
   
     .nav-bar {
       background-color: #6a0dad;

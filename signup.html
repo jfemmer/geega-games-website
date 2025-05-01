@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="style.css">
 
 <!-- ✅ Google Maps JS API -->
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places"></script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initAutocomplete"></script>
 
 <!-- ✅ Autocomplete Web Component Loader -->
 <script async defer src="https://www.gstatic.com/maps-platform/places/web/js/PlaceAutocompleteElement.js"></script>
@@ -111,11 +111,6 @@
     <!-- ✅ Autocomplete Component -->
     <input id="autocomplete" placeholder="Start typing your address" type="text" required />
 
-    <!-- ✅ Hidden address field (filled automatically) -->
-    <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" required>
-    <input type="text" id="city" placeholder="City" autocomplete="address-level2" required>
-    <input type="text" id="state" placeholder="State" autocomplete="address-level1" required>
-    <input type="text" id="zip" placeholder="Zip Code" autocomplete="postal-code" required>
 
     <button type="submit" id="signup-button">Sign Up</button>
   </form>
@@ -154,17 +149,17 @@
       return;
     }
 
-    const fullAddress = document.getElementById('autocomplete')?.value.trim() || '';
+    const fullAddress = document.getElementById('autocomplete').value.trim();
 
-const newUser = {
-  firstName: document.getElementById('first-name').value.trim(),
-  lastName: document.getElementById('last-name').value.trim(),
-  username: document.getElementById('new-username').value.trim(),
-  email: document.getElementById('new-email').value.trim(),
-  password: password,
-  phone: document.getElementById('phone').value.trim(),
-  address: fullAddress // 👈 Only submitting the full Google API address
-};
+    const newUser = {
+      firstName: document.getElementById('first-name').value.trim(),
+      lastName: document.getElementById('last-name').value.trim(),
+      username: document.getElementById('new-username').value.trim(),
+      email: document.getElementById('new-email').value.trim(),
+      password: password,
+      phone: document.getElementById('phone').value.trim(),
+      address: fullAddress
+    };
 
     console.log("📬 Submitting:", newUser);
 
@@ -210,37 +205,24 @@ const newUser = {
     }
   }
 
-  // ✅ Google Places Autocomplete to autofill address fields
-  let autocomplete;
-
+  // ✅ Google Places Autocomplete to autofill address field
   function initAutocomplete() {
-    const input = document.getElementById("autocomplete");
-    autocomplete = new google.maps.places.Autocomplete(input, {
-      types: ["address"],
-      componentRestrictions: { country: "us" },
-      fields: ["address_component"]
+    const input = document.getElementById('autocomplete');
+    const autocomplete = new google.maps.places.Autocomplete(input, {
+      types: ['address'],
+      componentRestrictions: { country: 'us' },
+      fields: ['formatted_address']
     });
 
-    autocomplete.addListener("place_changed", () => {
+    autocomplete.addListener('place_changed', () => {
       const place = autocomplete.getPlace();
-      if (!place.address_components) return;
-
-      const get = (type) =>
-        place.address_components.find(c => c.types.includes(type))?.long_name || '';
-
-      const streetNumber = get("street_number");
-      const route = get("route");
-      const city = get("locality") || get("sublocality");
-      const state = get("administrative_area_level_1");
-      const zip = get("postal_code");
-
-      document.getElementById("address").value = `${streetNumber} ${route}`.trim();
-      document.getElementById("city").value = city;
-      document.getElementById("state").value = state;
-      document.getElementById("zip").value = zip;
+      if (place.formatted_address) {
+        input.value = place.formatted_address;
+      }
     });
   }
 
+  // Expose initAutocomplete to the global scope
   window.initAutocomplete = initAutocomplete;
 </script>
 

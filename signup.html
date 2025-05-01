@@ -42,7 +42,7 @@
     }
 
     .signup-container input,
-    gmpx-placeautocomplete {
+    gmp-place-autocomplete {
       width: 90%;
       padding: 10px;
       margin: 10px 0;
@@ -108,11 +108,11 @@
     <p id="error-message" class="error-message"></p>
     <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
-    <!-- ✅ Modern Autocomplete Component -->
-    <gmp-place-autocomplete id="autocomplete" placeholder="Start typing your address" required></gmp-place-autocomplete>
+    <!-- ✅ Autocomplete Component -->
+    <input id="autocomplete" placeholder="Start typing your address" type="text" required />
 
-    <!-- ✅ Hidden address fields to be autofilled -->
-    <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" readonly required>
+    <!-- ✅ Hidden address field (filled automatically) -->
+    <input type="text" id="address" placeholder="Street Address" autocomplete="street-address" required>
     <input type="text" id="city" placeholder="City" autocomplete="address-level2" required>
     <input type="text" id="state" placeholder="State" autocomplete="address-level1" required>
     <input type="text" id="zip" placeholder="Zip Code" autocomplete="postal-code" required>
@@ -154,20 +154,17 @@
       return;
     }
 
-    const addressInput = document.getElementById('address').value.trim();
+    const fullAddress = document.getElementById('autocomplete')?.value.trim() || '';
 
-    const newUser = {
-      firstName: document.getElementById('first-name').value.trim(),
-      lastName: document.getElementById('last-name').value.trim(),
-      username: document.getElementById('new-username').value.trim(),
-      email: document.getElementById('new-email').value.trim(),
-      password: password,
-      phone: document.getElementById('phone').value.trim(),
-      address: addressInput,
-      city: document.getElementById('city').value.trim(),
-      state: document.getElementById('state').value.trim(),
-      zip: document.getElementById('zip').value.trim()
-    };
+const newUser = {
+  firstName: document.getElementById('first-name').value.trim(),
+  lastName: document.getElementById('last-name').value.trim(),
+  username: document.getElementById('new-username').value.trim(),
+  email: document.getElementById('new-email').value.trim(),
+  password: password,
+  phone: document.getElementById('phone').value.trim(),
+  address: fullAddress // 👈 Only submitting the full Google API address
+};
 
     console.log("📬 Submitting:", newUser);
 
@@ -200,7 +197,7 @@
     }
   });
 
-  function handleGoogleLogin(response) {
+  async function handleGoogleLogin(response) {
     const { credential } = response;
     try {
       const decoded = jwt_decode(credential);
@@ -213,34 +210,38 @@
     }
   }
 
-  // ✅ Autofill from <gmp-place-autocomplete>
-  const autocompleteEl = document.getElementById("autocomplete");
+  // ✅ Google Places Autocomplete to autofill address fields
+  let autocomplete;
 
-  autocompleteEl.addEventListener("gmp-placechange", (event) => {
-    const place = event.detail?.place;
-    if (!place || !place.addressComponents) {
-      console.warn("⚠️ No place data found.");
-      return;
-    }
+  function initAutocomplete() {
+    const input = document.getElementById("autocomplete");
+    autocomplete = new google.maps.places.Autocomplete(input, {
+      types: ["address"],
+      componentRestrictions: { country: "us" },
+      fields: ["address_component"]
+    });
 
-    const get = (type) =>
-      place.addressComponents.find(comp => comp.types.includes(type))?.text || '';
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (!place.address_components) return;
 
-    const streetNumber = get("street_number");
-    const route = get("route");
-    const city = get("locality") || get("sublocality");
-    const state = get("administrative_area_level_1");
-    const zip = get("postal_code");
+      const get = (type) =>
+        place.address_components.find(c => c.types.includes(type))?.long_name || '';
 
-    const address = `${streetNumber} ${route}`.trim();
+      const streetNumber = get("street_number");
+      const route = get("route");
+      const city = get("locality") || get("sublocality");
+      const state = get("administrative_area_level_1");
+      const zip = get("postal_code");
 
-    console.log("📦 Autofilled:", { address, city, state, zip });
+      document.getElementById("address").value = `${streetNumber} ${route}`.trim();
+      document.getElementById("city").value = city;
+      document.getElementById("state").value = state;
+      document.getElementById("zip").value = zip;
+    });
+  }
 
-    document.getElementById("address").value = address;
-    document.getElementById("city").value = city;
-    document.getElementById("state").value = state;
-    document.getElementById("zip").value = zip;
-  });
+  window.initAutocomplete = initAutocomplete;
 </script>
 
 </body>

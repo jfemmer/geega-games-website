@@ -51,10 +51,10 @@ if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI || !TRADEIN_DB_URI ) {
 }
 
 // ✅ Connect to MongoDB
-const db1 = mongoose.createConnection(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+const db1 = mongoose.createConnection(MONGODB_URI);
+const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI);
+const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI);
+const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI);
 
 
 // ✅ Connection Logs

@@ -42,9 +42,10 @@ const fetchScryfallImageUrl = async (name, set, options = {}) => {
 const MONGODB_URI = process.env.MONGODB_URI;
 const INVENTORY_DB_URI = process.env.INVENTORY_DB_URI;
 const EMPLOYEE_DB_URI = process.env.EMPLOYEE_DB_URI;
+const TRADEIN_DB_URI = process.env.TRADEIN_DB_URI;
 const port = process.env.PORT || 3000;
 
-if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI) {
+if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI || !TRADEIN_DB_URI ) {
   console.error('❌ One or more MongoDB URIs are missing in environment variables!');
   process.exit(1);
 }
@@ -53,6 +54,8 @@ if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI) {
 const db1 = mongoose.createConnection(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+
 
 // ✅ Connection Logs
 [db1, inventoryConnection, employeeConnection].forEach((db, i) => {
@@ -83,6 +86,24 @@ const employeeSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 const Employee = employeeConnection.model('Employee', employeeSchema, 'Employees');
+
+const tradeInSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  firstName: String,
+  lastName: String,
+  email: String,
+  phone: String,
+  cards: [
+    {
+      cardName: String,
+      set: String,
+      foil: Boolean,
+      condition: String,
+      imageUrl: String,
+    },
+  ],
+  submittedAt: { type: Date, default: Date.now }
+});
 
 // ✅ Routes
 
@@ -169,6 +190,35 @@ app.post('/api/inventory', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
+
+app.post('/api/tradein', async (req, res) => {
+  const { userId, cards } = req.body;
+
+  if (!userId || !Array.isArray(cards) || cards.length === 0) {
+    return res.status(400).json({ message: 'Invalid trade-in data.' });
+  }
+
+  try {
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    const tradeInData = {
+      userId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      cards
+    };
+
+    await new TradeIn(tradeInData).save();
+    res.status(201).json({ message: '🧾 Trade-in submitted successfully!' });
+  } catch (err) {
+    console.error('❌ Trade-in submission error:', err);
+    res.status(500).json({ message: 'Server error while submitting trade-in.' });
+  }
+});
+
 
 // Get All Inventory
 app.get('/api/inventory', async (req, res) => {

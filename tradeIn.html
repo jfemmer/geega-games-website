@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geega Games - Trade-In</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      padding: 20px;
+      margin: 0;
+    }
+  
+    h1 {
+      color: rebeccapurple;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+  
+    .upload-section,
+    .search-section {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+  
+    .centered-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+  
+    .trade-list {
+      list-style: none;
+      padding: 20px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      width: fit-content;
+      min-width: 320px;
+      max-width: 520px;
+    }
+  
+    .trade-list li {
+      background: #fdfdfd;
+      padding: 16px 12px;
+      border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      text-align: center;
+    }
+  
+    .trade-list img {
+      width: 65px;
+      height: auto;
+      border-radius: 6px;
+      box-shadow: 0 0 3px rgba(0,0,0,0.15);
+    }
+  
+    .trade-list .info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+  
+    .trade-list .info strong {
+      font-size: 1.05rem;
+      color: rebeccapurple;
+    }
+  
+    .trade-list .info span {
+      font-size: 0.9rem;
+      color: #444;
+    }
+  
+    #search-results {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+  
+    .card-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 170px;
+      background: #ffffff;
+      padding: 12px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+  
+    .card-item:hover {
+      transform: scale(1.04);
+      background-color: #f2e7ff;
+    }
+  
+    .card-item img {
+      width: 100%;
+      height: auto;
+      border-radius: 6px;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+    }
+  
+    .card-details {
+      margin-top: 10px;
+      text-align: center;
+    }
+  
+    .card-details strong {
+      font-size: 1.05em;
+      display: block;
+    }
+  
+    .card-details span {
+      display: block;
+      font-size: 0.9em;
+      margin: 4px 0;
+    }
+  
+    .card-details label {
+      font-size: 0.9em;
+      color: #444;
+      display: block;
+      margin-top: 4px;
+    }
+  
+    .card-details select {
+      margin-top: 4px;
+      padding: 4px;
+      font-size: 0.9em;
+      width: 100%;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+  
+    button {
+      background-color: rebeccapurple;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+  
+    button:hover {
+      background-color: #6a2f9c;
+    }
+
+    .card-details .add-button {
+        margin-top: 8px;
+    }
+
+    .search-box {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.search-box input {
+  width: 80%;
+  max-width: 480px;
+  padding: 12px 16px;
+  font-size: 1rem;
+  border: 2px solid rebeccapurple;
+  border-radius: 10px;
+  outline: none;
+  transition: 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.search-box input:focus {
+  border-color: #6a2f9c;
+  box-shadow: 0 0 0 3px rgba(106, 47, 156, 0.15);
+}
+  </style>
+</head>
+<body>
+  <script>
+    if (!localStorage.getItem('userId')) window.location.href = 'login.html';
+  </script>
+
+  <h1>Sniff Out Some Store Credit!</h1>
+
+  <div class="search-section">
+    <h2>🔍 Search Cards</h2>
+    <div class="search-box">
+        <input type="text" id="card-search" placeholder="Search for a Magic card..." />
+      </div>
+    <div id="search-results"></div>
+  </div>
+
+  <!--<div class="upload-section">
+    <h2>📷 Upload Card Image</h2>
+    <input type="file" id="image-upload" accept="image/*">
+    <button onclick="handleImageUpload()">Analyze Image</button>
+  </div>
+
+  <div class="upload-section">
+    <h2>📄 Upload CSV File</h2>
+    <input type="file" id="csv-upload" accept=".csv">
+    <button onclick="parseCSV()">Import CSV</button>
+  </div>-->
+
+  <h2 style="text-align:center;">📝 Trade-In List</h2>
+  <div class="centered-container">
+    <ul id="trade-list" class="trade-list"></ul>
+  </div>
+
+  <div style="text-align:center; margin-top: 20px;">
+    <button onclick="submitTradeInList()" style="padding: 10px 20px; background-color: rebeccapurple; color: white; border: none; border-radius: 6px; cursor: pointer;">Submit Trade-In</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script>
+    const tradeList = [];
+    const tradeListElem = document.getElementById('trade-list');
+
+    function renderTradeList() {
+      tradeListElem.innerHTML = '';
+      tradeList.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <img src="${item.imageUrl}" alt="${item.cardName}">
+          <div class="info">
+            <strong>${item.cardName}</strong>
+            <span>Set: ${item.set || 'Unknown'}</span>
+            <span>Condition: ${item.condition || 'NM'}</span>
+            <span>${item.foil ? 'Foil' : 'Non-Foil'}</span>
+          </div>
+        `;
+        tradeListElem.appendChild(li);
+      });
+    }
+
+    function parseCSV() {
+      const file = document.getElementById('csv-upload').files[0];
+      if (!file) return alert('Please upload a CSV file.');
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          tradeList.push(...results.data);
+          renderTradeList();
+        }
+      });
+    }
+
+    async function handleImageUpload() {
+      const file = document.getElementById('image-upload').files[0];
+      if (!file) return alert('Please upload an image.');
+      alert('🧠 OCR image recognition not yet implemented');
+    }
+
+    async function submitTradeInList() {
+      const userId = localStorage.getItem('userId');
+      if (!userId || tradeList.length === 0) return alert('You must be logged in and have cards to submit.');
+      try {
+        const res = await fetch('/api/tradein', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, cards: tradeList })
+        });
+        const data = await res.json();
+        alert(data.message || 'Trade-in submitted!');
+        tradeList.length = 0;
+        renderTradeList();
+      } catch (err) {
+        alert('❌ Failed to submit trade-in.');
+      }
+    }
+
+    let debounceTimeout;
+document.getElementById('card-search').addEventListener('input', function () {
+  clearTimeout(debounceTimeout);
+  const query = this.value.trim();
+  const resultsDiv = document.getElementById('search-results'); // ✅ move this up
+
+  if (!query || query.length < 2 || query.includes(':')) {
+    resultsDiv.innerHTML = '<p>Please enter a valid card name.</p>';
+    return;
+  }
+
+  if (query.length === 0) {
+    resultsDiv.innerHTML = '';
+    return;
+  }
+
+  debounceTimeout = setTimeout(() => {
+    searchScryfall(query);
+  }, 300);
+});
+
+    async function searchScryfall(query) {
+  const resultsDiv = document.getElementById('search-results');
+  resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+
+  if (!query || query.length < 2 || query.includes(':')) {
+    resultsDiv.innerHTML = `<p>❗ Please enter a valid card name (not a filter like "b:1").</p>`;
+    return;
+  }
+
+  try {
+    const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
+    if (!searchRes.ok) throw new Error(`Card not found: ${query}`);
+    const baseCard = await searchRes.json();
+
+    const printsRes = await fetch(baseCard.prints_search_uri);
+    if (!printsRes.ok) throw new Error('Failed to fetch card versions.');
+    const printsData = await printsRes.json();
+
+    const cards = [baseCard, ...printsData.data];
+    resultsDiv.innerHTML = '';
+
+    cards.slice(0, 20).forEach(card => {
+      const imageUrl = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
+      let displayName = card.name;
+      const treatments = [];
+
+      // 🎨 Special Art Styles (most are in frame_effects)
+      if (card.frame_effects?.includes('showcase')) treatments.push('Showcase');
+      if (card.frame_effects?.includes('extendedart')) treatments.push('Extended Art');
+      if (card.frame_effects?.includes('borderless')) treatments.push('Borderless');
+      if (card.promo_types?.includes('fullart')) treatments.push('Full-Art');
+      if (card.promo_types?.includes('retro')) treatments.push('Retro Frame');
+      if (card.promo_types?.includes('textless')) treatments.push('Textless');
+      if (card.promo_types?.includes('phyrexian')) treatments.push('Phyrexian');
+
+      // ✨ Special Foil Styles (excluding normal foil/nonfoil)
+      if (card.finishes?.includes('etched')) treatments.push('Etched Foil');
+      if (card.finishes?.includes('gilded')) treatments.push('Gilded Foil');
+      if (card.finishes?.includes('rainbow_foil')) treatments.push('Rainbow Foil');
+      if (card.finishes?.includes('glossy')) treatments.push('Glossy');
+
+      // 🔢 Serialized
+      if (card.promo_types?.includes('serialized')) treatments.push('Serialized');
+
+      if (treatments.length > 0) {
+        displayName += ` (${treatments.join(', ')})`;
+      }
+
+      const set = card.set_name;
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'card-item';
+      const foilId = `foil-${Math.random().toString(36).substr(2, 9)}`;
+      const conditionId = `condition-${Math.random().toString(36).substr(2, 9)}`;
+
+      cardDiv.innerHTML = `
+        <img src="${imageUrl}" alt="${displayName}">
+        <div class="card-details">
+          <strong>${displayName}</strong>
+          <span>Set: ${set}</span>
+          ${
+            card.finishes?.length === 1 && card.finishes[0] === 'foil'
+              ? '<span style="font-size: 0.9em; color: #6a2f9c;">✨ Foil Only</span>'
+              : card.finishes?.includes('foil') && card.finishes?.includes('nonfoil')
+                ? `<label><input type="checkbox" id="${foilId}" class="foil-checkbox"> Foil</label>`
+                : ''
+          }
+          <label for="${conditionId}">Condition:</label>
+          <select id="${conditionId}" class="condition-select">
+            <option value="NM">Near Mint</option>
+            <option value="LP">Lightly Played</option>
+            <option value="MP">Moderately Played</option>
+            <option value="HP">Heavily Played</option>
+            <option value="DMG">Damaged</option>
+          </select>
+          <button class="add-button">Add to Trade List</button>
+        </div>
+      `;
+
+      // 👇 Add-to-trade list handler
+      cardDiv.querySelector('.add-button').addEventListener('click', () => {
+        let isFoil = false;
+        if (card.finishes?.length === 1 && card.finishes[0] === 'foil') {
+          isFoil = true; // foil-only
+        } else if (card.finishes?.includes('foil')) {
+          isFoil = cardDiv.querySelector('.foil-checkbox')?.checked || false;
+        }
+        const condition = cardDiv.querySelector('.condition-select').value;
+        tradeList.push({ cardName: displayName, set, foil: isFoil, condition, imageUrl });
+        renderTradeList();
+        document.getElementById('card-search').value = '';
+        resultsDiv.innerHTML = '';
+      });
+
+      resultsDiv.appendChild(cardDiv);
+    });
+  } catch (err) {
+    console.error('Scryfall error:', err);
+    resultsDiv.innerHTML = `<p>❌ Could not find a card for "<strong>${query}</strong>".</p>`;
+  }
+}
+  </script>
+</body>
+</html>

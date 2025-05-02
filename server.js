@@ -58,7 +58,7 @@ const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI, { useNewUrlP
 
 
 // ✅ Connection Logs
-[db1, inventoryConnection, employeeConnection].forEach((db, i) => {
+[db1, inventoryConnection, employeeConnection, tradeInConnection].forEach((db, i) => {
   db.on('connected', () => console.log(`✅ Connected to MongoDB database #${i+1}`));
   db.on('error', (err) => console.error(`❌ MongoDB connection error #${i+1}:`, err.message));
 });

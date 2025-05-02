@@ -105,6 +105,8 @@ const tradeInSchema = new mongoose.Schema({
   submittedAt: { type: Date, default: Date.now }
 });
 
+const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
+
 // ✅ Routes
 
 // Root

@@ -278,6 +278,30 @@ app.delete('/api/inventory', async (req, res) => {
   }
 });
 
+app.patch('/api/inventory/decrement', async (req, res) => {
+  try {
+    const { cardName, set, foil } = req.body;
+
+    const card = await CardInventory.findOne({ cardName, set, foil: !!foil });
+
+    if (!card) {
+      return res.status(404).json({ message: 'Card not found.' });
+    }
+
+    if (card.quantity > 1) {
+      card.quantity -= 1;
+      await card.save();
+      return res.status(200).json({ message: 'Quantity decremented.' });
+    } else {
+      await CardInventory.deleteOne({ _id: card._id });
+      return res.status(200).json({ message: 'Card removed from inventory (quantity reached 0).' });
+    }
+  } catch (err) {
+    console.error('❌ Decrement card error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
 // Add Employee
 app.post('/api/employees', async (req, res) => {
   const { role, firstName, lastName, phone, email, emergencyContact } = req.body;

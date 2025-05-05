@@ -4,116 +4,269 @@
   <meta charset="UTF-8">
   <title>Admin Dashboard | Geega Games</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
+  
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       display: flex;
       margin: 0;
+      background-color: #f4f6f8;
+      color: #333;
     }
-
+  
     .sidebar {
       background-color: rebeccapurple;
       color: white;
       padding: 20px;
-      width: 200px;
+      width: 220px;
       height: 100vh;
+      transition: width 0.3s ease;
+      overflow-x: hidden;
     }
-
+  
+    .sidebar.collapsed {
+      width: 60px;
+    }
+  
     .sidebar h2 {
       margin-top: 0;
+      font-size: 1.5rem;
     }
-
+  
     .sidebar a {
       color: white;
       text-decoration: none;
       display: block;
-      margin: 10px 0;
+      margin: 12px 0;
+      font-size: 1rem;
+      transition: padding 0.2s;
     }
-
+  
+    .sidebar a:hover {
+      text-decoration: underline;
+      padding-left: 5px;
+    }
+  
+    .sidebar-toggle {
+      background: white;
+      color: rebeccapurple;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 16px;
+      margin-bottom: 15px;
+      cursor: pointer;
+    }
+  
     .main {
       flex-grow: 1;
-      padding: 20px;
+      padding: 30px;
       background-color: #ecf0f1;
     }
-
+  
     .section {
       background-color: white;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 24px;
+      margin-bottom: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
     }
-
+  
+    .collapsible {
+      display: none;
+    }
+  
+    .collapsible.active {
+      display: block;
+    }
+  
+    .right-menu {
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100vh;
+      width: 60px;
+      background-color: rebeccapurple;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 20px;
+      z-index: 1100;
+      transition: width 0.3s ease;
+    }
+  
+    .right-menu.expanded {
+      width: 400px;
+      align-items: flex-start;
+      padding: 20px;
+      overflow-y: auto;
+    }
+  
+    .right-menu button.toggle-panel {
+      background: white;
+      color: rebeccapurple;
+      border: none;
+      padding: 8px 12px;
+      margin: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  
+    .right-panel-content {
+      display: none;
+      width: 100%;
+    }
+  
+    .right-menu.expanded .right-panel-content {
+      display: block;
+      color: #333;
+    }
+  
+    #search-results,
+    #delete-search-results {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+  
+    .card-item,
+    .delete-card-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 170px;
+      background: #ffffff;
+      padding: 12px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+  
+    .card-item:hover {
+      transform: scale(1.04);
+      background-color: #f2e7ff;
+    }
+  
+    .delete-card-item:hover {
+      transform: scale(1.04);
+      background-color: #ffe7e7;
+    }
+  
+    .card-item img,
+    .delete-card-item img {
+      width: 100%;
+      height: auto;
+      border-radius: 6px;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+    }
+  
+    .card-details,
+    .delete-card-details {
+      margin-top: 10px;
+      text-align: center;
+    }
+  
+    .card-details strong,
+    .delete-card-details strong {
+      font-size: 1.05em;
+      display: block;
+    }
+  
+    .card-details span,
+    .delete-card-details span {
+      display: block;
+      font-size: 0.9em;
+      margin: 4px 0;
+    }
+  
+    .card-details label {
+      font-size: 0.9em;
+      color: #444;
+      display: block;
+      margin-top: 4px;
+    }
+  
+    .card-details select {
+      margin-top: 4px;
+      padding: 4px;
+      font-size: 0.9em;
+      width: 100%;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+  
+    .card-details .add-button {
+      margin-top: 8px;
+      background-color: rebeccapurple;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  
+    .card-details .add-button:hover {
+      background-color: #6a2f9c;
+    }
+  
+    .delete-card-details button {
+      margin-top: 8px;
+      background-color: crimson;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  
+    .delete-card-details button:hover {
+      background-color: #a30000;
+    }
+  
     label {
       display: block;
-      margin: 10px 0 5px;
+      margin: 12px 0 6px;
+      font-weight: 600;
     }
-
+  
     input, textarea, button, select {
       width: 100%;
-      padding: 8px;
-      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-bottom: 14px;
+      font-size: 14px;
     }
-
+  
     button {
       background-color: rebeccapurple;
       color: white;
       border: none;
       cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
     }
-
+  
     button:hover {
       background-color: #5a2d85;
     }
-
-    .card-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #f8f8f8;
-      padding: 10px;
-      margin-bottom: 10px;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      cursor: pointer;
-    }
-
-    .card-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .card-info img {
-      width: 80px;
-      height: auto;
-      border-radius: 4px;
-      transition: transform 0.2s ease-in-out;
-    }
-
-    .card-info img:hover {
-      transform: scale(2.5);
-      z-index: 10;
-      position: relative;
-    }
-
-    .card-info div {
-      display: flex;
-      flex-direction: column;
-    }
-
+  
     input::-webkit-autofill,
     input:-webkit-autofill {
       box-shadow: 0 0 0px 1000px white inset !important;
       -webkit-box-shadow: 0 0 0px 1000px white inset !important;
     }
-
+  
     .shimmer {
-      background: linear-gradient(
-        to right,
-        rebeccapurple 4%,
-        #ffffff 25%,
-        rebeccapurple 36%
-      );
+      background: linear-gradient(to right, rebeccapurple 4%, #ffffff 25%, rebeccapurple 36%);
       background-size: 200% auto;
       color: white;
       background-clip: text;
@@ -123,14 +276,15 @@
       animation: shimmer 2s linear infinite;
       font-weight: bold;
     }
-
+  
     @keyframes shimmer {
       to {
         background-position: 200% center;
       }
     }
-
   </style>
+  
+
   
 <!-- 🔐 Login Logic
 <script>
@@ -240,45 +394,36 @@
   <!-- Existing HTML remains unchanged below this line -->
     
 
-  <div class="sidebar">
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
     <h2>Geega Admin</h2>
-    <a href="#">Dashboard</a>
-    <a href="#">Users</a>
-    <a href="#">Inventory</a>
-    <a href="#">Announcements</a>
+    <a href="#" onclick="showSection('inventory-section')">Inventory</a>
+    <a href="#" onclick="showSection('user-management-section')">User Management</a>
+    <a href="#" onclick="showSection('announcement-section')">Post Announcement</a>
+    <a href="#" onclick="showSection('employee-section')">Add Employee</a>
     <a href="#">Logout</a>
   </div>
-
+  
+  <!-- Main Content -->
   <div class="main">
     <h1>Welcome, Admin!</h1>
-
-    <div class="section">
-      <h2>User Management</h2>
-      <div id="user-list">
-        <p>Loading users...</p>
-      </div>
-    </div>
-
-    <div class="section">
+  
+    <!-- Inventory Section -->
+    <div class="section" id="inventory-section">
       <h2>Add Inventory</h2>
-
-      <!-- 🔍 Scryfall Search -->
       <h3>Search Magic Card</h3>
       <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
       <div id="search-results" style="margin-top: 10px;"></div>
-
       <hr style="margin: 20px 0;">
-
+  
       <form id="update-card-form">
         <label for="cardName">Card Name</label>
         <input type="text" id="cardName" name="cardName" required>
-      
         <label for="quantity">Quantity</label>
         <input type="number" id="quantity" name="quantity" min="0" required>
-      
         <label for="set">Set</label>
         <input type="text" id="set" name="set" required>
-      
         <label for="condition">Condition</label>
         <select id="condition" name="condition" required>
           <option value="">Select Condition</option>
@@ -288,35 +433,98 @@
           <option value="HP">Heavily Played</option>
           <option value="DMG">Damaged</option>
         </select>
-      
         <input type="hidden" id="imageUrl" name="imageUrl">
-      
         <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
-          <input type="checkbox" id="foil" name="foil"
-            style="width: 20px; height: 20px; margin: 0; margin-top: 5px; margin-bottom: 5px;">
-          <label for="foil" class="shimmer" style="margin: 0; margin-top: 5px; font-size: 1.1rem;">
-            Foil
-          </label>
+          <input type="checkbox" id="foil" name="foil" style="width: 20px; height: 20px;">
+          <label for="foil" class="shimmer" style="margin: 0; font-size: 1.1rem;">Foil</label>
         </div>
-      
-        <!-- ✅ Button moved here -->
         <button type="submit">Add / Update Card</button>
       </form>
-
-      <!-- Delete Card Form -->
-      <div class="section">
-        <h3>Delete Card from Inventory</h3>
-        <form id="delete-card-form">
-          <label for="deleteCardName">Card Name</label>
-          <input type="text" id="delete-search-input" placeholder="Search inventory..." autocomplete="off" />
-          <div id="delete-search-results" style="margin-top: 10px;"></div>
-          <input type="hidden" id="deleteCardName" name="deleteCardName" required>
-          <input type="hidden" id="deleteSet" name="deleteSet" required>
-          <input type="hidden" id="deleteFoil" name="deleteFoil" required>
-          <button type="submit" style="background-color: crimson;">Delete Card</button>
-        </form>
+  
+      <hr style="margin: 30px 0;">
+  
+      <h3>Delete Card from Inventory</h3>
+      <form id="delete-card-form">
+        <label for="deleteCardName">Card Name</label>
+        <input type="text" id="delete-search-input" placeholder="Search inventory..." autocomplete="off" />
+        <div id="delete-search-results" style="margin-top: 10px;"></div>
+        <input type="hidden" id="deleteCardName" name="deleteCardName" required>
+        <input type="hidden" id="deleteSet" name="deleteSet" required>
+        <input type="hidden" id="deleteFoil" name="deleteFoil" required>
+        <button type="submit" style="background-color: crimson;">Delete Card</button>
+      </form>
+    </div>
+  
+    <!-- User Management Section -->
+    <div class="section" id="user-management-section" style="display:none;">
+      <h2>User Management</h2>
+      <div id="user-list">
+        <p>Loading users...</p>
       </div>
     </div>
+  
+    <!-- Post Announcement Section -->
+    <div class="section" id="announcement-section" style="display:none;">
+      <h2>Post Announcement</h2>
+      <form id="announcement-form">
+        <label for="announcement">Message</label>
+        <textarea id="announcement" rows="4" required></textarea>
+        <label for="announcement-type">Send via:</label>
+        <select id="announcement-type" required>
+          <option value="email">Email Only</option>
+          <option value="sms">SMS Only</option>
+          <option value="both">Both Email & SMS</option>
+        </select>
+        <button type="submit">Post Announcement</button>
+      </form>
+    </div>
+  
+    <!-- Add Employee Section -->
+    <div class="section" id="employee-section" style="display:none;">
+      <h2>Add Employee</h2>
+        <label for="employeeRole">Role</label>
+        <select id="employeeRole" name="employeeRole" required>
+          <option value="">Select Role</option>
+          <option value="Admin">Admin</option>
+          <option value="Buyback Buddy">Buyback Buddy</option>
+          <option value="Card Slinger">Card Slinger</option>
+          <option value="Event Coordinator">Event Coordinator</option>
+          <option value="Inventory Management">Inventory Management</option>
+          <option value="Manager">Manager</option>
+        </select>
+        <label for="employeeFirstName">First Name</label>
+        <input type="text" id="employeeFirstName" name="employeeFirstName" required>
+        <label for="employeeLastName">Last Name</label>
+        <input type="text" id="employeeLastName" name="employeeLastName" required>
+        <label for="employeePhone">Phone</label>
+        <input type="tel" id="employeePhone" name="employeePhone" required>
+        <label for="employeeEmail">Email</label>
+        <input type="email" id="employeeEmail" name="employeeEmail" required>
+        <label for="emergencyContact">Emergency Contact</label>
+        <input type="text" id="emergencyContact" name="emergencyContact" required>
+        <button type="submit">Add Employee</button>
+      </form>
+    </div>
+  </div>
+  
+  <!-- JS for Sidebar and Section Switching -->
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+  
+    function showSection(sectionId) {
+      document.querySelectorAll('.main .section').forEach(section => {
+        section.style.display = 'none';
+      });
+      document.getElementById(sectionId).style.display = 'block';
+    }
+  
+    // Show inventory on initial load
+    document.addEventListener('DOMContentLoaded', () => {
+      showSection('inventory-section');
+    });
+  </script>
   
    <script>
   let deleteDebounceTimeout;
@@ -336,59 +544,63 @@
   });
 
   async function searchInventoryCards(query) {
-    const resultsDiv = document.getElementById('delete-search-results');
-    resultsDiv.innerHTML = `<p>Searching inventory for "<strong>${query}</strong>"...</p>`;
+  const resultsDiv = document.getElementById('delete-search-results');
+  resultsDiv.innerHTML = `<p>Searching inventory for "<strong>${query}</strong>"...</p>`;
 
-    try {
-      const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory");
-      if (!res.ok) throw new Error("Error fetching inventory");
+  try {
+    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory");
+    if (!res.ok) throw new Error("Error fetching inventory");
 
-      const cards = await res.json();
-      const filtered = cards.filter(card =>
-        card.cardName.toLowerCase().includes(query) ||
-        card.set.toLowerCase().includes(query)
-      );
+    const cards = await res.json();
+    const filtered = cards.filter(card =>
+      card.cardName.toLowerCase().includes(query) ||
+      card.set.toLowerCase().includes(query)
+    );
 
-      if (filtered.length === 0) {
-        resultsDiv.innerHTML = `<p>No matches in inventory for "${query}".</p>`;
-        return;
-      }
+    if (filtered.length === 0) {
+      resultsDiv.innerHTML = `<p>No matches in inventory for "${query}".</p>`;
+      return;
+    }
 
-      resultsDiv.innerHTML = '';
+    resultsDiv.innerHTML = '';
 
-      filtered.slice(0, 10).forEach(card => {
-        const displayName = card.cardName + (card.foil ? " (Foil)" : "");
-        const displaySet = card.set.toUpperCase();
-        const cardImage = card.imageUrl || '';
+    filtered.slice(0, 20).forEach(card => {
+      const displayName = card.cardName + (card.foil ? " (Foil)" : "");
+      const displaySet = card.set.toUpperCase();
+      const condition = card.condition || "Unknown";
+      const cardImage = card.imageUrl || '';
 
-        const cardDiv = document.createElement('div');
-        cardDiv.className = 'card-item';
-        cardDiv.innerHTML = `
-          <div class="card-info">
-            <img src="${cardImage}" alt="${displayName}" style="width: 80px; height: auto; border-radius: 4px;">
-            <div>
-              <strong>${displayName}</strong>
-              <span>Set: ${displaySet}</span>
-            </div>
-          </div>
-        `;
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'delete-card-item';
+      cardDiv.innerHTML = `
+        <img src="${cardImage}" alt="${displayName}">
+        <div class="delete-card-details">
+          <strong>${displayName}</strong>
+          <span>Set: ${displaySet}</span>
+          <span>Condition: ${condition}</span>
+          <button style="margin-top: 8px; background-color: crimson; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold;">Remove from Inventory</button>
+        </div>
+      `;
 
-        cardDiv.addEventListener('click', () => {
-          document.getElementById('deleteCardName').value = card.cardName;
-          document.getElementById('deleteSet').value = card.set;
-          document.getElementById('deleteFoil').value = card.foil;
-          document.getElementById('delete-search-input').value = `${displayName} (${displaySet})`;
-          resultsDiv.innerHTML = '';
-        });
+      cardDiv.querySelector('button').addEventListener('click', async () => {
+        const confirmed = confirm(`Are you sure you want to delete 1x of "${displayName}" from ${displaySet}?`);
+        if (!confirmed) return;
 
-        resultsDiv.appendChild(cardDiv);
+        document.getElementById('deleteCardName').value = card.cardName;
+        document.getElementById('deleteSet').value = card.set;
+        document.getElementById('deleteFoil').value = card.foil;
+
+        document.getElementById('delete-card-form').requestSubmit();
       });
 
-    } catch (err) {
-      console.error('❌ Inventory search error:', err);
-      resultsDiv.innerHTML = '<p>❌ Could not search inventory.</p>';
-    }
+      resultsDiv.appendChild(cardDiv);
+    });
+
+  } catch (err) {
+    console.error('❌ Inventory search error:', err);
+    resultsDiv.innerHTML = '<p>❌ Could not search inventory.</p>';
   }
+}
 
   // 🔥 Moved outside the async function!
   document.getElementById('delete-card-form').addEventListener('submit', async function (e) {
@@ -398,76 +610,27 @@
   const cardSet = document.getElementById('deleteSet').value.trim();
   const isFoil = document.getElementById('deleteFoil').value === 'true';
 
-  console.log({ cardName, cardSet, isFoil }); // 🛠️ Add this line to debug what you are sending!
+  console.log({ cardName, cardSet, isFoil });
 
   if (!cardName || !cardSet) return alert("Missing card name or set.");
 
   try {
-    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
-      method: "DELETE",
+    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory/decrement", {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cardName, set: cardSet, foil: isFoil })
     });
 
-    if (!res.ok) throw new Error(`Delete failed with status ${res.status}`);
-    alert("✅ Card deleted from inventory!");
+    if (!res.ok) throw new Error(`Decrement failed with status ${res.status}`);
+    alert("✅ Card quantity updated or removed.");
     document.getElementById('delete-card-form').reset();
   } catch (err) {
     console.error("❌ Delete Error:", err);
-    alert("❌ Error deleting card.");
+    alert("❌ Error updating inventory.");
   }
 });
 </script>
 
-    <div class="section">
-      <h2>Post Announcement</h2>
-      <form id="announcement-form">
-        <label for="announcement">Message</label>
-        <textarea id="announcement" rows="4" required></textarea>
-    
-        <label for="announcement-type">Send via:</label>
-        <select id="announcement-type" required>
-          <option value="email">Email Only</option>
-          <option value="sms">SMS Only</option>
-          <option value="both">Both Email & SMS</option>
-        </select>
-    
-        <button type="submit">Post Announcement</button>
-      </form>
-    </div>
-
-    <div class="section">
-      <h2>Add Employee</h2>
-      <form id="add-employee-form">
-        <label for="employeeRole">Role</label>
-        <select id="employeeRole" name="employeeRole" required>
-          <option value="">Select Role</option>
-          <option value="Admin">Admin</option>
-          <option value="Buyback Buddy">Buyback Buddy</option>
-          <option value="Card Slinger">Card Slinger</option>
-          <option value="Event Coordinator">Event Coordinator</option>
-          <option value="Inventory Management">Inventory Management</option>
-          <option value="Manager">Manager</option>
-        </select>
-    
-        <label for="employeeFirstName">First Name</label>
-        <input type="text" id="employeeFirstName" name="employeeFirstName" required>
-    
-        <label for="employeeLastName">Last Name</label>
-        <input type="text" id="employeeLastName" name="employeeLastName" required>
-    
-        <label for="employeePhone">Phone</label>
-        <input type="tel" id="employeePhone" name="employeePhone" required>
-    
-        <label for="employeeEmail">Email</label>
-        <input type="email" id="employeeEmail" name="employeeEmail" required>
-    
-        <label for="emergencyContact">Emergency Contact</label>
-        <input type="text" id="emergencyContact" name="emergencyContact" required>
-    
-        <button type="submit">Add Employee</button>
-      </form>
-    </div>
 
   <script>
     async function loadUsers() {
@@ -528,101 +691,99 @@
   });
 
   async function searchScryfall(query) {
-    const resultsDiv = document.getElementById('search-results');
-    resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+  const resultsDiv = document.getElementById('search-results');
+  resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
 
-    try {
-      const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
-      if (!searchRes.ok) throw new Error('No matching card found');
+  try {
+    const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
+    if (!searchRes.ok) throw new Error('Card not found');
 
-      const baseCard = await searchRes.json();
-      const printRes = await fetch(baseCard.prints_search_uri);
-      const printData = await printRes.json();
+    const baseCard = await searchRes.json();
+    const printsRes = await fetch(baseCard.prints_search_uri);
+    const printsData = await printsRes.json();
 
-      const sorted = [...printData.data].sort((a, b) => {
-        const aScore = (a.full_art || a.frame_effects?.length) ? 1 : 0;
-        const bScore = (b.full_art || b.frame_effects?.length) ? 1 : 0;
-        return bScore - aScore;
-      });
+    const cards = [baseCard, ...printsData.data];
+    resultsDiv.innerHTML = '';
 
-      const topResults = sorted.slice(0, 10);
-      resultsDiv.innerHTML = '';
+    cards.slice(0, 20).forEach(card => {
+      const imageUrl = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
+      let displayName = card.name;
+      const treatments = [];
 
-      topResults.forEach(card => {
-        const cardImage = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
-        if (!cardImage) return;
+      if (card.frame_effects?.includes('showcase')) treatments.push('Showcase');
+      if (card.frame_effects?.includes('extendedart')) treatments.push('Extended Art');
+      if (card.frame_effects?.includes('borderless')) treatments.push('Borderless');
+      if (card.promo_types?.includes('fullart')) treatments.push('Full-Art');
+      if (card.promo_types?.includes('retro')) treatments.push('Retro Frame');
+      if (card.promo_types?.includes('textless')) treatments.push('Textless');
+      if (card.promo_types?.includes('phyrexian')) treatments.push('Phyrexian');
+      if (card.finishes?.includes('etched')) treatments.push('Etched Foil');
+      if (card.finishes?.includes('gilded')) treatments.push('Gilded Foil');
+      if (card.finishes?.includes('rainbow_foil')) treatments.push('Rainbow Foil');
+      if (card.promo_types?.includes('serialized')) treatments.push('Serialized');
 
-        const cardName = card.name;
-        const cardSet = card.set.toUpperCase();
-        const typeLine = card.type_line || "Unknown";
+      if (treatments.length > 0) {
+        displayName += ` (${treatments.join(', ')})`;
+      }
 
-        let variantLabel = '';
+      const set = card.set_name;
+      const foilId = `foil-${Math.random().toString(36).substr(2, 9)}`;
+      const conditionId = `condition-${Math.random().toString(36).substr(2, 9)}`;
 
-        const frameEffectPriority = [
-          { key: 'serialized', label: '(Serialized)' },
-          { key: 'oil_slicked', label: '(Oil Slick)' },
-          { key: 'shatteredglass', label: '(Shattered Glass)' },
-          { key: 'showcase', label: '(Showcase)' },
-          { key: 'extendedart', label: '(Extended Art)' },
-          { key: 'borderless', label: '(Borderless)' },
-          { key: 'inverted', label: '(Inverted)' },
-          { key: 'lesson', label: '(Lesson)' },
-          { key: 'nyxtouched', label: '(Nyx-touched)' },
-          { key: 'companion', label: '(Companion)' },
-          { key: 'devoid', label: '(Devoid)' },
-          { key: 'colorshifted', label: '(Color Shifted)' },
-          { key: 'snow', label: '(Snow Frame)' },
-          { key: 'promo-stamped', label: '(Promo Stamped)' },
-        ];
-
-        const effects = card.frame_effects || [];
-        for (const effect of frameEffectPriority) {
-          if (effects.includes(effect.key)) {
-            variantLabel = effect.label;
-            break;
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'card-item';
+      cardDiv.innerHTML = `
+        <img src="${imageUrl}" alt="${displayName}">
+        <div class="card-details">
+          <strong>${displayName}</strong>
+          <span>Set: ${set}</span>
+          ${
+            card.finishes?.length === 1 && card.finishes[0] === 'foil'
+              ? '<span style="font-size: 0.9em; color: #6a2f9c;">✨ Foil Only</span>'
+              : card.finishes?.includes('foil') && card.finishes?.includes('nonfoil')
+                ? `<label><input type="checkbox" id="${foilId}" class="foil-checkbox"> Foil</label>`
+                : ''
           }
-        }
+          <label for="${conditionId}">Condition:</label>
+          <select id="${conditionId}" class="condition-select">
+            <option value="NM">Near Mint</option>
+            <option value="LP">Lightly Played</option>
+            <option value="MP">Moderately Played</option>
+            <option value="HP">Heavily Played</option>
+            <option value="DMG">Damaged</option>
+          </select>
+          <button class="add-button">Add / Update</button>
+        </div>
+      `;
 
-        if (!variantLabel && card.full_art) {
-          variantLabel = '(Full Art)';
-        }
+      cardDiv.querySelector('.add-button').addEventListener('click', () => {
+        const isFoil = card.finishes?.length === 1 && card.finishes[0] === 'foil'
+          ? true
+          : cardDiv.querySelector('.foil-checkbox')?.checked || false;
+        const condition = cardDiv.querySelector('.condition-select')?.value || 'NM';
 
-        const displayName = variantLabel ? `${cardName} ${variantLabel}` : cardName;
+        // Populate form fields
+        document.getElementById('cardName').value = displayName;
+        document.getElementById('set').value = set;
+        document.getElementById('foil').checked = isFoil;
+        document.getElementById('condition').value = condition;
+        document.getElementById('imageUrl').value = imageUrl;
+        document.getElementById('quantity').value = 1;
 
-        const cardDiv = document.createElement('div');
-        cardDiv.className = 'card-item';
+        // Clear UI
+        document.getElementById('search-input').value = '';
+        resultsDiv.innerHTML = '';
 
-        cardDiv.innerHTML = `
-          <div class="card-info">
-            <img src="${cardImage}" alt="${displayName}">
-            <div>
-              <strong>${displayName}</strong>
-              <span>Set: ${cardSet}</span><br>
-              <span>${typeLine}</span>
-            </div>
-          </div>
-        `;
-
-        cardDiv.addEventListener('mousedown', e => e.preventDefault());
-
-           cardDiv.addEventListener('click', e => {
-              e.preventDefault();
-              document.getElementById('cardName').value = displayName;
-              document.getElementById('set').value = card.set_name;
-              document.getElementById('search-input').value = '';
-              document.getElementById('quantity').value = 1;
-              document.getElementById('imageUrl').value = cardImage; // ✅ Set image URL here
-              resultsDiv.innerHTML = '';
-              document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
-            });
-
-        resultsDiv.appendChild(cardDiv);
+        document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
       });
-    } catch (err) {
-      console.error('Error searching Scryfall:', err);
-      resultsDiv.innerHTML = `<p>No results found for "<strong>${query}</strong>".</p>`;
-    }
+
+      resultsDiv.appendChild(cardDiv);
+    });
+  } catch (err) {
+    console.error('Scryfall error:', err);
+    resultsDiv.innerHTML = `<p>❌ Could not find a card for "<strong>${query}</strong>".</p>`;
   }
+}
 </script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {

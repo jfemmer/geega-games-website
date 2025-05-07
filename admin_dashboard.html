@@ -399,6 +399,7 @@
     <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
     <h2>Geega Admin</h2>
     <a href="#" onclick="showSection('inventory-section')">Inventory</a>
+    <a href="#" onclick="showSection('orders-section')">Orders</a>
     <a href="#" onclick="showSection('user-management-section')">User Management</a>
     <a href="#" onclick="showSection('announcement-section')">Post Announcement</a>
     <a href="#" onclick="showSection('employee-section')">Add Employee</a>
@@ -407,7 +408,6 @@
   
   <!-- Main Content -->
   <div class="main">
-    <h1>Welcome, Admin!</h1>
   
     <!-- Inventory Section -->
     <div class="section" id="inventory-section">
@@ -416,6 +416,14 @@
       <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
       <div id="search-results" style="margin-top: 10px;"></div>
       <hr style="margin: 20px 0;">
+
+      <!-- Orders Section -->
+      <div class="section" id="orders-section" style="display: none;">
+      <h2>Order Management</h2>
+      <div id="orders-list">
+        <p>Loading orders...</p>
+        </div>
+      </div>
   
       <form id="update-card-form">
         <label for="cardName">Card Name</label>
@@ -675,6 +683,46 @@
     loadUsers();
 
   let debounceTimeout;
+
+  async function loadOrders() {
+  const ordersList = document.getElementById('orders-list');
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/orders');
+    if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+    const orders = await res.json();
+
+    if (!Array.isArray(orders) || orders.length === 0) {
+      ordersList.innerHTML = "<p>No orders found.</p>";
+      return;
+    }
+
+    ordersList.innerHTML = orders.map(order => `
+      <div style="border: 1px solid #ccc; border-radius: 10px; margin-bottom: 20px; padding: 15px; background: white;">
+        <h3>${order.firstName} ${order.lastName}</h3>
+        <p><strong>Email:</strong> ${order.email}</p>
+        <p><strong>Address:</strong> ${order.address || '—'}</p>
+        <p><strong>Submitted:</strong> ${new Date(order.submittedAt).toLocaleString()}</p>
+        <h4>Cards:</h4>
+        <ul>
+          ${order.cards.map(card => `
+            <li>
+              <strong>${card.cardName}</strong> — ${card.quantity}x
+              <br><em>Set:</em> ${card.set || 'N/A'}
+              ${card.foil ? '<br>✨ <strong>Foil</strong>' : ''}
+              ${card.specialArt ? `<br><strong>Art:</strong> ${card.specialArt}` : ''}
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `).join('');
+  } catch (error) {
+    ordersList.innerHTML = "<p>❌ Error loading orders.</p>";
+    console.error('❌ Order fetch error:', error);
+  }
+}
+
+// 👇 Load when section is clicked
+document.querySelector('a[href="#"][onclick*="orders-section"]').addEventListener('click', loadOrders);
 
   document.getElementById('search-input').addEventListener('input', function () {
     clearTimeout(debounceTimeout);

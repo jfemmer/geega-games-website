@@ -222,10 +222,24 @@ app.post('/api/tradein', async (req, res) => {
 });
 
 
-// Get All Inventory
 app.get('/api/inventory', async (req, res) => {
   try {
-    res.json(await CardInventory.find().sort({ cardName: 1 }));
+    const cards = await CardInventory.find({}, {
+      cardName: 1,
+      quantity: 1,
+      set: 1,
+      condition: 1,
+      foil: 1,
+      imageUrl: 1,
+      colors: 1,
+      cardType: 1,
+      creatureTypes: 1,
+      priceUsd: 1,
+      priceUsdFoil: 1,
+      addedAt: 1
+    }).sort({ cardName: 1 });
+
+    res.json(cards);
   } catch (err) {
     console.error('❌ Fetch inventory error:', err);
     res.status(500).json({ message: 'Internal server error.' });

@@ -87,6 +87,26 @@ const employeeSchema = new mongoose.Schema({
 });
 const Employee = employeeConnection.model('Employee', employeeSchema, 'Employees');
 
+const orderSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  firstName: String,
+  lastName: String,
+  email: String,
+  address: String,
+  cards: [
+    {
+      cardName: String,
+      set: String,
+      foil: Boolean,
+      specialArt: String, // e.g., "Showcase", "Borderless", etc.
+      quantity: Number
+    }
+  ],
+  submittedAt: { type: Date, default: Date.now }
+});
+
+const Order = db1.model('Order', orderSchema, 'Orders');
+
 const tradeInSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, required: true },
   firstName: String,
@@ -279,6 +299,32 @@ app.post('/api/inventory/prices', async (req, res) => {
   }
 });
 
+app.post('/api/orders', async (req, res) => {
+  const { userId, firstName, email, cards } = req.body;
+
+  if (!userId || !cards || !Array.isArray(cards) || cards.length === 0) {
+    return res.status(400).json({ message: 'Invalid order data.' });
+  }
+
+  try {
+    await new Order({ userId, firstName, email, cards }).save();
+    res.status(201).json({ message: 'Order submitted successfully!' });
+  } catch (err) {
+    console.error('❌ Order submission error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+app.get('/api/orders', async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ submittedAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    console.error('❌ Fetch orders error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
 // Delete Inventory Card
 app.delete('/api/inventory', async (req, res) => {
   try {
@@ -327,6 +373,7 @@ app.post('/api/employees', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
+
 
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

@@ -408,9 +408,15 @@
   
   <!-- Main Content -->
   <div class="main">
-  
+
     <!-- Inventory Section -->
     <div class="section" id="inventory-section">
+      <div id="inventory-summary" style="padding: 20px; background-color: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center;">
+        <h3 style="color: rebeccapurple;">Inventory Summary</h3>
+        <p><strong>Total Cards:</strong> <span id="total-card-count">Loading...</span></p>
+        <p><strong>Total Inventory Value:</strong> $<span id="total-inventory-value">Loading...</span></p>
+      </div>  
+
       <h2>Add Inventory</h2>
       <h3>Search Magic Card</h3>
       <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
@@ -461,6 +467,7 @@
         <input type="hidden" id="deleteFoil" name="deleteFoil" required>
         <button type="submit" style="background-color: crimson;">Delete Card</button>
       </form>
+
     </div>
   
     <!-- User Management Section -->
@@ -684,41 +691,30 @@
 
   let debounceTimeout;
 
-  async function loadOrders() {
+  function loadOrders() {
   const ordersList = document.getElementById('orders-list');
-  try {
-    const res = await fetch('https://geega-games-website-production.up.railway.app/api/orders');
-    if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-    const orders = await res.json();
-
-    if (!Array.isArray(orders) || orders.length === 0) {
-      ordersList.innerHTML = "<p>No orders found.</p>";
-      return;
-    }
-
-    ordersList.innerHTML = orders.map(order => `
-      <div style="border: 1px solid #ccc; border-radius: 10px; margin-bottom: 20px; padding: 15px; background: white;">
-        <h3>${order.firstName} ${order.lastName}</h3>
-        <p><strong>Email:</strong> ${order.email}</p>
-        <p><strong>Address:</strong> ${order.address || '—'}</p>
-        <p><strong>Submitted:</strong> ${new Date(order.submittedAt).toLocaleString()}</p>
-        <h4>Cards:</h4>
-        <ul>
-          ${order.cards.map(card => `
-            <li>
-              <strong>${card.cardName}</strong> — ${card.quantity}x
-              <br><em>Set:</em> ${card.set || 'N/A'}
-              ${card.foil ? '<br>✨ <strong>Foil</strong>' : ''}
-              ${card.specialArt ? `<br><strong>Art:</strong> ${card.specialArt}` : ''}
-            </li>
-          `).join('')}
-        </ul>
-      </div>
-    `).join('');
-  } catch (error) {
-    ordersList.innerHTML = "<p>❌ Error loading orders.</p>";
-    console.error('❌ Order fetch error:', error);
-  }
+  
+  // For now, simulate with sampleOrder from the external file
+  const orders = [sampleOrder]; // You could also manually push this to your fetched results
+  
+  ordersList.innerHTML = orders.map(order => `
+   <div style="border: 1px solid #ccc; border-radius: 10px; margin-bottom: 20px; padding: 15px; background: white;">
+      <h3>${order.firstName} ${order.lastName}</h3>
+      <p><strong>Email:</strong> ${order.email}</p>
+      <p><strong>Address:</strong> ${order.address || '—'}</p>
+      <h4>Cards:</h4>
+      <ul>
+        ${order.cards.map(card => `
+          <li>
+            <strong>${card.cardName}</strong> — ${card.quantity}x
+            <br><em>Set:</em> ${card.set || 'N/A'}
+            ${card.foil ? '<br>✨ <strong>Foil</strong>' : ''}
+            ${card.specialArt ? `<br><strong>Art:</strong> ${card.specialArt}` : ''}
+          </li>
+        `).join('')}
+      </ul>
+    </div>
+  `).join('');
 }
 
 // 👇 Load when section is clicked
@@ -907,6 +903,39 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 </script>
+
+<script>
+  async function calculateInventoryTotals() {
+    try {
+      const res = await fetch('https://geega-games-website-production.up.railway.app/api/inventory');
+      if (!res.ok) throw new Error('Failed to fetch inventory');
+  
+      const inventory = await res.json();
+      let totalValue = 0;
+      let totalQuantity = 0;
+  
+      inventory.forEach(card => {
+        const quantity = card.quantity || 0;
+        const isFoil = card.foil;
+        const rawPrice = parseFloat(isFoil ? card.priceUsdFoil : card.priceUsd);
+        const price = isNaN(rawPrice) ? 0 : rawPrice;
+        totalValue += price * quantity;
+        totalQuantity += quantity;
+      });
+  
+      document.getElementById('total-card-count').textContent = totalQuantity;
+      document.getElementById('total-inventory-value').textContent = totalValue.toFixed(2);
+    } catch (err) {
+      console.error('❌ Error calculating inventory totals:', err);
+      document.getElementById('inventory-summary').innerHTML = '<p style="color:red;">❌ Could not load inventory summary.</p>';
+    }
+  }
+  
+  // Auto-calculate when page loads
+  document.addEventListener('DOMContentLoaded', () => {
+    calculateInventoryTotals();
+  });
+  </script>
   
 </body>
 </html>

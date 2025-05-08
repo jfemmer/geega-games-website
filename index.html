@@ -535,6 +535,9 @@ async function showLegalities(cardNameRaw) {
 
     if (!data.legalities) throw new Error('No legalities found.');
 
+    const importantFormats = ['commander', 'standard', 'modern', 'pauper', 'legacy'];
+const isMobile = window.innerWidth <= 768;
+
 const formatted = `
   <div style="display: flex; justify-content: center;">
     <div style="
@@ -547,13 +550,14 @@ const formatted = `
       text-align: left;
     ">
       ${Object.entries(data.legalities)
+        .filter(([format]) => !isMobile || importantFormats.includes(format))
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([format, status]) => {
           let color = '#555';
           if (status === 'legal') color = 'green';
           else if (status === 'banned') color = 'red';
           else if (status === 'restricted') color = 'orange';
-          else if (status === 'not_legal') color = 'red';
+          else if (status === 'not_legal') color = '#888';
 
           return `
             <div><strong>${format.replace(/_/g, ' ').toUpperCase()}</strong></div>

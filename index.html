@@ -188,9 +188,10 @@
     .filter-sort-container {
       display: flex;
       justify-content: center;
-      gap: 20px;
-      margin: 20px 0;
       flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 40px;
+      margin: 30px 0 10px;
     }
   
     .dropdown-block {
@@ -338,6 +339,7 @@
   margin: 4px 0;
 }
 
+
   
     @media (min-width: 768px) {
       .header-inner {
@@ -354,6 +356,7 @@
   0% { opacity: 0; transform: translateY(-10px); }
   100% { opacity: 1; transform: translateY(0); }
 }
+
 
 #welcome-banner {
   animation: slideFade 0.5s ease-in-out;
@@ -414,13 +417,14 @@
     </a>
   </div>
   
-  <!-- FILTERS -->
   <div class="filter-sort-container">
-    <div class="dropdown-block">
-      <label for="sort-dropdown">Sort by Name:</label>
+    <div class="dropdown-block sort-block">
+      <label for="sort-dropdown">Sort by:</label>
       <select id="sort-dropdown" class="styled-dropdown">
-        <option value="asc">Name A → Z</option>
-        <option value="desc">Name Z → A</option>
+        <option value="name-asc">Name A → Z</option>
+        <option value="name-desc">Name Z → A</option>
+        <option value="price-asc">Price Low → High</option>
+        <option value="price-desc">Price High → Low</option>
       </select>
     </div>
   
@@ -443,7 +447,7 @@
       <label for="creature-filter">Filter by Creature Type:</label>
       <select id="creature-filter" class="styled-dropdown">
         <option value="">All Types</option>
-        <!-- Options will be populated dynamically -->
+        <!-- dynamically populated -->
       </select>
     </div>
   </div>
@@ -462,68 +466,180 @@
     }
   
     async function renderAllCards() {
-      const session = ++renderSessionToken;
-      const container = document.getElementById('card-container');
-      container.innerHTML = '';
-    
-      filteredCards.forEach(card => {
-        const cardDiv = document.createElement('div');
-        cardDiv.className = 'card';
-  
-        const imageWrapper = document.createElement('div');
-        imageWrapper.className = `image-wrapper ${card.foil ? 'foil-shimmer' : ''}`;
-        imageWrapper.innerHTML = `<img src="${card.imageUrl}" alt="${card.cardName}" loading="lazy" />`;
-  
-        const title = document.createElement('h3');
-        title.className = 'card-title';
-        title.textContent = card.foil ? `${card.cardName} (Foil)` : card.cardName;
-  
-        const set = document.createElement('p');
-        set.className = 'card-text';
-        set.textContent = `Set: ${card.set}`;
-  
-        const condition = document.createElement('p');
-        condition.className = 'card-condition';
-        condition.textContent = `Condition: ${formatCondition(card.condition)}`;
-  
-        const quantity = document.createElement('p');
-        quantity.textContent = `Quantity: ${card.quantity}`;
-  
-        const price = document.createElement('p');
-        const rawPrice = parseFloat(card.foil ? card.priceUsdFoil : card.priceUsd);
-        const adjustedPrice = isNaN(rawPrice) ? 'N/A' : (rawPrice < 0.5 ? '0.50' : rawPrice.toFixed(2));
-        price.textContent = `Price: $${adjustedPrice}`;
-        
-        cardDiv.append(imageWrapper, title, set, condition, quantity, price);
-        container.appendChild(cardDiv);
-      });
+  const session = ++renderSessionToken;
+  const container = document.getElementById('card-container');
+  container.innerHTML = '';
+
+  filteredCards.forEach(card => {
+    const cardDiv = document.createElement('div');
+    cardDiv.className = 'card';
+
+    const imageWrapper = document.createElement('div');
+    imageWrapper.className = `image-wrapper ${card.foil ? 'foil-shimmer' : ''}`;
+    imageWrapper.innerHTML = `<img src="${card.imageUrl}" alt="${card.cardName}" loading="lazy" />`;
+
+    // Combine foil and variant labels
+    const foilLabel = card.foilType ? card.foilType : (card.foil ? "Foil" : "");
+    const variantLabel = card.variantType || "";
+    const labels = [variantLabel, foilLabel].filter(Boolean).join(" / ");
+
+    const title = document.createElement('h3');
+    title.className = 'card-title';
+    title.textContent = labels ? `${card.cardName} (${labels})` : card.cardName;
+
+    const set = document.createElement('p');
+    set.className = 'card-text';
+    set.textContent = `Set: ${card.set}`;
+
+    const condition = document.createElement('p');
+    condition.className = 'card-condition';
+    condition.textContent = `Condition: ${formatCondition(card.condition)}`;
+
+    const quantity = document.createElement('p');
+    quantity.textContent = `Quantity: ${card.quantity}`;
+
+    // Price with fallback logic
+    const price = document.createElement('p');
+    const isFoil = card.foil || !!card.foilType;
+    let rawPrice = parseFloat(isFoil ? card.priceUsdFoil : card.priceUsd);
+    if (isFoil && (isNaN(rawPrice) || rawPrice === 0)) {
+      rawPrice = parseFloat(card.priceUsd);
     }
+    const adjustedPrice = isNaN(rawPrice) ? 'N/A' : (rawPrice < 0.5 ? '0.50' : rawPrice.toFixed(2));
+    price.textContent = `Price: $${adjustedPrice}`;
+    if (labels) price.title = `Edition: ${labels}`;
+
+    // 📌 Attach click event to show Scryfall format legalities
+    cardDiv.addEventListener('click', () => {
+      showLegalities(card.cardName);
+    });
+
+    cardDiv.append(imageWrapper, title, set, condition, quantity, price);
+    container.appendChild(cardDiv);
+  });
+}
+async function showLegalities(cardNameRaw) {
+  const modal = document.getElementById('legalities-modal');
+  const content = document.getElementById('legalities-content');
+
+  // Clean up card name
+  const cardName = cardNameRaw.split(' // ')[0].replace(/\(.*?\)/g, '').trim();
+
+  // Show modal and loading message immediately
+  modal.style.display = 'flex';
+  content.innerHTML = `<p style="text-align:center; color: rebeccapurple;">Loading legalities...</p>`;
+
+  try {
+    const response = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}`);
+    const data = await response.json();
+
+    if (!data.legalities) throw new Error('No legalities found.');
+
+    const formatted = `
+      <div style="display: flex; justify-content: center;">
+        <div style="
+          width: 280px;
+          display: grid;
+          grid-template-columns: auto auto;
+          gap: 6px 16px;
+          font-size: 14px;
+          text-align: left;
+        ">
+          ${Object.entries(data.legalities)
+            .sort((a, b) => a[0].localeCompare(b[0])) // Descending alphabetical order
+            .map(([format, status]) => {
+              let color = '#555';
+              if (status === 'legal') color = 'green';
+              else if (status === 'banned') color = 'red';
+              else if (status === 'restricted') color = 'orange';
+              else if (status === 'not_legal') color = 'red';
+
+              return `
+                <div><strong>${format.replace(/_/g, ' ').toUpperCase()}</strong></div>
+                <div style="color: ${color}; text-transform: capitalize;">${status.replace(/_/g, ' ')}</div>
+              `;
+            }).join('')}
+        </div>
+      </div>
+    `;
+
+    content.innerHTML = `
+      <div style="text-align: center;">
+        <img src="${data.image_uris?.small || ''}" alt="${data.name}" style="border-radius: 8px; margin-bottom: 12px; max-height: 150px;"><br>
+        <h4 style="margin: 0 0 12px; color: rebeccapurple;">${data.name}</h4>
+        ${formatted}
+      </div>
+    `;
+  } catch (err) {
+    content.innerHTML = `<p style="text-align:center;">❌ Could not fetch legalities.</p>`;
+  }
+}
+
+function closeModal() {
+  document.getElementById('legalities-modal').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('legalities-modal');
+  const content = document.getElementById('legalities-content');
+
+  if (modal) {
+    modal.style.display = 'none'; // ✅ Force hidden
+    content.innerHTML = '';       // ✅ Clear any stale content
+
+    modal.addEventListener('click', (e) => {
+      if (e.target.id === 'legalities-modal') closeModal();
+    });
+  }
+});
+
   
-    function applyFilters() {
-      const color = document.getElementById('color-filter').value;
-      const creature = document.getElementById('creature-filter').value.toLowerCase();
-      const sortDir = document.getElementById('sort-dropdown').value;
-      renderSessionToken++;
-  
-      filteredCards = cardsData.filter(card => {
-        const matchesColor = !color ||
-          (color === 'C' && card.colors?.[0] === 'Colorless' && card.cardType?.toLowerCase().includes('artifact')) ||
-          (color === 'M' && card.colors?.[0] === 'Multicolor') ||
-          (color === 'L' && card.cardType?.toLowerCase().includes('land')) ||
-          (Array.isArray(card.colors) && card.colors.includes(color));
-        const matchesType = !creature ||
-          (Array.isArray(card.creatureTypes) && card.creatureTypes.some(type => type.toLowerCase() === creature));
-        return matchesColor && matchesType;
-      });
-  
-      filteredCards.sort((a, b) => {
-        const aTitle = a.foil ? `${a.cardName} (Foil)` : a.cardName;
-        const bTitle = b.foil ? `${b.cardName} (Foil)` : b.cardName;
-        return sortDir === "asc" ? aTitle.localeCompare(bTitle) : bTitle.localeCompare(aTitle);
-      });
-  
-      renderAllCards();
+function applyFilters() {
+  const color = document.getElementById('color-filter').value;
+  const creature = document.getElementById('creature-filter').value.toLowerCase();
+  const sortDir = document.getElementById('sort-dropdown').value;
+  renderSessionToken++;
+
+  filteredCards = cardsData.filter(card => {
+    const matchesColor = !color ||
+      (color === 'C' && card.colors?.[0] === 'Colorless' && card.cardType?.toLowerCase().includes('artifact')) ||
+      (color === 'M' && card.colors?.[0] === 'Multicolor') ||
+      (color === 'L' && card.cardType?.toLowerCase().includes('land')) ||
+      (Array.isArray(card.colors) && card.colors.includes(color));
+
+    const matchesType = !creature ||
+      (Array.isArray(card.creatureTypes) && card.creatureTypes.some(type => type.toLowerCase() === creature));
+
+    return matchesColor && matchesType;
+  });
+
+  filteredCards.sort((a, b) => {
+    const getEffectivePrice = (card, descending = false) => {
+      const isFoil = card.foil || !!card.foilType;
+      let price = parseFloat(isFoil ? card.priceUsdFoil : card.priceUsd);
+      if (isFoil && (isNaN(price) || price === 0)) {
+        price = parseFloat(card.priceUsd);
+      }
+
+      // Push N/A prices to the bottom
+      return isNaN(price) ? (descending ? -Infinity : Infinity) : price;
+    };
+
+    if (sortDir === 'price-asc' || sortDir === 'price-desc') {
+      const descending = sortDir === 'price-desc';
+      const priceA = getEffectivePrice(a, descending);
+      const priceB = getEffectivePrice(b, descending);
+      return descending ? priceB - priceA : priceA - priceB;
     }
+
+    const aTitle = a.foil ? `${a.cardName} (Foil)` : a.cardName;
+    const bTitle = b.foil ? `${b.cardName} (Foil)` : b.cardName;
+    return sortDir === 'name-asc' ? aTitle.localeCompare(bTitle) : bTitle.localeCompare(aTitle);
+  });
+
+  renderAllCards();
+}
+
   
     async function loadCards() {
       try {
@@ -531,7 +647,8 @@
         const data = await res.json();
         const mergedMap = new Map();
         data.forEach(card => {
-          const key = `${card.cardName.toLowerCase()}|${card.set.toLowerCase()}|${card.foil}|${card.condition.toLowerCase()}`;
+          const variantKey = [card.variantType, card.foilType].filter(Boolean).join("|").toLowerCase();
+          const key = `${card.cardName.toLowerCase()}|${card.set.toLowerCase()}|${card.foil}|${card.condition.toLowerCase()}|${variantKey}`;
           if (mergedMap.has(key)) mergedMap.get(key).quantity += card.quantity;
           else mergedMap.set(key, { ...card });
         });
@@ -641,5 +758,52 @@ document.getElementById('logout-button').addEventListener('click', () => {
     loadCreatureTypes();
   </script>
   
+
+<!-- Legalities Modal -->
+<div id="legalities-modal" style="
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+">
+  <div style="
+    background: #fff;
+    padding: 24px 28px;
+    border-radius: 14px;
+    max-width: 480px;
+    width: 90%;
+    position: relative;
+    color: #333;
+    font-family: 'Segoe UI', sans-serif;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    animation: fadeIn 0.3s ease-in-out;
+  ">
+    <button onclick="closeModal()" style="
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: none;
+      border: none;
+      font-size: 22px;
+      color: #888;
+      cursor: pointer;
+      transition: color 0.2s;
+    " onmouseover="this.style.color='rebeccapurple'" onmouseout="this.style.color='#888'">
+      &times;
+    </button>
+    <h3 style="color: rebeccapurple; margin-top: 0; font-size: 20px;">Format Legalities</h3>
+    <div id="legalities-content" style="
+      margin-top: 14px;
+      line-height: 1.6;
+      font-size: 15px;
+    "></div>
+  </div>
+</div>
+
 </body>
 </html>

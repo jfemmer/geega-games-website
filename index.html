@@ -535,7 +535,7 @@ async function showLegalities(cardNameRaw) {
 
     if (!data.legalities) throw new Error('No legalities found.');
 
-    const formatted = `
+const formatted = `
   <div style="display: flex; justify-content: center;">
     <div style="
       width: 100%;
@@ -553,7 +553,7 @@ async function showLegalities(cardNameRaw) {
           if (status === 'legal') color = 'green';
           else if (status === 'banned') color = 'red';
           else if (status === 'restricted') color = 'orange';
-          else if (status === 'not_legal') color = '#888';
+          else if (status === 'not_legal') color = 'red';
 
           return `
             <div><strong>${format.replace(/_/g, ' ').toUpperCase()}</strong></div>

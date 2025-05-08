@@ -536,33 +536,33 @@ async function showLegalities(cardNameRaw) {
     if (!data.legalities) throw new Error('No legalities found.');
 
     const formatted = `
-      <div style="display: flex; justify-content: center;">
-        <div style="
-          width: 280px;
-          display: grid;
-          grid-template-columns: auto auto;
-          gap: 6px 16px;
-          font-size: 14px;
-          text-align: left;
-        ">
-          ${Object.entries(data.legalities)
-            .sort((a, b) => a[0].localeCompare(b[0])) // Descending alphabetical order
-            .map(([format, status]) => {
-              let color = '#555';
-              if (status === 'legal') color = 'green';
-              else if (status === 'banned') color = 'red';
-              else if (status === 'restricted') color = 'orange';
-              else if (status === 'not_legal') color = 'red';
+  <div style="display: flex; justify-content: center;">
+    <div style="
+      width: 100%;
+      max-width: 280px;
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: 6px 16px;
+      font-size: 14px;
+      text-align: left;
+    ">
+      ${Object.entries(data.legalities)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([format, status]) => {
+          let color = '#555';
+          if (status === 'legal') color = 'green';
+          else if (status === 'banned') color = 'red';
+          else if (status === 'restricted') color = 'orange';
+          else if (status === 'not_legal') color = '#888';
 
-              return `
-                <div><strong>${format.replace(/_/g, ' ').toUpperCase()}</strong></div>
-                <div style="color: ${color}; text-transform: capitalize;">${status.replace(/_/g, ' ')}</div>
-              `;
-            }).join('')}
-        </div>
-      </div>
-    `;
-
+          return `
+            <div><strong>${format.replace(/_/g, ' ').toUpperCase()}</strong></div>
+            <div style="color: ${color}; text-transform: capitalize;">${status.replace(/_/g, ' ')}</div>
+          `;
+        }).join('')}
+    </div>
+  </div>
+`;
     content.innerHTML = `
       <div style="text-align: center;">
         <img src="${data.image_uris?.small || ''}" alt="${data.name}" style="border-radius: 8px; margin-bottom: 12px; max-height: 150px;"><br>
@@ -771,18 +771,17 @@ document.getElementById('logout-button').addEventListener('click', () => {
   justify-content: center;
   align-items: center;
 ">
-  <div style="
-    background: #fff;
-    padding: 24px 28px;
-    border-radius: 14px;
-    max-width: 480px;
-    width: 90%;
+<div style="
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    max-width: 340px;
+    width: 92%;
     position: relative;
     color: #333;
-    font-family: 'Segoe UI', sans-serif;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-    animation: fadeIn 0.3s ease-in-out;
-  ">
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    box-sizing: border-box;
+">
     <button onclick="closeModal()" style="
       position: absolute;
       top: 10px;

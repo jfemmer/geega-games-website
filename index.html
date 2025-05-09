@@ -556,39 +556,57 @@
       });
     }
   
-    function addToCart(card) {
-      const cart = JSON.parse(localStorage.getItem('cart')) || [];
-      const key = `${card.cardName}|${card.set}|${card.foil}|${card.condition}`;
-      const existing = cart.find(item => item.key === key);
+    async function addToCart(card) {
+  const userId = localStorage.getItem('userId');
+  if (!userId) {
+    alert('❌ Please log in first.');
+    return;
+  }
+
+  try {
+    const item = {
+      cardName: card.cardName,
+      set: card.set,
+      foil: !!card.foil,
+      variantType: card.variantType || '',
+      condition: card.condition,
+      quantity: 1,
+      priceUsd: card.foil ? card.priceUsdFoil : card.priceUsd
+    };
+
+    const res = await fetch('/api/cart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, item })
+    });
+
+    if (!res.ok) throw new Error('Failed to add to cart');
+
+    updateCartCount();
+    alert('✅ Added to cart!');
+  } catch (err) {
+    console.error('❌ Cart add error:', err);
+    alert('❌ Could not add card to cart.');
+  }
+}
   
-      const totalInCart = existing ? existing.quantity : 0;
-      const maxAvailable = card.quantity;
-  
-      if (totalInCart >= maxAvailable) {
-        alert(`Sorry there's no more available.`);
-        return;
-      }
-  
-      if (existing) {
-        existing.quantity += 1;
-      } else {
-        cart.push({ key, ...card, quantity: 1 });
-      }
-  
-      localStorage.setItem('cart', JSON.stringify(cart));
-      updateCartCount();
-      alert('✅ Added to cart!');
+async function updateCartCount() {
+  const userId = localStorage.getItem('userId');
+  if (!userId) return;
+
+  try {
+    const res = await fetch(`/api/cart?userId=${userId}`);
+    const data = await res.json();
+    const count = data.items.reduce((sum, item) => sum + item.quantity, 0);
+    const cartCountEl = document.getElementById('cart-count');
+    if (cartCountEl) {
+      cartCountEl.textContent = count;
+      cartCountEl.style.display = count > 0 ? 'flex' : 'none';
     }
-  
-    function updateCartCount() {
-      const cart = JSON.parse(localStorage.getItem('cart')) || [];
-      const count = cart.reduce((sum, item) => sum + item.quantity, 0);
-      const cartCountEl = document.getElementById('cart-count');
-      if (cartCountEl) {
-        cartCountEl.textContent = count;
-        cartCountEl.style.display = count > 0 ? 'flex' : 'none';
-      }
-    }
+  } catch (err) {
+    console.error('❌ Failed to fetch cart count:', err);
+  }
+}
   
     async function showLegalities(cardNameRaw) {
       const modal = document.getElementById('legalities-modal');

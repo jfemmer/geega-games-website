@@ -147,43 +147,49 @@ app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js versi
 // ✅ GET cart
 // ✅ GET cart
 // ✅ GET cart
+// 🛒 GET cart
 app.get('/api/cart', async (req, res) => {
   const { userId } = req.query;
-  console.log('📥 [GET] /api/cart - userId:', userId);
+  console.log('📥 [GET] /api/cart - Received userId:', userId);
 
   if (!mongoose.Types.ObjectId.isValid(userId)) {
-    console.warn('⚠️ Invalid userId format:', userId);
+    console.warn('⚠️ Invalid userId format (GET):', userId);
     return res.status(400).json({ message: 'Invalid userId format.' });
   }
 
   try {
-    const cart = await Cart.findOne({ userId: new mongoose.Types.ObjectId(userId) });
-    console.log('📦 Cart found:', cart);
+    const objectId = new mongoose.Types.ObjectId(userId);
+    console.log('🔍 Converted userId to ObjectId:', objectId);
+
+    const cart = await Cart.findOne({ userId: objectId });
+    console.log('📦 Cart query result:', cart);
+
     res.json(cart ? { items: cart.items || [] } : { items: [] });
   } catch (err) {
-    console.error('❌ Fetch cart error:', err);
+    console.error('❌ [GET] Fetch cart error:', err.stack || err);
     res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
 
-// ✅ POST add item to cart
+// 🛒 POST add item to cart
 app.post('/api/cart', async (req, res) => {
   const { userId, item } = req.body;
-  console.log('📥 [POST] /api/cart - Incoming cart request:', { userId, item });
+  console.log('📥 [POST] /api/cart - Payload:', { userId, item });
 
   if (!mongoose.Types.ObjectId.isValid(userId)) {
-    console.warn('⚠️ Invalid userId format on POST:', userId);
+    console.warn('⚠️ Invalid userId format (POST):', userId);
     return res.status(400).json({ message: 'Invalid userId format.' });
   }
 
   try {
     const objectId = new mongoose.Types.ObjectId(userId);
     let cart = await Cart.findOne({ userId: objectId });
-    console.log('🛒 Existing cart:', cart);
+
+    console.log('🛒 Existing cart:', cart || 'None found');
 
     if (!cart) {
-      cart = new Cart({ userId: objectId, items: [item] });
       console.log('➕ Creating new cart');
+      cart = new Cart({ userId: objectId, items: [item] });
     } else {
       const key = `${item.cardName}|${item.set}|${item.foil}|${item.condition}|${item.variantType}`;
       const existing = cart.items.find(i =>
@@ -191,71 +197,80 @@ app.post('/api/cart', async (req, res) => {
       );
 
       if (existing) {
-        console.log('🧩 Found existing item, increasing quantity');
+        console.log('🧩 Found existing item in cart, incrementing quantity');
         existing.quantity += item.quantity;
       } else {
-        console.log('🆕 Adding new item to cart');
+        console.log('🆕 Pushing new item to cart');
         cart.items.push(item);
       }
     }
 
     cart.updatedAt = new Date();
     await cart.save();
-    console.log('✅ Cart saved successfully');
+    console.log('✅ Cart saved successfully:', cart);
     res.status(200).json({ message: 'Item added to cart' });
   } catch (err) {
-    console.error('❌ Add to cart error:', err);
+    console.error('❌ [POST] Add to cart error:', err.stack || err);
     res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
 
-// ✅ POST remove item by index
+// 🗑️ POST remove item by index
 app.post('/api/cart/remove', async (req, res) => {
   const { userId, index } = req.body;
   console.log('📥 [POST] /api/cart/remove - userId:', userId, 'index:', index);
 
   if (!mongoose.Types.ObjectId.isValid(userId)) {
-    console.warn('⚠️ Invalid userId format on REMOVE:', userId);
+    console.warn('⚠️ Invalid userId format (REMOVE):', userId);
     return res.status(400).json({ message: 'Invalid userId format.' });
   }
 
   try {
-    const cart = await Cart.findOne({ userId: new mongoose.Types.ObjectId(userId) });
-    if (!cart || index < 0 || index >= cart.items.length) {
-      console.warn('⚠️ Invalid cart or index range');
-      return res.status(400).json({ message: 'Invalid index or cart not found.' });
+    const objectId = new mongoose.Types.ObjectId(userId);
+    const cart = await Cart.findOne({ userId: objectId });
+
+    if (!cart) {
+      console.warn('⚠️ No cart found for userId:', userId);
+      return res.status(404).json({ message: 'Cart not found.' });
     }
 
+    if (index < 0 || index >= cart.items.length) {
+      console.warn('⚠️ Index out of bounds:', index);
+      return res.status(400).json({ message: 'Invalid index.' });
+    }
+
+    console.log('🗑️ Removing item at index:', index, '->', cart.items[index]);
     cart.items.splice(index, 1);
     cart.updatedAt = new Date();
     await cart.save();
-    console.log('🗑️ Item removed and cart updated');
     res.status(200).json({ message: 'Item removed from cart' });
   } catch (err) {
-    console.error('❌ Remove from cart error:', err);
+    console.error('❌ [REMOVE] Error:', err.stack || err);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
 
-// ✅ POST clear cart
+// 🧹 POST clear cart
 app.post('/api/cart/clear', async (req, res) => {
   const { userId } = req.body;
   console.log('📥 [POST] /api/cart/clear - userId:', userId);
 
   if (!mongoose.Types.ObjectId.isValid(userId)) {
-    console.warn('⚠️ Invalid userId format on CLEAR:', userId);
+    console.warn('⚠️ Invalid userId format (CLEAR):', userId);
     return res.status(400).json({ message: 'Invalid userId format.' });
   }
 
   try {
-    await Cart.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId) },
+    const objectId = new mongoose.Types.ObjectId(userId);
+    const result = await Cart.findOneAndUpdate(
+      { userId: objectId },
       { items: [], updatedAt: new Date() }
     );
-    console.log('🧹 Cart cleared');
+
+    console.log('🧹 Cart clear result:', result);
     res.status(200).json({ message: 'Cart cleared' });
   } catch (err) {
-    console.error('❌ Clear cart error:', err);
+    console.error('❌ [CLEAR] Cart error:', err.stack || err);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

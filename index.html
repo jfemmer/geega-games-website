@@ -564,6 +564,13 @@
     return;
   }
 
+  // 🔍 Validate card data before sending to server
+  if (!card.cardName || !card.set || !card.condition) {
+    console.error('❌ Incomplete card data:', card);
+    alert('❌ Cannot add card to cart: Missing card name, set, or condition.');
+    return;
+  }
+
   try {
     const item = {
       cardName: card.cardName,
@@ -581,7 +588,10 @@
       body: JSON.stringify({ userId, item })
     });
 
-    if (!res.ok) throw new Error('Failed to add to cart');
+    if (!res.ok) {
+      const errMsg = await res.text();
+      throw new Error(`Failed to add to cart: ${errMsg}`);
+    }
 
     updateCartCount();
     alert('✅ Added to cart!');
@@ -591,6 +601,7 @@
   }
 }
 
+
 async function updateCartCount() {
   const userId = localStorage.getItem('userId');
   if (!userId) return;
@@ -598,9 +609,13 @@ async function updateCartCount() {
   try {
     const res = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
     const data = await res.json();
-    const count = Array.isArray(data.items) 
-  ? data.items.reduce((sum, item) => sum + item.quantity, 0) 
-  : 0;
+
+    console.log('🛒 Cart data:', data);
+
+    const count = Array.isArray(data?.items)
+      ? data.items.reduce((sum, item) => sum + item.quantity, 0)
+      : 0;
+
     const cartCountEl = document.getElementById('cart-count');
     if (cartCountEl) {
       cartCountEl.textContent = count;
@@ -610,7 +625,6 @@ async function updateCartCount() {
     console.error('❌ Failed to fetch cart count:', err);
   }
 }
-  
     async function showLegalities(cardNameRaw) {
       const modal = document.getElementById('legalities-modal');
       const content = document.getElementById('legalities-content');

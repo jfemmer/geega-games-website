@@ -598,7 +598,9 @@ async function updateCartCount() {
   try {
     const res = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
     const data = await res.json();
-    const count = data.items.reduce((sum, item) => sum + item.quantity, 0);
+    const count = Array.isArray(data.items) 
+  ? data.items.reduce((sum, item) => sum + item.quantity, 0) 
+  : 0;
     const cartCountEl = document.getElementById('cart-count');
     if (cartCountEl) {
       cartCountEl.textContent = count;

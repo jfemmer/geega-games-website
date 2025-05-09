@@ -1,87 +1,182 @@
-<!-- wishlist.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Your Wishlist | Geega Games</title>
-  <link rel="stylesheet" href="style.css">
-  <script>
-    const userId = localStorage.getItem('userId');
-    if (!userId) {
-      alert('You need to be logged in to view your wishlist.');
-      window.location.href = 'login.html';
-    }
-  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Cart - Geega Games</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
-    .wishlist-container, .cart-container {
-      max-width: 800px;
-      margin: 40px auto;
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f8ff;
+      margin: 0;
       padding: 20px;
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-    .wishlist-container h2, .cart-container h2 {
+    h1 {
       text-align: center;
       color: rebeccapurple;
     }
-    .wishlist-item, .cart-item {
+    .cart-container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .cart-item {
+      border-bottom: 1px solid #ddd;
+      padding: 10px 0;
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      padding: 10px;
-      border-bottom: 1px solid #eee;
+      align-items: center;
     }
-    .wishlist-item img, .cart-item img {
-      height: 80px;
-      border-radius: 6px;
+    .cart-item:last-child {
+      border-bottom: none;
     }
-    .wishlist-item button, .cart-item button {
-      padding: 6px 12px;
-      border: none;
-      background-color: crimson;
+    .item-info {
+      flex-grow: 1;
+    }
+    .item-title {
+      font-weight: bold;
+      color: rebeccapurple;
+    }
+    .remove-btn {
+      background: red;
       color: white;
-      border-radius: 5px;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
       cursor: pointer;
     }
-    .wishlist-item button:hover, .cart-item button:hover {
-      background-color: darkred;
+    .checkout-section {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .checkout-btn {
+      background: darkgreen;
+      color: white;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <div class="wishlist-container">
-    <h2>Your Wishlist</h2>
-    <div id="wishlist-items"></div>
+  <h1>Your Cart</h1>
+  <div class="cart-container" id="cart-container"></div>
+  <div class="checkout-section">
+    <button class="checkout-btn" onclick="submitOrder()">Checkout</button>
   </div>
-  
+
   <script>
-    const wishlist = JSON.parse(localStorage.getItem(`wishlist_${userId}`) || '[]');
-    const container = document.getElementById('wishlist-items');
+    async function loadCart() {
+      const container = document.getElementById('cart-container');
+      const userId = localStorage.getItem('userId');
+      container.innerHTML = '';
 
-    if (wishlist.length === 0) {
-      container.innerHTML = '<p style="text-align:center">No items in wishlist.</p>';
-    } else {
-      wishlist.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'wishlist-item';
-        div.innerHTML = `
-          <img src="${item.imageUrl}" alt="${item.cardName}" />
-          <div>
-            <strong>${item.cardName}</strong><br>
-            <small>Set: ${item.set}</small>
-          </div>
-          <button onclick="removeFromWishlist('${item.cardName}', '${item.set}')">Remove</button>
-        `;
-        container.appendChild(div);
-      });
+      if (!userId) {
+        container.innerHTML = '<p style="text-align:center;">❌ Please log in to view your cart.</p>';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/cart?userId=${userId}`);
+        const data = await res.json();
+
+        if (!data.items || data.items.length === 0) {
+          container.innerHTML = '<p style="text-align:center;">🛒 Your cart is empty!</p>';
+          return;
+        }
+
+        data.items.forEach((item, index) => {
+          const div = document.createElement('div');
+          div.className = 'cart-item';
+          div.innerHTML = `
+            <div class="item-info">
+              <div class="item-title">${item.cardName}</div>
+              <div>Set: ${item.set} | Condition: ${item.condition} | Quantity: ${item.quantity}</div>
+              <div>${item.foil ? 'Foil' : 'Non-Foil'}</div>
+            </div>
+            <button class="remove-btn" onclick="removeFromCart(${index})">Remove</button>
+          `;
+          container.appendChild(div);
+        });
+      } catch (err) {
+        container.innerHTML = '<p style="text-align:center; color: red;">❌ Failed to load cart.</p>';
+        console.error('Load cart error:', err);
+      }
     }
 
-    function removeFromWishlist(cardName, set) {
-      const updated = wishlist.filter(card => !(card.cardName === cardName && card.set === set));
-      localStorage.setItem(`wishlist_${userId}`, JSON.stringify(updated));
-      location.reload();
+    async function removeFromCart(index) {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+
+      try {
+        const res = await fetch(`/api/cart/remove`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, index })
+        });
+
+        if (res.ok) {
+          loadCart();
+        } else {
+          alert('❌ Could not remove item.');
+        }
+      } catch (err) {
+        console.error('Remove error:', err);
+      }
     }
+
+    async function submitOrder() {
+      const userId = localStorage.getItem('userId');
+      const firstName = localStorage.getItem('firstName') || 'Customer';
+
+      if (!userId) {
+        alert('❌ Please log in before placing an order.');
+        return;
+      }
+
+      try {
+        const cartRes = await fetch(`/api/cart?userId=${userId}`);
+        const cart = await cartRes.json();
+
+        const order = {
+          userId,
+          firstName,
+          cards: cart.items
+        };
+
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(order)
+        });
+
+        if (response.ok) {
+          await fetch('/api/cart/clear', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+          });
+
+          alert('✅ Order submitted successfully!');
+          window.location.href = 'index.html';
+        } else {
+          alert('❌ Failed to submit order.');
+        }
+      } catch (err) {
+        console.error('Order error:', err);
+        alert('❌ Something went wrong.');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadCart);
   </script>
 </body>
 </html>

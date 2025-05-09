@@ -5,7 +5,8 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
-const Cart = require('./models/Cart')(db1);
+const Cart = require('./models/Cart');
+
 const app = express();
 
 // ✅ Middleware
@@ -43,7 +44,6 @@ const MONGODB_URI = process.env.MONGODB_URI;
 const INVENTORY_DB_URI = process.env.INVENTORY_DB_URI;
 const EMPLOYEE_DB_URI = process.env.EMPLOYEE_DB_URI;
 const TRADEIN_DB_URI = process.env.TRADEIN_DB_URI;
-
 const port = process.env.PORT || 3000;
 
 if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI || !TRADEIN_DB_URI ) {
@@ -141,15 +141,12 @@ app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js versi
 // ✅ GET cart
 app.get('/api/cart', async (req, res) => {
   const { userId } = req.query;
-  console.log('📥 GET cart for:', userId);
-
   try {
     const cart = await Cart.findOne({ userId: new mongoose.Types.ObjectId(userId) });
-    console.log('📤 Returning cart:', cart);
     res.json(cart || { items: [] });
   } catch (err) {
     console.error('❌ Fetch cart error:', err);
-    res.status(500).json({ message: 'Internal server error', error: err.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 

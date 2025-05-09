@@ -5,7 +5,8 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
-const Cart = require('./models/Cart');
+const createCartModel = require('./models/Cart');
+const Cart = createCartModel(db1);
 
 const app = express();
 
@@ -139,21 +140,36 @@ app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js versi
 
 // 🔁 Get cart
 // ✅ GET cart
+// ✅ GET cart
+// ✅ GET cart
 app.get('/api/cart', async (req, res) => {
   const { userId } = req.query;
+  console.log('📥 [GET] /api/cart - userId:', userId);
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    console.warn('⚠️ Invalid userId format:', userId);
+    return res.status(400).json({ message: 'Invalid userId format.' });
+  }
+
   try {
     const cart = await Cart.findOne({ userId: new mongoose.Types.ObjectId(userId) });
+    console.log('📦 Cart found:', cart);
     res.json(cart ? { items: cart.items || [] } : { items: [] });
   } catch (err) {
     console.error('❌ Fetch cart error:', err);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
 
 // ✅ POST add item to cart
 app.post('/api/cart', async (req, res) => {
   const { userId, item } = req.body;
-  console.log('📦 Incoming cart request:', { userId, item });
+  console.log('📥 [POST] /api/cart - Incoming cart request:', { userId, item });
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    console.warn('⚠️ Invalid userId format on POST:', userId);
+    return res.status(400).json({ message: 'Invalid userId format.' });
+  }
 
   try {
     const objectId = new mongoose.Types.ObjectId(userId);
@@ -162,6 +178,7 @@ app.post('/api/cart', async (req, res) => {
 
     if (!cart) {
       cart = new Cart({ userId: objectId, items: [item] });
+      console.log('➕ Creating new cart');
     } else {
       const key = `${item.cardName}|${item.set}|${item.foil}|${item.condition}|${item.variantType}`;
       const existing = cart.items.find(i =>
@@ -169,14 +186,17 @@ app.post('/api/cart', async (req, res) => {
       );
 
       if (existing) {
+        console.log('🧩 Found existing item, increasing quantity');
         existing.quantity += item.quantity;
       } else {
+        console.log('🆕 Adding new item to cart');
         cart.items.push(item);
       }
     }
 
     cart.updatedAt = new Date();
     await cart.save();
+    console.log('✅ Cart saved successfully');
     res.status(200).json({ message: 'Item added to cart' });
   } catch (err) {
     console.error('❌ Add to cart error:', err);
@@ -187,15 +207,24 @@ app.post('/api/cart', async (req, res) => {
 // ✅ POST remove item by index
 app.post('/api/cart/remove', async (req, res) => {
   const { userId, index } = req.body;
+  console.log('📥 [POST] /api/cart/remove - userId:', userId, 'index:', index);
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    console.warn('⚠️ Invalid userId format on REMOVE:', userId);
+    return res.status(400).json({ message: 'Invalid userId format.' });
+  }
+
   try {
     const cart = await Cart.findOne({ userId: new mongoose.Types.ObjectId(userId) });
     if (!cart || index < 0 || index >= cart.items.length) {
+      console.warn('⚠️ Invalid cart or index range');
       return res.status(400).json({ message: 'Invalid index or cart not found.' });
     }
 
     cart.items.splice(index, 1);
     cart.updatedAt = new Date();
     await cart.save();
+    console.log('🗑️ Item removed and cart updated');
     res.status(200).json({ message: 'Item removed from cart' });
   } catch (err) {
     console.error('❌ Remove from cart error:', err);
@@ -206,11 +235,19 @@ app.post('/api/cart/remove', async (req, res) => {
 // ✅ POST clear cart
 app.post('/api/cart/clear', async (req, res) => {
   const { userId } = req.body;
+  console.log('📥 [POST] /api/cart/clear - userId:', userId);
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    console.warn('⚠️ Invalid userId format on CLEAR:', userId);
+    return res.status(400).json({ message: 'Invalid userId format.' });
+  }
+
   try {
     await Cart.findOneAndUpdate(
       { userId: new mongoose.Types.ObjectId(userId) },
       { items: [], updatedAt: new Date() }
     );
+    console.log('🧹 Cart cleared');
     res.status(200).json({ message: 'Cart cleared' });
   } catch (err) {
     console.error('❌ Clear cart error:', err);

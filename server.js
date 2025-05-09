@@ -5,8 +5,29 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
-const Cart = require('./models/Cart')(db1);
+
 const app = express();
+
+// ✅ Environment variables
+const MONGODB_URI = process.env.MONGODB_URI;
+const INVENTORY_DB_URI = process.env.INVENTORY_DB_URI;
+const EMPLOYEE_DB_URI = process.env.EMPLOYEE_DB_URI;
+const TRADEIN_DB_URI = process.env.TRADEIN_DB_URI;
+const port = process.env.PORT || 3000;
+
+if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI || !TRADEIN_DB_URI) {
+  console.error('❌ One or more MongoDB URIs are missing in environment variables!');
+  process.exit(1);
+}
+
+// ✅ Connect to MongoDB
+const db1 = mongoose.createConnection(MONGODB_URI);
+const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI);
+const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI);
+const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI);
+
+// ✅ Load Cart model AFTER db1 is defined
+const Cart = require('./models/Cart')(db1);
 
 // ✅ Middleware
 app.use(cors());
@@ -37,31 +58,6 @@ const fetchScryfallImageUrl = async (name, set, options = {}) => {
     return '';
   }
 };
-
-// ✅ Environment variables
-const MONGODB_URI = process.env.MONGODB_URI;
-const INVENTORY_DB_URI = process.env.INVENTORY_DB_URI;
-const EMPLOYEE_DB_URI = process.env.EMPLOYEE_DB_URI;
-const TRADEIN_DB_URI = process.env.TRADEIN_DB_URI;
-const port = process.env.PORT || 3000;
-
-if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI || !TRADEIN_DB_URI ) {
-  console.error('❌ One or more MongoDB URIs are missing in environment variables!');
-  process.exit(1);
-}
-
-// ✅ Connect to MongoDB
-const db1 = mongoose.createConnection(MONGODB_URI);
-const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI);
-const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI);
-const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI);
-
-
-// ✅ Connection Logs
-[db1, inventoryConnection, employeeConnection, tradeInConnection].forEach((db, i) => {
-  db.on('connected', () => console.log(`✅ Connected to MongoDB database #${i+1}`));
-  db.on('error', (err) => console.error(`❌ MongoDB connection error #${i+1}:`, err.message));
-});
 
 // ✅ Schemas and Models
 const userSchema = new mongoose.Schema({

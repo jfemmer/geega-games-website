@@ -30,7 +30,10 @@ const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI);
 const Cart = require('./models/Cart')(db1);
 
 // ✅ Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'https://jfemmer.github.io',
+  credentials: true
+}));
 app.use(express.json());
 
 // ✅ Scryfall Image Fetch Helper

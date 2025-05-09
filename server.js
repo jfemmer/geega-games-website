@@ -5,8 +5,7 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
-const Cart = require('./models/Cart');
-
+const Cart = require('./models/Cart')(db1);
 const app = express();
 
 // ✅ Middleware

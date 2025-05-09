@@ -7,72 +7,128 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f8f8ff;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      text-align: center;
-      color: rebeccapurple;
-    }
-    .cart-container {
-      max-width: 800px;
-      margin: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    .cart-item {
-      border-bottom: 1px solid #ddd;
-      padding: 10px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .cart-item:last-child {
-      border-bottom: none;
-    }
-    .item-info {
-      flex-grow: 1;
-    }
-    .item-title {
-      font-weight: bold;
-      color: rebeccapurple;
-    }
-    .remove-btn {
-      background: red;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 10px;
-      cursor: pointer;
-    }
-    .checkout-section {
-      text-align: center;
-      margin-top: 20px;
-    }
-    .checkout-btn {
-      background: darkgreen;
-      color: white;
-      font-weight: bold;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-    }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f0ff;
+    margin: 0;
+    padding: 0;
+  }
+  
+  header.top-banner {
+    background-color: rebeccapurple;
+    color: white;
+    padding: 12px 20px;
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  
+  .main-content {
+    max-width: 900px;
+    margin: 30px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+  
+  h1 {
+    text-align: center;
+    color: rebeccapurple;
+    margin-bottom: 20px;
+  }
+  
+  .back-home-link {
+    display: inline-block;
+    margin-bottom: 20px;
+    color: rebeccapurple;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 16px;
+    transition: color 0.2s;
+  }
+  
+  .back-home-link:hover {
+    color: darkmagenta;
+    text-decoration: underline;
+  }
+  
+  .cart-item {
+    border-bottom: 1px solid #eee;
+    padding: 16px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+  }
+  
+  .cart-item:hover {
+    background-color: #fafafa;
+  }
+  
+  .item-info {
+    flex-grow: 1;
+    padding-right: 20px;
+  }
+  
+  .item-title {
+    font-weight: 600;
+    color: rebeccapurple;
+    font-size: 16px;
+  }
+  
+  .remove-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  
+  .checkout-section {
+    text-align: center;
+    margin-top: 30px;
+  }
+  
+  .checkout-btn {
+    background: darkgreen;
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 17px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .checkout-btn:hover {
+    background: seagreen;
+  }
+  
+
   </style>
 </head>
 <body>
-  <h1>Your Cart</h1>
-  <div class="cart-container" id="cart-container"></div>
-  <div class="checkout-section">
-    <button class="checkout-btn" onclick="submitOrder()">Checkout</button>
-  </div>
+  <header class="top-banner">
+    Geega Games 🧙‍♂️ – Your Cart
+  </header>
 
+  <div class="main-content">
+    <a href="index.html" class="back-home-link">
+      <i class="fa-solid fa-arrow-left"></i> Back to Home
+    </a>
+
+    <h1>Your Cart</h1>
+    <div id="cart-container"></div>
+
+    <div class="checkout-section">
+      <button class="checkout-btn" onclick="submitOrder()">Checkout</button>
+    </div>
+  </div>
   <script>
     const API_BASE = 'https://geega-games-website-production.up.railway.app';
   

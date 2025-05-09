@@ -143,7 +143,7 @@ app.get('/api/cart', async (req, res) => {
   const { userId } = req.query;
   try {
     const cart = await Cart.findOne({ userId: new mongoose.Types.ObjectId(userId) });
-    res.json(cart || { items: [] });
+    res.json(cart ? { items: cart.items || [] } : { items: [] });
   } catch (err) {
     console.error('❌ Fetch cart error:', err);
     res.status(500).json({ message: 'Internal server error' });

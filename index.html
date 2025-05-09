@@ -485,6 +485,7 @@
        let renderSessionToken = 0;
     const apiEndpoint = 'https://geega-games-website-production.up.railway.app/api/inventory';
     let cardsData = [], filteredCards = [];
+    const API_BASE = 'https://geega-games-website-production.up.railway.app';
   
     function formatCondition(abbr) {
       const map = { NM: "Near Mint", LP: "Lightly Played", MP: "Moderately Played", HP: "Heavily Played", DMG: "Damaged" };
@@ -574,7 +575,7 @@
       priceUsd: card.foil ? card.priceUsdFoil : card.priceUsd
     };
 
-    const res = await fetch('/api/cart', {
+    const res = await fetch(`${API_BASE}/api/cart`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, item })
@@ -589,13 +590,13 @@
     alert('❌ Could not add card to cart.');
   }
 }
-  
+
 async function updateCartCount() {
   const userId = localStorage.getItem('userId');
   if (!userId) return;
 
   try {
-    const res = await fetch(`/api/cart?userId=${userId}`);
+    const res = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
     const data = await res.json();
     const count = data.items.reduce((sum, item) => sum + item.quantity, 0);
     const cartCountEl = document.getElementById('cart-count');

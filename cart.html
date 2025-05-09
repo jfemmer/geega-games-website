@@ -74,25 +74,27 @@
   </div>
 
   <script>
+    const API_BASE = 'https://geega-games-website-production.up.railway.app';
+  
     async function loadCart() {
       const container = document.getElementById('cart-container');
       const userId = localStorage.getItem('userId');
       container.innerHTML = '';
-
+  
       if (!userId) {
         container.innerHTML = '<p style="text-align:center;">❌ Please log in to view your cart.</p>';
         return;
       }
-
+  
       try {
-        const res = await fetch(`/api/cart?userId=${userId}`);
+        const res = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
         const data = await res.json();
-
+  
         if (!data.items || data.items.length === 0) {
           container.innerHTML = '<p style="text-align:center;">🛒 Your cart is empty!</p>';
           return;
         }
-
+  
         data.items.forEach((item, index) => {
           const div = document.createElement('div');
           div.className = 'cart-item';
@@ -111,18 +113,18 @@
         console.error('Load cart error:', err);
       }
     }
-
+  
     async function removeFromCart(index) {
       const userId = localStorage.getItem('userId');
       if (!userId) return;
-
+  
       try {
-        const res = await fetch(`/api/cart/remove`, {
+        const res = await fetch(`${API_BASE}/api/cart/remove`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, index })
         });
-
+  
         if (res.ok) {
           loadCart();
         } else {
@@ -132,39 +134,39 @@
         console.error('Remove error:', err);
       }
     }
-
+  
     async function submitOrder() {
       const userId = localStorage.getItem('userId');
       const firstName = localStorage.getItem('firstName') || 'Customer';
-
+  
       if (!userId) {
         alert('❌ Please log in before placing an order.');
         return;
       }
-
+  
       try {
-        const cartRes = await fetch(`/api/cart?userId=${userId}`);
+        const cartRes = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
         const cart = await cartRes.json();
-
+  
         const order = {
           userId,
           firstName,
           cards: cart.items
         };
-
-        const response = await fetch('/api/orders', {
+  
+        const response = await fetch(`${API_BASE}/api/orders`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(order)
         });
-
+  
         if (response.ok) {
-          await fetch('/api/cart/clear', {
+          await fetch(`${API_BASE}/api/cart/clear`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId })
           });
-
+  
           alert('✅ Order submitted successfully!');
           window.location.href = 'index.html';
         } else {
@@ -175,7 +177,7 @@
         alert('❌ Something went wrong.');
       }
     }
-
+  
     document.addEventListener('DOMContentLoaded', loadCart);
   </script>
 </body>

@@ -564,7 +564,7 @@
   }
 
   try {
-    await fetch('/api/cart', {
+    await fetch('https://geega-games-website-production.up.railway.app/api/cart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, card })
@@ -577,13 +577,13 @@
     alert('Error adding to cart.');
   }
 }
-  
+
 async function updateCartCount() {
   const userId = localStorage.getItem('userId');
   if (!userId) return;
 
   try {
-    const res = await fetch(`/api/cart?userId=${userId}`);
+    const res = await fetch(`https://geega-games-website-production.up.railway.app/api/cart?userId=${userId}`);
     const cart = await res.json();
     const count = cart.items.reduce((sum, item) => sum + item.quantity, 0);
     const cartCountEl = document.getElementById('cart-count');
@@ -595,6 +595,7 @@ async function updateCartCount() {
     console.error('❌ Failed to fetch cart:', err);
   }
 }
+
   
     async function showLegalities(cardNameRaw) {
       const modal = document.getElementById('legalities-modal');

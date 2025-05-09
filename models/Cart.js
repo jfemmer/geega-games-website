@@ -7,11 +7,11 @@ const CartItemSchema = new mongoose.Schema({
   variantType: String,
   condition: String,
   quantity: Number,
-  priceUsd: String,
+  priceUsd: String, // or Number, but OK for now
 });
 
 const CartSchema = new mongoose.Schema({
-  userId: { type: String, required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true },
   items: [CartItemSchema],
   updatedAt: { type: Date, default: Date.now }
 });

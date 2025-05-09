@@ -141,22 +141,28 @@ app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js versi
 // ✅ GET cart
 app.get('/api/cart', async (req, res) => {
   const { userId } = req.query;
+  console.log('📥 GET cart for:', userId);
+
   try {
     const cart = await Cart.findOne({ userId: new mongoose.Types.ObjectId(userId) });
+    console.log('📤 Returning cart:', cart);
     res.json(cart || { items: [] });
   } catch (err) {
     console.error('❌ Fetch cart error:', err);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
 
 // ✅ POST add item to cart
 app.post('/api/cart', async (req, res) => {
   const { userId, item } = req.body;
+  console.log('📦 Incoming cart request:', { userId, item });
+
   try {
     const objectId = new mongoose.Types.ObjectId(userId);
     let cart = await Cart.findOne({ userId: objectId });
-    
+    console.log('🛒 Existing cart:', cart);
+
     if (!cart) {
       cart = new Cart({ userId: objectId, items: [item] });
     } else {
@@ -177,7 +183,7 @@ app.post('/api/cart', async (req, res) => {
     res.status(200).json({ message: 'Item added to cart' });
   } catch (err) {
     console.error('❌ Add to cart error:', err);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
 

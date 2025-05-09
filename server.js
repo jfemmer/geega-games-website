@@ -5,8 +5,6 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
-const createCartModel = require('./models/Cart');
-const Cart = createCartModel(db1);
 
 const app = express();
 
@@ -61,6 +59,9 @@ const db1 = mongoose.createConnection(MONGODB_URI);
 const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI);
 const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI);
 const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI);
+
+const createCartModel = require('./models/Cart');
+const Cart = createCartModel(db1);
 
 
 // ✅ Connection Logs

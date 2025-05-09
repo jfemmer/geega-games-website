@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
+const Cart = require('./models/Cart');
 
 const app = express();
 
@@ -56,7 +57,6 @@ const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI);
 const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI);
 const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI);
 
-
 // ✅ Connection Logs
 [db1, inventoryConnection, employeeConnection, tradeInConnection].forEach((db, i) => {
   db.on('connected', () => console.log(`✅ Connected to MongoDB database #${i+1}`));
@@ -98,13 +98,12 @@ const orderSchema = new mongoose.Schema({
       cardName: String,
       set: String,
       foil: Boolean,
-      specialArt: String, // e.g., "Showcase", "Borderless", etc.
+      specialArt: String,
       quantity: Number
     }
   ],
   submittedAt: { type: Date, default: Date.now }
 });
-
 const Order = db1.model('Order', orderSchema, 'Orders');
 
 const tradeInSchema = new mongoose.Schema({
@@ -124,18 +123,12 @@ const tradeInSchema = new mongoose.Schema({
   ],
   submittedAt: { type: Date, default: Date.now }
 });
-
 const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
 
 // ✅ Routes
-
-// Root
 app.get('/', (req, res) => res.send('🧙‍♂️ Welcome to the Geega Games API!'));
-
-// Version Check
 app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js version'));
 
-// Creature Types
 app.get('/api/inventory/creature-types', async (req, res) => {
   try {
     const types = await CardInventory.distinct('creatureTypes');
@@ -146,7 +139,6 @@ app.get('/api/inventory/creature-types', async (req, res) => {
   }
 });
 
-// Signup
 app.post('/signup', async (req, res) => {
   try {
     const { firstName, lastName, username, email, password, phone, address, state, zip } = req.body;
@@ -165,29 +157,19 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-// Login
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
+    if (!user || !(await bcrypt.compare(password, user.password))) return res.status(401).json({ message: 'Invalid credentials.' });
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
-    }
-
-    res.json({
-      message: 'Login successful',
-      userId: user._id,
-      username: user.username,
-      firstName: user.firstName  // ✅ make sure this is here
-    });
+    res.json({ message: 'Login successful', userId: user._id, username: user.username, firstName: user.firstName });
   } catch (err) {
     console.error('❌ Login error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-// Get All Users
 app.get('/api/users', async (req, res) => {
   try {
     res.json(await User.find().sort({ createdAt: -1 }));
@@ -197,7 +179,6 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// Add Inventory Card
 app.post('/api/inventory', async (req, res) => {
   try {
     const { cardName, quantity, set, condition, foil, price } = req.body;
@@ -213,98 +194,74 @@ app.post('/api/inventory', async (req, res) => {
   }
 });
 
-app.post('/api/tradein', async (req, res) => {
-  const { userId, cards } = req.body;
-
-  if (!userId || !Array.isArray(cards) || cards.length === 0) {
-    return res.status(400).json({ message: 'Invalid trade-in data.' });
-  }
+// Cart Routes
+app.get('/api/cart', async (req, res) => {
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
   try {
-    const user = await User.findById(userId).lean();
-    if (!user) return res.status(404).json({ message: 'User not found.' });
-
-    const tradeInData = {
-      userId,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      phone: user.phone,
-      cards
-    };
-
-    await new TradeIn(tradeInData).save();
-    res.status(201).json({ message: '🧾 Trade-in submitted successfully!' });
+    const cart = await Cart.findOne({ userId });
+    res.json(cart || { items: [] });
   } catch (err) {
-    console.error('❌ Trade-in submission error:', err);
-    res.status(500).json({ message: 'Server error while submitting trade-in.' });
-  }
-});
-
-
-app.get('/api/inventory', async (req, res) => {
-  try {
-    const cards = await CardInventory.find({}, {
-      cardName: 1,
-      quantity: 1,
-      set: 1,
-      condition: 1,
-      foil: 1,
-      imageUrl: 1,
-      colors: 1,
-      cardType: 1,
-      creatureTypes: 1,
-      priceUsd: 1,
-      priceUsdFoil: 1,
-      addedAt: 1
-    }).sort({ cardName: 1 });
-
-    res.json(cards);
-  } catch (err) {
-    console.error('❌ Fetch inventory error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
-  }
-});
-
-// Get Single Price
-app.post('/api/inventory/price', async (req, res) => {
-  const { cardName, set, foil } = req.body;
-  try {
-    const card = await CardInventory.findOne({ cardName, set, foil: !!foil });
-    if (!card || card.price == null) return res.status(404).json({ error: 'Price not found' });
-    res.json({ price: card.price });
-  } catch (err) {
-    console.error('❌ Single price error:', err);
+    console.error('❌ Cart fetch error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// ✅ NEW: Batch Fetch Prices
-app.post('/api/inventory/prices', async (req, res) => {
+app.post('/api/cart', async (req, res) => {
+  const { userId, card } = req.body;
+  if (!userId || !card) return res.status(400).json({ message: 'Missing data' });
+
+  let cart = await Cart.findOne({ userId });
+  if (!cart) cart = new Cart({ userId, items: [] });
+
+  const key = `${card.cardName}|${card.set}|${card.foil}|${card.condition}`;
+  const existing = cart.items.find(i => `${i.cardName}|${i.set}|${i.foil}|${i.condition}` === key);
+
+  if (existing) existing.quantity += 1;
+  else cart.items.push(card);
+
+  cart.updatedAt = new Date();
+  await cart.save();
+  res.json(cart);
+});
+
+app.post('/api/cart/remove', async (req, res) => {
+  const { userId, index } = req.body;
+  if (!userId || typeof index !== 'number') return res.status(400).json({ error: 'Missing data' });
+
   try {
-    const { cards } = req.body;
-    if (!Array.isArray(cards)) return res.status(400).json({ error: 'Cards array required.' });
+    const cart = await Cart.findOne({ userId });
+    if (!cart || !cart.items || index >= cart.items.length) return res.status(404).json({ error: 'Item not found' });
 
-    const prices = {};
-    for (const { cardName, set, foil } of cards) {
-      if (!cardName || !set) continue;
-      const match = await CardInventory.findOne({ cardName, set, foil: !!foil });
-      if (match && match.price != null) prices[`${cardName}|${set}|${foil ? '1' : '0'}`] = match.price;
-    }
+    cart.items.splice(index, 1);
+    cart.updatedAt = new Date();
+    await cart.save();
 
-    res.json(prices);
+    res.json({ success: true });
   } catch (err) {
-    console.error('❌ Batch prices error:', err);
+    console.error('❌ Remove from cart error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
+app.post('/api/cart/clear', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+  try {
+    await Cart.findOneAndUpdate({ userId }, { items: [], updatedAt: new Date() });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Cart clear error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Orders
 app.post('/api/orders', async (req, res) => {
   const { userId, firstName, email, cards } = req.body;
-
-  if (!userId || !cards || !Array.isArray(cards) || cards.length === 0) {
-    return res.status(400).json({ message: 'Invalid order data.' });
-  }
+  if (!userId || !cards || !Array.isArray(cards) || cards.length === 0) return res.status(400).json({ message: 'Invalid order data.' });
 
   try {
     await new Order({ userId, firstName, email, cards }).save();
@@ -324,56 +281,6 @@ app.get('/api/orders', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
-
-// Delete Inventory Card
-app.delete('/api/inventory', async (req, res) => {
-  try {
-    const { cardName, set, foil } = req.body;
-    const deleted = await CardInventory.findOneAndDelete({ cardName, set, foil: !!foil });
-    if (!deleted) return res.status(404).json({ message: 'Card not found.' });
-    res.status(200).json({ message: 'Card deleted successfully.' });
-  } catch (err) {
-    console.error('❌ Delete card error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
-  }
-});
-
-app.patch('/api/inventory/decrement', async (req, res) => {
-  try {
-    const { cardName, set, foil } = req.body;
-
-    const card = await CardInventory.findOne({ cardName, set, foil: !!foil });
-
-    if (!card) {
-      return res.status(404).json({ message: 'Card not found.' });
-    }
-
-    if (card.quantity > 1) {
-      card.quantity -= 1;
-      await card.save();
-      return res.status(200).json({ message: 'Quantity decremented.' });
-    } else {
-      await CardInventory.deleteOne({ _id: card._id });
-      return res.status(200).json({ message: 'Card removed from inventory (quantity reached 0).' });
-    }
-  } catch (err) {
-    console.error('❌ Decrement card error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
-  }
-});
-
-// Add Employee
-app.post('/api/employees', async (req, res) => {
-  const { role, firstName, lastName, phone, email, emergencyContact } = req.body;
-  try {
-    await new Employee({ role, firstName, lastName, phone, email, emergencyContact }).save();
-    res.status(201).json({ message: 'Employee added!' });
-  } catch (err) {
-    console.error('❌ Employee error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
-  }
-});
-
 
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

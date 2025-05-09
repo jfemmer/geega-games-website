@@ -11,7 +11,11 @@ const Cart = createCartModel(db1);
 const app = express();
 
 // ✅ Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5500', 'https://jfemmer.github.io'], // ✅ allow local + GitHub
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type']
+}));
 app.use(express.json());
 
 // ✅ Scryfall Image Fetch Helper

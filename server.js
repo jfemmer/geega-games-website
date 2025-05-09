@@ -190,8 +190,26 @@ app.post('/api/cart', async (req, res) => {
 
   try {
     const objectId = new mongoose.Types.ObjectId(userId);
-    let cart = await Cart.findOne({ userId: objectId });
 
+    // 🔍 Lookup matching inventory item
+    const inventoryItem = await CardInventory.findOne({
+      cardName: item.cardName,
+      set: item.set,
+      foil: !!item.foil,
+      condition: item.condition
+    });
+
+    if (!inventoryItem) {
+      console.warn('⚠️ Inventory item not found:', item);
+      return res.status(404).json({ message: 'Item not found in inventory.' });
+    }
+
+    if (inventoryItem.quantity < item.quantity) {
+      console.warn(`⚠️ Not enough stock. Requested: ${item.quantity}, Available: ${inventoryItem.quantity}`);
+      return res.status(400).json({ message: 'Not enough inventory to add to cart.' });
+    }
+
+    let cart = await Cart.findOne({ userId: objectId });
     console.log('🛒 Existing cart:', cart || 'None found');
 
     if (!cart) {
@@ -203,9 +221,17 @@ app.post('/api/cart', async (req, res) => {
         `${i.cardName}|${i.set}|${i.foil}|${i.condition}|${i.variantType}` === key
       );
 
+      const currentQty = existing ? existing.quantity : 0;
+      const newTotalQty = currentQty + item.quantity;
+
+      if (newTotalQty > inventoryItem.quantity) {
+        console.warn(`⚠️ Combined quantity (${newTotalQty}) exceeds stock (${inventoryItem.quantity})`);
+        return res.status(400).json({ message: 'You cannot add more than what is in stock.' });
+      }
+
       if (existing) {
-        console.log('🧩 Found existing item in cart, incrementing quantity');
-        existing.quantity += item.quantity;
+        console.log('🧩 Updating quantity of existing item in cart');
+        existing.quantity = newTotalQty;
       } else {
         console.log('🆕 Pushing new item to cart');
         cart.items.push(item);

@@ -341,7 +341,7 @@
 
 .add-to-cart-button {
   margin-top: 8px;
-  background-color: rebeccapurple;
+  background-color: darkgreen;
   color: white;
   border: none;
   padding: 8px;
@@ -390,23 +390,23 @@
           <i class="fa-solid fa-heart"></i>
         </a>-->
         <a href="cart.html" title="Cart" class="icon-button" id="cart-button" style="position: relative;">
-          <i class="fa-solid fa-cart-shopping"></i>
-          <span id="cart-count" style="
-            position: absolute;
-            top: -6px;
-            right: -6px;
-            background: red;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-            border-radius: 50%;
-            width: 18px;
-            height: 18px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-          ">0</span>
-        </a>
+  <i class="fa-solid fa-cart-shopping"></i>
+  <span id="cart-count" style="
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: red;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  ">0</span>
+</a>
         <div id="user-actions" class="account-login-container">        
           <button id="logout-button" style="display: none; background: white; color: rebeccapurple; font-weight: bold; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer;">Logout</button>
           <a href="login.html" id="login-button" title="Login">
@@ -556,46 +556,39 @@
       });
     }
   
-    async function addToCart(card) {
-  const userId = localStorage.getItem('userId');
-  if (!userId) {
-    alert('Please log in to add to cart.');
-    return;
-  }
-
-  try {
-    await fetch('https://geega-games-website-production.up.railway.app/api/cart', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, card })
-    });
-
-    updateCartCount();
-    alert('✅ Added to cart!');
-  } catch (err) {
-    console.error('❌ Add to cart failed:', err);
-    alert('Error adding to cart.');
-  }
-}
-
-async function updateCartCount() {
-  const userId = localStorage.getItem('userId');
-  if (!userId) return;
-
-  try {
-    const res = await fetch(`https://geega-games-website-production.up.railway.app/api/cart?userId=${userId}`);
-    const cart = await res.json();
-    const count = cart.items.reduce((sum, item) => sum + item.quantity, 0);
-    const cartCountEl = document.getElementById('cart-count');
-    if (cartCountEl) {
-      cartCountEl.textContent = count;
-      cartCountEl.style.display = count > 0 ? 'flex' : 'none';
+    function addToCart(card) {
+      const cart = JSON.parse(localStorage.getItem('cart')) || [];
+      const key = `${card.cardName}|${card.set}|${card.foil}|${card.condition}`;
+      const existing = cart.find(item => item.key === key);
+  
+      const totalInCart = existing ? existing.quantity : 0;
+      const maxAvailable = card.quantity;
+  
+      if (totalInCart >= maxAvailable) {
+        alert(`Sorry there's no more available.`);
+        return;
+      }
+  
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        cart.push({ key, ...card, quantity: 1 });
+      }
+  
+      localStorage.setItem('cart', JSON.stringify(cart));
+      updateCartCount();
+      alert('✅ Added to cart!');
     }
-  } catch (err) {
-    console.error('❌ Failed to fetch cart:', err);
-  }
-}
-
+  
+    function updateCartCount() {
+      const cart = JSON.parse(localStorage.getItem('cart')) || [];
+      const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+      const cartCountEl = document.getElementById('cart-count');
+      if (cartCountEl) {
+        cartCountEl.textContent = count;
+        cartCountEl.style.display = count > 0 ? 'flex' : 'none';
+      }
+    }
   
     async function showLegalities(cardNameRaw) {
       const modal = document.getElementById('legalities-modal');

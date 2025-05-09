@@ -176,9 +176,16 @@ app.post('/api/cart', async (req, res) => {
   const { userId, item } = req.body;
   console.log('📥 [POST] /api/cart - Payload:', { userId, item });
 
+  // 🔍 Validate userId
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     console.warn('⚠️ Invalid userId format (POST):', userId);
     return res.status(400).json({ message: 'Invalid userId format.' });
+  }
+
+  // 🔍 Validate item fields
+  if (!item || !item.cardName || !item.set || !item.condition || item.quantity == null) {
+    console.warn('⚠️ Missing required item fields:', item);
+    return res.status(400).json({ message: 'Missing required item fields (cardName, set, condition, quantity).' });
   }
 
   try {
@@ -207,7 +214,7 @@ app.post('/api/cart', async (req, res) => {
 
     cart.updatedAt = new Date();
     await cart.save();
-    console.log('✅ Cart saved successfully:', cart);
+    console.log('✅ Cart saved successfully');
     res.status(200).json({ message: 'Item added to cart' });
   } catch (err) {
     console.error('❌ [POST] Add to cart error:', err.stack || err);

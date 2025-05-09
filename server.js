@@ -138,10 +138,11 @@ app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js versi
 
 
 // 🔁 Get cart
+// ✅ GET cart
 app.get('/api/cart', async (req, res) => {
   const { userId } = req.query;
   try {
-    const cart = await Cart.findOne({ userId });
+    const cart = await Cart.findOne({ userId: new mongoose.Types.ObjectId(userId) });
     res.json(cart || { items: [] });
   } catch (err) {
     console.error('❌ Fetch cart error:', err);
@@ -149,13 +150,15 @@ app.get('/api/cart', async (req, res) => {
   }
 });
 
-// ➕ Add item to cart
+// ✅ POST add item to cart
 app.post('/api/cart', async (req, res) => {
   const { userId, item } = req.body;
   try {
-    let cart = await Cart.findOne({ userId });
+    const objectId = new mongoose.Types.ObjectId(userId);
+    let cart = await Cart.findOne({ userId: objectId });
+    
     if (!cart) {
-      cart = new Cart({ userId, items: [item] });
+      cart = new Cart({ userId: objectId, items: [item] });
     } else {
       const key = `${item.cardName}|${item.set}|${item.foil}|${item.condition}|${item.variantType}`;
       const existing = cart.items.find(i =>
@@ -178,11 +181,11 @@ app.post('/api/cart', async (req, res) => {
   }
 });
 
-// ❌ Remove item by index
+// ✅ POST remove item by index
 app.post('/api/cart/remove', async (req, res) => {
   const { userId, index } = req.body;
   try {
-    const cart = await Cart.findOne({ userId });
+    const cart = await Cart.findOne({ userId: new mongoose.Types.ObjectId(userId) });
     if (!cart || index < 0 || index >= cart.items.length) {
       return res.status(400).json({ message: 'Invalid index or cart not found.' });
     }
@@ -197,11 +200,14 @@ app.post('/api/cart/remove', async (req, res) => {
   }
 });
 
-// 🧹 Clear cart after checkout
+// ✅ POST clear cart
 app.post('/api/cart/clear', async (req, res) => {
   const { userId } = req.body;
   try {
-    await Cart.findOneAndUpdate({ userId }, { items: [], updatedAt: new Date() });
+    await Cart.findOneAndUpdate(
+      { userId: new mongoose.Types.ObjectId(userId) },
+      { items: [], updatedAt: new Date() }
+    );
     res.status(200).json({ message: 'Cart cleared' });
   } catch (err) {
     console.error('❌ Clear cart error:', err);

@@ -7,7 +7,7 @@ const CartItemSchema = new mongoose.Schema({
   variantType: String,
   condition: String,
   quantity: Number,
-  priceUsd: String, // or Number, but OK for now
+  priceUsd: String // You can switch to Number later if needed
 });
 
 const CartSchema = new mongoose.Schema({
@@ -16,4 +16,6 @@ const CartSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Cart', CartSchema);
+// ✅ Export as a function to bind to a specific connection
+module.exports = (connection) =>
+  connection.model('Cart', CartSchema, 'Cart');

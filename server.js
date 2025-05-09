@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
+const Cart = require('./Cart');
 
 const app = express();
 
@@ -134,6 +135,79 @@ app.get('/', (req, res) => res.send('🧙‍♂️ Welcome to the Geega Games AP
 
 // Version Check
 app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js version'));
+
+
+// 🔁 Get cart
+app.get('/api/cart', async (req, res) => {
+  const { userId } = req.query;
+  try {
+    const cart = await Cart.findOne({ userId });
+    res.json(cart || { items: [] });
+  } catch (err) {
+    console.error('❌ Fetch cart error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// ➕ Add item to cart
+app.post('/api/cart', async (req, res) => {
+  const { userId, item } = req.body;
+  try {
+    let cart = await Cart.findOne({ userId });
+    if (!cart) {
+      cart = new Cart({ userId, items: [item] });
+    } else {
+      const key = `${item.cardName}|${item.set}|${item.foil}|${item.condition}|${item.variantType}`;
+      const existing = cart.items.find(i =>
+        `${i.cardName}|${i.set}|${i.foil}|${i.condition}|${i.variantType}` === key
+      );
+
+      if (existing) {
+        existing.quantity += item.quantity;
+      } else {
+        cart.items.push(item);
+      }
+    }
+
+    cart.updatedAt = new Date();
+    await cart.save();
+    res.status(200).json({ message: 'Item added to cart' });
+  } catch (err) {
+    console.error('❌ Add to cart error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// ❌ Remove item by index
+app.post('/api/cart/remove', async (req, res) => {
+  const { userId, index } = req.body;
+  try {
+    const cart = await Cart.findOne({ userId });
+    if (!cart || index < 0 || index >= cart.items.length) {
+      return res.status(400).json({ message: 'Invalid index or cart not found.' });
+    }
+
+    cart.items.splice(index, 1);
+    cart.updatedAt = new Date();
+    await cart.save();
+    res.status(200).json({ message: 'Item removed from cart' });
+  } catch (err) {
+    console.error('❌ Remove from cart error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// 🧹 Clear cart after checkout
+app.post('/api/cart/clear', async (req, res) => {
+  const { userId } = req.body;
+  try {
+    await Cart.findOneAndUpdate({ userId }, { items: [], updatedAt: new Date() });
+    res.status(200).json({ message: 'Cart cleared' });
+  } catch (err) {
+    console.error('❌ Clear cart error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 // Creature Types
 app.get('/api/inventory/creature-types', async (req, res) => {

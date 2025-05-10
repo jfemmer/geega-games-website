@@ -205,7 +205,8 @@
 </p>
 </div>
 </div>
-   <div class="payment-methods" id="payment-methods">
+<!-- Payment Buttons -->
+<div class="payment-methods" id="payment-methods">
   <button id="venmo-btn" class="venmo" onclick="redirectTo('venmo')">
     <i class="fab fa-venmo"></i> Pay with Venmo<br>
     <small id="venmo-note" style="font-size: 12px; font-weight: normal;">(Friends & Family only for PWE)</small>
@@ -216,8 +217,11 @@
   </button>
 </div>
 
-    <a href="cart.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Cart</a>
-  </div>
+<!-- ✅ New submit button to finalize the order -->
+<button class="submit-btn" onclick="placeOrder()">Place My Order</button>
+
+<!-- Navigation -->
+<a href="cart.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Cart</a>
 
 <script>
 const API_BASE = 'https://geega-games-website-production.up.railway.app';
@@ -451,10 +455,19 @@ async function placeOrder() {
     const cartRes = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
     const cart = await cartRes.json();
 
+    if (!cart.items || cart.items.length === 0) {
+      alert('❌ Your cart is empty.');
+      return;
+    }
+
+    const fullAddress = [currentUser.address, currentUser.state, currentUser.zip].filter(Boolean).join(', ');
+
     const order = {
       userId,
       firstName: currentUser.firstName,
+      lastName: currentUser.lastName || '',
       email: currentUser.email,
+      address: fullAddress,
       cards: cart.items,
       shippingMethod,
       paymentMethod: selectedPayment

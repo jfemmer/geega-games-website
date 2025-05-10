@@ -220,10 +220,15 @@
 const API_BASE = 'https://geega-games-website-production.up.railway.app';
 let currentUser = null;
 
-(async () => {
-  const total = localStorage.getItem('cartTotal') || '0.00';
-  document.getElementById('summary-total').textContent = `$${parseFloat(total).toFixed(2)}`;
+function calculateAndDisplayTotal() {
+  const base = parseFloat(localStorage.getItem('cartTotal') || '0.00');
+  const shipping = document.querySelector('input[name="shippingMethod"]:checked')?.value;
+  const total = shipping === 'tracked' ? base + 5 : base;
+  document.getElementById('summary-total').textContent = `$${total.toFixed(2)}`;
+  localStorage.setItem('cartTotalFinal', total.toFixed(2)); // used in redirectTo
+}
 
+(async () => {
   const userId = localStorage.getItem('userId');
   if (!userId) {
     document.getElementById('summary-name').textContent = 'Not logged in';
@@ -267,7 +272,6 @@ let currentUser = null;
 
     for (const item of data.items) {
       let img = item.imageUrl;
-
       if (!img || !img.startsWith('http')) {
         try {
           const scryRes = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(item.cardName)}`);
@@ -299,6 +303,8 @@ let currentUser = null;
       `;
       container.appendChild(card);
     }
+
+    calculateAndDisplayTotal(); // 👈 Recalculate total now that cart is loaded
   } catch (err) {
     console.error('❌ Error loading cart data:', err);
     document.getElementById('cart-cards').innerHTML = '<p>Failed to load cart items.</p>';
@@ -324,6 +330,8 @@ function updatePaymentOptions() {
     cashappBtn.style.display = 'flex';
     venmoNote.style.display = 'none';
   }
+
+  calculateAndDisplayTotal(); // 👈 Recalculate when shipping changes
 }
 
 function editAddress() {
@@ -373,7 +381,7 @@ async function saveAddress() {
 function redirectTo(method) {
   window.lastSelectedPaymentMethod = method;
 
-  const raw = localStorage.getItem('cartTotal') || '0.00';
+  const raw = localStorage.getItem('cartTotalFinal') || localStorage.getItem('cartTotal') || '0.00';
   const amount = parseFloat(raw).toFixed(2);
   const note = encodeURIComponent('MTG Order');
 

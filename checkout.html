@@ -319,19 +319,21 @@ function updatePaymentOptions() {
   const cashappBtn = document.getElementById('cashapp-btn');
   const venmoNote = document.getElementById('venmo-note');
 
+  if (!venmoBtn || !venmoNote) return; // safeguard
+
   if (shipping === 'pwe') {
     venmoBtn.style.display = 'flex';
-    paypalBtn.style.display = 'none';
-    cashappBtn.style.display = 'none';
+    if (paypalBtn) paypalBtn.style.display = 'none';
+    if (cashappBtn) cashappBtn.style.display = 'none';
     venmoNote.style.display = 'inline';
   } else {
     venmoBtn.style.display = 'flex';
-    paypalBtn.style.display = 'flex';
-    cashappBtn.style.display = 'flex';
+    if (paypalBtn) paypalBtn.style.display = 'flex';
+    if (cashappBtn) cashappBtn.style.display = 'flex';
     venmoNote.style.display = 'none';
   }
 
-  calculateAndDisplayTotal(); // 👈 Recalculate when shipping changes
+  calculateAndDisplayTotal();
 }
 
 function editAddress() {

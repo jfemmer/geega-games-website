@@ -1,18 +1,19 @@
 const mongoose = require('mongoose');
 
-const CartItemSchema = new mongoose.Schema({
+const itemSchema = new mongoose.Schema({
   cardName: String,
   set: String,
   foil: Boolean,
   variantType: String,
   condition: String,
   quantity: Number,
-  priceUsd: String // You can switch to Number later if needed
+  priceUsd: Number,
+  imageUrl: String  // ✅ Add this line
 });
 
 const CartSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, required: true },
-  items: [CartItemSchema],
+  items: [itemSchema],
   updatedAt: { type: Date, default: Date.now }
 });
 

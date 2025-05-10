@@ -5,7 +5,6 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
-const Order = require('./models/orders');
 
 const app = express();
 

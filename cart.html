@@ -279,18 +279,9 @@ async function loadCart() {
       const item = data.items[index];
 
       // 🔁 Fallback to fetch image from Scryfall if missing
-      if (!item.imageUrl) {
-        try {
-          const scryfallRes = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(item.cardName)}`);
-          const scryfallData = await scryfallRes.json();
-          item.imageUrl =
-            scryfallData.image_uris?.normal ||
-            scryfallData.card_faces?.[0]?.image_uris?.normal ||
-            'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
-        } catch (err) {
-          item.imageUrl = 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
-        }
-      }
+     if (!item.imageUrl || !item.imageUrl.startsWith('http')) {
+  item.imageUrl = 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
+}
 
       const price = parseFloat(item.priceUsd || 0);
       const quantity = item.quantity || 1;

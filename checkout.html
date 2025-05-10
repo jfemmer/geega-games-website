@@ -6,89 +6,154 @@
   <title>Checkout - Geega Games</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f8f8ff;
-      margin: 0;
-      padding: 0;
-    }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f2f5;
+    margin: 0;
+    padding: 0;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 40px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  h1 {
+    text-align: center;
+    color: rebeccapurple;
+    font-size: 28px;
+    margin-bottom: 30px;
+  }
+
+  .section {
+    margin-bottom: 35px;
+  }
+
+  .section h2 {
+    font-size: 20px;
+    color: rebeccapurple;
+    margin-bottom: 12px;
+    border-bottom: 2px solid #e3d5ec;
+    padding-bottom: 4px;
+  }
+
+  .summary {
+    border: 1px solid #ddd;
+    padding: 20px;
+    border-radius: 12px;
+    background: #fdfdfd;
+  }
+
+  .summary p,
+  .summary label,
+  .summary small {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .payment-methods button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 14px;
+    padding: 14px 18px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+
+  .venmo {
+    background: #3d95ce;
+    color: white;
+  }
+
+  .venmo:hover {
+    background: #2c7eb9;
+  }
+
+  .paypal {
+    background: #ffc439;
+    color: #111;
+  }
+
+  .paypal:hover {
+    background: #e0ac00;
+  }
+
+  .cashapp {
+    background: #00d632;
+    color: white;
+  }
+
+  .cashapp:hover {
+    background: #00b82a;
+  }
+
+  .submit-btn {
+    background: darkgreen;
+    color: white;
+    font-size: 18px;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    width: 100%;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 25px;
+    transition: background-color 0.3s;
+  }
+
+  .submit-btn:hover {
+    background: seagreen;
+  }
+
+  .back-link {
+    display: block;
+    text-align: center;
+    margin-top: 35px;
+    color: rebeccapurple;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .back-link:hover {
+    text-decoration: underline;
+  }
+
+  gmpx-placeautocomplete {
+    display: block;
+    font-size: 16px;
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+  }
+
+  @media (max-width: 768px) {
     .container {
-      max-width: 700px;
-      margin: 40px auto;
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+      margin: 20px;
+      padding: 20px;
     }
-    h1 {
-      text-align: center;
-      color: rebeccapurple;
-      margin-bottom: 20px;
-    }
-    .section {
-      margin-bottom: 30px;
-    }
-    .section h2 {
-      font-size: 20px;
-      color: rebeccapurple;
-      margin-bottom: 10px;
-    }
-    .summary {
-      border: 1px solid #ddd;
-      padding: 15px;
-      border-radius: 8px;
-    }
-    .summary p {
-      margin: 8px 0;
-      font-size: 15px;
-    }
+
     .payment-methods button {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      width: 100%;
-      margin-bottom: 12px;
+      font-size: 15px;
       padding: 12px;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background 0.3s;
     }
-    .venmo { background: #3d95ce; color: white; }
-    .venmo:hover { background: #307bbd; }
-    .paypal { background: #ffc439; color: #111; }
-    .paypal:hover { background: #e0ac00; }
-    .cashapp { background: #00d632; color: white; }
-    .cashapp:hover { background: #00b82a; }
+
     .submit-btn {
-      background: darkgreen;
-      color: white;
       font-size: 16px;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      width: 100%;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 20px;
-      transition: background-color 0.3s;
     }
-    .submit-btn:hover {
-      background: seagreen;
-    }
-    .back-link {
-      display: block;
-      text-align: center;
-      margin-top: 30px;
-      color: rebeccapurple;
-      text-decoration: none;
-    }
-    .back-link:hover {
-      text-decoration: underline;
-    }
-  </style>
+  }
+</style>
  <script async defer
   src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&loading=async">
 </script>
@@ -121,14 +186,32 @@
       </div>
     </div>
 
-    <div class="section">
-      <h2>Select Payment Method</h2>
-      <div class="payment-methods">
-        <button class="venmo" onclick="redirectTo('venmo')"><i class="fab fa-venmo"></i> Pay with Venmo</button>
-        <button class="paypal" onclick="redirectTo('paypal')"><i class="fab fa-paypal"></i> Pay with PayPal</button>
-      </div>
-      <button class="submit-btn" onclick="placeOrder()">Place Order</button>
-    </div>
+<div class="section">
+  <h2>Shipping Method</h2>
+<div class="summary">
+  <label style="display: block; margin-bottom: 10px;">
+    <input type="radio" name="shippingMethod" value="pwe" checked onchange="updatePaymentOptions()" />
+    Plain White Envelope (PWE) – Free (no tracking, buyer’s risk)<br>
+    <small style="color: crimson;"><em>* Only Venmo Friends & Family is accepted for PWE</em></small>
+  </label>
+
+  <label style="display: block; margin-top: 10px;">
+    <input type="radio" name="shippingMethod" value="tracked" onchange="updatePaymentOptions()" />
+    Tracked Shipping – $5 (USPS First Class)<br>
+    <small><em>All payment methods accepted</em></small>
+  </label>
+</div>
+</div>
+   <div class="payment-methods" id="payment-methods">
+  <button id="venmo-btn" class="venmo" onclick="redirectTo('venmo')">
+    <i class="fab fa-venmo"></i> Pay with Venmo<br>
+    <small id="venmo-note" style="font-size: 12px; font-weight: normal;">(Friends & Family only for PWE)</small>
+  </button>
+
+  <button id="paypal-btn" class="paypal" onclick="redirectTo('paypal')">
+    <i class="fab fa-paypal"></i> Pay with PayPal
+  </button>
+</div>
 
     <a href="cart.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Cart</a>
   </div>
@@ -183,10 +266,9 @@ let currentUser = null;
     }
 
     for (const item of data.items) {
-      const price = parseFloat(item.priceUsd || 0).toFixed(2);
       let img = item.imageUrl;
 
-      if (!img) {
+      if (!img || !img.startsWith('http')) {
         try {
           const scryRes = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(item.cardName)}`);
           const scryData = await scryRes.json();
@@ -197,6 +279,7 @@ let currentUser = null;
       }
 
       img = img || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
+      const price = parseFloat(item.priceUsd || 0).toFixed(2);
       const quantity = item.quantity || 1;
 
       const card = document.createElement('div');
@@ -221,9 +304,27 @@ let currentUser = null;
     document.getElementById('cart-cards').innerHTML = '<p>Failed to load cart items.</p>';
   }
 })();
-</script>
 
-<script>
+function updatePaymentOptions() {
+  const shipping = document.querySelector('input[name="shippingMethod"]:checked')?.value;
+
+  const venmoBtn = document.getElementById('venmo-btn');
+  const paypalBtn = document.getElementById('paypal-btn');
+  const cashappBtn = document.getElementById('cashapp-btn');
+  const venmoNote = document.getElementById('venmo-note');
+
+  if (shipping === 'pwe') {
+    venmoBtn.style.display = 'flex';
+    paypalBtn.style.display = 'none';
+    cashappBtn.style.display = 'none';
+    venmoNote.style.display = 'inline';
+  } else {
+    venmoBtn.style.display = 'flex';
+    paypalBtn.style.display = 'flex';
+    cashappBtn.style.display = 'flex';
+    venmoNote.style.display = 'none';
+  }
+}
 
 function editAddress() {
   document.getElementById('address-modal').style.display = 'flex';
@@ -236,7 +337,7 @@ function closeModal() {
 
 async function saveAddress() {
   const placeElement = document.getElementById('autocomplete');
-const place = placeElement.getPlace?.();
+  const place = placeElement.getPlace?.();
   if (!place || !place.formatted_address) {
     alert('Please select a valid address from the dropdown.');
     return;
@@ -270,9 +371,12 @@ const place = placeElement.getPlace?.();
 }
 
 function redirectTo(method) {
+  window.lastSelectedPaymentMethod = method;
+
   const raw = localStorage.getItem('cartTotal') || '0.00';
   const amount = parseFloat(raw).toFixed(2);
   const note = encodeURIComponent('MTG Order');
+
   switch (method) {
     case 'venmo':
       window.location.href = `https://venmo.com/GeegaGames?txn=pay&amount=${amount}&note=${note}`;
@@ -295,15 +399,27 @@ async function placeOrder() {
     return;
   }
 
+  const shippingMethod = document.querySelector('input[name="shippingMethod"]:checked')?.value || 'pwe';
+  const selectedPayment = window.lastSelectedPaymentMethod || 'venmo';
+
+  if (shippingMethod === 'pwe' && selectedPayment !== 'venmo') {
+    alert('❌ Only Venmo (Friends & Family) is accepted for Plain White Envelope shipping.');
+    return;
+  }
+
   try {
     const cartRes = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
     const cart = await cartRes.json();
+
     const order = {
       userId,
       firstName: currentUser.firstName,
       email: currentUser.email,
-      cards: cart.items
+      cards: cart.items,
+      shippingMethod,
+      paymentMethod: selectedPayment
     };
+
     const res = await fetch(`${API_BASE}/api/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -326,6 +442,8 @@ async function placeOrder() {
     alert('Something went wrong while placing your order.');
   }
 }
+
+document.addEventListener('DOMContentLoaded', updatePaymentOptions);
 </script>
 
 <div id="address-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">

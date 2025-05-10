@@ -250,8 +250,8 @@ app.post('/api/cart', async (req, res) => {
 
 // 🗑️ POST remove item by index
 app.post('/api/cart/remove', async (req, res) => {
-  const { userId, index } = req.body;
-  console.log('📥 [POST] /api/cart/remove - userId:', userId, 'index:', index);
+  const { userId, index, quantity = 1 } = req.body;
+  console.log('📥 [POST] /api/cart/remove - userId:', userId, 'index:', index, 'quantity:', quantity);
 
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     console.warn('⚠️ Invalid userId format (REMOVE):', userId);
@@ -272,16 +272,31 @@ app.post('/api/cart/remove', async (req, res) => {
       return res.status(400).json({ message: 'Invalid index.' });
     }
 
-    console.log('🗑️ Removing item at index:', index, '->', cart.items[index]);
-    cart.items.splice(index, 1);
+    const item = cart.items[index];
+
+    if (!item.quantity || typeof item.quantity !== 'number') {
+      console.warn('⚠️ Invalid item quantity:', item.quantity);
+      return res.status(400).json({ message: 'Invalid item quantity.' });
+    }
+
+    if (item.quantity > quantity) {
+      console.log(`➖ Decreasing quantity of "${item.cardName}" from ${item.quantity} by ${quantity}`);
+      cart.items[index].quantity -= quantity;
+    } else {
+      console.log(`🗑️ Removing entire item "${item.cardName}" from cart (quantity ${item.quantity})`);
+      cart.items.splice(index, 1);
+    }
+
     cart.updatedAt = new Date();
     await cart.save();
-    res.status(200).json({ message: 'Item removed from cart' });
+
+    res.status(200).json({ message: 'Item updated in cart' });
   } catch (err) {
     console.error('❌ [REMOVE] Error:', err.stack || err);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 // 🧹 POST clear cart
 app.post('/api/cart/clear', async (req, res) => {
@@ -366,6 +381,27 @@ app.get('/api/users', async (req, res) => {
     res.json(await User.find().sort({ createdAt: -1 }));
   } catch (err) {
     console.error('❌ Fetch users error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// PATCH /api/users/:id - Update address info
+app.patch('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { address, state, zip } = req.body;
+
+    const updated = await User.findByIdAndUpdate(
+      id,
+      { address, state, zip },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ message: 'User not found.' });
+
+    res.json({ message: 'User updated.', user: updated });
+  } catch (err) {
+    console.error('❌ Failed to update user:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });

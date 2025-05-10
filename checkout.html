@@ -190,16 +190,19 @@
   <h2>Shipping Method</h2>
 <div class="summary">
   <label style="display: block; margin-bottom: 10px;">
-    <input type="radio" name="shippingMethod" value="pwe" checked onchange="updatePaymentOptions()" />
+    <input type="radio" name="shippingMethod" value="pwe" onchange="updatePaymentOptions()" />
     Plain White Envelope (PWE) – Free (no tracking, buyer’s risk)<br>
     <small style="color: crimson;"><em>* Only Venmo Friends & Family is accepted for PWE</em></small>
   </label>
 
   <label style="display: block; margin-top: 10px;">
-    <input type="radio" name="shippingMethod" value="tracked" onchange="updatePaymentOptions()" />
+    <input type="radio" name="shippingMethod" value="tracked" checked onchange="updatePaymentOptions()" />
     Tracked Shipping – $5 (USPS First Class)<br>
     <small><em>All payment methods accepted</em></small>
   </label>
+  <p id="free-tracking-note" style="color: green; font-weight: bold; display: none; margin-top: 10px;">
+  🎉 Free tracking applied to orders over $75!
+</p>
 </div>
 </div>
    <div class="payment-methods" id="payment-methods">
@@ -221,11 +224,26 @@ const API_BASE = 'https://geega-games-website-production.up.railway.app';
 let currentUser = null;
 
 function calculateAndDisplayTotal() {
-  const base = parseFloat(localStorage.getItem('cartTotal') || '0.00');
+  let base = parseFloat(localStorage.getItem('cartTotal'));
+  if (isNaN(base)) base = 0;
+
   const shipping = document.querySelector('input[name="shippingMethod"]:checked')?.value;
-  const total = shipping === 'tracked' ? base + 5 : base;
+  let total = base;
+
+  const qualifiesForFreeTracking = base >= 75 && shipping === 'tracked';
+  console.log(`📦 Base: ${base}, Shipping: ${shipping}, Free tracking? ${qualifiesForFreeTracking}`);
+
+  if (shipping === 'tracked' && !qualifiesForFreeTracking) {
+    total += 5;
+  }
+
   document.getElementById('summary-total').textContent = `$${total.toFixed(2)}`;
-  localStorage.setItem('cartTotalFinal', total.toFixed(2)); // used in redirectTo
+  localStorage.setItem('cartTotalFinal', total.toFixed(2));
+
+  const freeTrackingNote = document.getElementById('free-tracking-note');
+  if (freeTrackingNote) {
+    freeTrackingNote.style.display = qualifiesForFreeTracking ? 'block' : 'none';
+  }
 }
 
 (async () => {
@@ -304,7 +322,19 @@ function calculateAndDisplayTotal() {
       container.appendChild(card);
     }
 
-    calculateAndDisplayTotal(); // 👈 Recalculate total now that cart is loaded
+ // 👇 Sum up the cart
+let subtotal = 0;
+for (const item of data.items) {
+  const price = parseFloat(item.priceUsd || 0);
+  const quantity = item.quantity || 1;
+  subtotal += price * quantity;
+}
+localStorage.setItem('cartTotal', subtotal.toFixed(2));
+
+// 👇 Force update shipping cost & display
+updatePaymentOptions();  // ✅ This now works with the real subtotal
+
+calculateAndDisplayTotal(); // 🔁 Now this uses correct subtotal
   } catch (err) {
     console.error('❌ Error loading cart data:', err);
     document.getElementById('cart-cards').innerHTML = '<p>Failed to load cart items.</p>';
@@ -453,7 +483,13 @@ async function placeOrder() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', updatePaymentOptions);
+document.addEventListener('DOMContentLoaded', () => {
+  // Manually select the default radio input value
+  const trackedRadio = document.querySelector('input[name="shippingMethod"][value="tracked"]');
+  if (trackedRadio) trackedRadio.checked = true;
+
+  updatePaymentOptions(); // 🔁 Ensures $5 is added if < $75
+});
 </script>
 
 <div id="address-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">

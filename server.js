@@ -6,6 +6,8 @@ const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 const app = express();
 
 // ✅ Middleware
@@ -247,6 +249,24 @@ app.post('/api/cart', async (req, res) => {
     res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
+
+app.post('/create-payment-intent', async (req, res) => {
+  const { amount } = req.body;
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // convert dollars to cents
+      currency: 'usd',
+      payment_method_types: ['card'],
+    });
+
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (error) {
+    console.error('❌ Stripe error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // 🗑️ POST remove item by index
 app.post('/api/cart/remove', async (req, res) => {
@@ -509,18 +529,29 @@ app.post('/api/inventory/prices', async (req, res) => {
 });
 
 app.post('/api/orders', async (req, res) => {
-  const { userId, firstName, email, cards } = req.body;
+  const { userId, firstName, lastName, email, address, cards, shippingMethod, paymentMethod } = req.body;
 
-  if (!userId || !cards || !Array.isArray(cards) || cards.length === 0) {
-    return res.status(400).json({ message: 'Invalid order data.' });
+  if (!userId || !cards || !Array.isArray(cards)) {
+    return res.status(400).json({ message: 'Missing required fields or invalid format.' });
   }
 
   try {
-    await new Order({ userId, firstName, email, cards }).save();
-    res.status(201).json({ message: 'Order submitted successfully!' });
+    const newOrder = new Order({
+      userId,
+      firstName,
+      lastName,
+      email,
+      address,
+      cards,
+      shippingMethod,
+      paymentMethod
+    });
+
+    const savedOrder = await newOrder.save();
+    res.status(201).json(savedOrder);
   } catch (err) {
-    console.error('❌ Order submission error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
+    console.error('❌ Error saving order:', err);
+    res.status(500).json({ message: 'Server error while saving order.' });
   }
 });
 

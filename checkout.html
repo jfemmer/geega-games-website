@@ -6,154 +6,228 @@
   <title>Checkout - Geega Games</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f0f2f5;
-    margin: 0;
-    padding: 0;
-  }
+ body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f0f2f5;
+  margin: 0;
+  padding: 0;
+}
 
+.container {
+  max-width: 800px;
+  margin: 40px auto;
+  background: #fff;
+  padding: 32px;
+  border-radius: 18px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+h1 {
+  text-align: center;
+  color: rebeccapurple;
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: 30px;
+}
+
+.section {
+  margin-bottom: 40px;
+}
+
+.section h2 {
+  font-size: 22px;
+  color: rebeccapurple;
+  margin-bottom: 14px;
+  border-bottom: 2px solid #e0d3ee;
+  padding-bottom: 6px;
+  font-weight: 500;
+}
+
+.summary {
+  border: 1px solid #ddd;
+  padding: 22px;
+  border-radius: 14px;
+  background: #fafafa;
+}
+
+.summary p,
+.summary label,
+.summary small {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.payment-methods {
+  margin-bottom: 30px;
+}
+
+.payment-methods button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.payment-methods button:hover {
+  transform: scale(1.03);
+}
+
+.venmo {
+  background: #3d95ce;
+  color: white;
+}
+
+.venmo:hover {
+  background: #2c7eb9;
+}
+
+.paypal {
+  background: #003087;
+  color: white;
+}
+
+.paypal:hover {
+  background: #002065;
+}
+
+.cashapp {
+  background: #00d632;
+  color: white;
+}
+
+.cashapp:hover {
+  background: #00b82a;
+}
+
+.submit-btn {
+  background: rebeccapurple;
+  color: white;
+  font-size: 18px;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 12px;
+  width: 100%;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(102, 51, 153, 0.15);
+  transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+}
+
+.submit-btn:hover {
+  background: #4b1c6e;
+  transform: scale(1.03);
+  box-shadow: 0 8px 24px rgba(102, 51, 153, 0.3);
+}
+
+.back-link {
+  display: block;
+  text-align: center;
+  margin-top: 35px;
+  color: rebeccapurple;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+gmpx-placeautocomplete {
+  display: block;
+  font-size: 16px;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+#card-element {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fdfdfd;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+#card-element:focus-within {
+  border-color: rebeccapurple;
+  outline: none;
+}
+
+.payment-button-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+#venmo-btn-container,
+#paypal-button-container {
+  width: 100%;
+  max-width: 2000px;
+  margin-left: 50px;
+}
+
+.foil-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.foil-shimmer::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    130deg,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  animation: shimmer 2.5s infinite linear;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translate(-100%, -100%) rotate(25deg);
+  }
+  100% {
+    transform: translate(100%, 100%) rotate(25deg);
+  }
+}
+
+@media (max-width: 768px) {
   .container {
-    max-width: 800px;
-    margin: 40px auto;
-    background: white;
-    padding: 30px;
-    border-radius: 16px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-  }
-
-  h1 {
-    text-align: center;
-    color: rebeccapurple;
-    font-size: 28px;
-    margin-bottom: 30px;
-  }
-
-  .section {
-    margin-bottom: 35px;
-  }
-
-  .section h2 {
-    font-size: 20px;
-    color: rebeccapurple;
-    margin-bottom: 12px;
-    border-bottom: 2px solid #e3d5ec;
-    padding-bottom: 4px;
-  }
-
-  .summary {
-    border: 1px solid #ddd;
+    margin: 20px;
     padding: 20px;
-    border-radius: 12px;
-    background: #fdfdfd;
-  }
-
-  .summary p,
-  .summary label,
-  .summary small {
-    font-size: 15px;
-    line-height: 1.6;
   }
 
   .payment-methods button {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    margin-bottom: 14px;
-    padding: 14px 18px;
-    border: none;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.3s ease;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  }
-
-  .venmo {
-    background: #3d95ce;
-    color: white;
-  }
-
-  .venmo:hover {
-    background: #2c7eb9;
-  }
-
-  .paypal {
-    background: #ffc439;
-    color: #111;
-  }
-
-  .paypal:hover {
-    background: #e0ac00;
-  }
-
-  .cashapp {
-    background: #00d632;
-    color: white;
-  }
-
-  .cashapp:hover {
-    background: #00b82a;
+    font-size: 15px;
+    padding: 12px;
   }
 
   .submit-btn {
-    background: darkgreen;
-    color: white;
-    font-size: 18px;
-    padding: 14px;
-    border: none;
-    border-radius: 12px;
-    width: 100%;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 25px;
-    transition: background-color 0.3s;
-  }
-
-  .submit-btn:hover {
-    background: seagreen;
-  }
-
-  .back-link {
-    display: block;
-    text-align: center;
-    margin-top: 35px;
-    color: rebeccapurple;
-    text-decoration: none;
-    font-weight: 600;
-  }
-
-  .back-link:hover {
-    text-decoration: underline;
-  }
-
-  gmpx-placeautocomplete {
-    display: block;
     font-size: 16px;
-    margin-top: 8px;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
   }
+}
 
-  @media (max-width: 768px) {
-    .container {
-      margin: 20px;
-      padding: 20px;
-    }
-
-    .payment-methods button {
-      font-size: 15px;
-      padding: 12px;
-    }
-
-    .submit-btn {
-      font-size: 16px;
-    }
-  }
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://js.stripe.com/v3/"></script>
+<script src="https://www.paypal.com/sdk/js?client-id=AZEjeBXcTiffGaJM0dgIE9-RVe9VV7wBf9aH27Fe1Y5SUQRgYIG5YuM59O-Nb5k93EeK7umarb0_23qn&components=buttons,funding-eligibility&enable-funding=venmo,paypal&disable-funding=card,credit,paylater"></script>
 </head>
 <body>
   <div class="container">
@@ -185,8 +259,8 @@
 <div class="summary">
   <label style="display: block; margin-bottom: 10px;">
     <input type="radio" name="shippingMethod" value="pwe" onchange="updatePaymentOptions()" />
-    Plain White Envelope (PWE) – Free (no tracking, buyer’s risk)<br>
-    <small style="color: crimson;"><em>* Only Venmo Friends & Family is accepted for PWE</em></small>
+    Plain White Envelope (PWE) – $1.25 (no tracking, buyer’s risk)<br>
+    <small style="color: crimson;"><em>* Only Credit/Debit is accepted for PWE</em></small>
   </label>
 
   <label style="display: block; margin-top: 10px;">
@@ -199,18 +273,26 @@
 </p>
 </div>
 </div>
-   <!--<div class="payment-methods" id="payment-methods">
-  <button id="venmo-btn" class="venmo" onclick="redirectTo('venmo')">
-    <i class="fab fa-venmo"></i> Pay with Venmo<br>
-    <small id="venmo-note" style="font-size: 12px; font-weight: normal;">(Friends & Family only for PWE)</small>
-  </button>
 
-  <button id="paypal-btn" class="paypal" onclick="redirectTo('paypal')">
-    <i class="fab fa-paypal"></i> Pay with PayPal
-  </button>
+   <div class="payment-methods" id="payment-methods" style="margin-bottom: 25px;">
+  <small id="venmo-note" style="font-size: 12px; font-weight: normal;">(Venmo with Friends only for PWE)</small>
+ <div class="payment-button-wrapper">
+  <div id="venmo-btn-container"></div>
+  <div id="paypal-button-container"></div>
+</div>
 </div>
 
-<button class="submit-btn" onclick="placeOrder()">Place My Order</button>-->
+<div class="section">
+  <h2>Pay With Card</h2>
+  <div class="summary">
+    <form id="payment-form">
+      <div id="card-element"></div>
+      <div id="card-errors" role="alert" style="color: crimson; margin-top:10px;"></div>
+    </form>
+  </div>
+</div>
+
+<button class="submit-btn">Submit My Order</button>
 
     <a href="cart.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Cart</a>
   </div>
@@ -218,6 +300,22 @@
 <script>
 const API_BASE = 'https://geega-games-website-production.up.railway.app';
 let currentUser = null;
+
+function initAutocomplete() {
+  const input = document.getElementById('autocomplete');
+  const autocomplete = new google.maps.places.Autocomplete(input, {
+    types: ['address'],
+    componentRestrictions: { country: 'us' },
+    fields: ['formatted_address']
+  });
+
+  autocomplete.addListener('place_changed', () => {
+    const place = autocomplete.getPlace();
+    if (place.formatted_address) {
+      input.value = place.formatted_address;
+    }
+  });
+}
 
 function calculateAndDisplayTotal() {
   let base = parseFloat(localStorage.getItem('cartTotal'));
@@ -229,9 +327,11 @@ function calculateAndDisplayTotal() {
   const qualifiesForFreeTracking = base >= 75 && shipping === 'tracked';
   console.log(`📦 Base: ${base}, Shipping: ${shipping}, Free tracking? ${qualifiesForFreeTracking}`);
 
-  if (shipping === 'tracked' && !qualifiesForFreeTracking) {
-    total += 5;
-  }
+if (shipping === 'tracked' && !qualifiesForFreeTracking) {
+  total += 5;
+} else if (shipping === 'pwe') {
+  total += 1.25;
+}
 
   document.getElementById('summary-total').textContent = `$${total.toFixed(2)}`;
   localStorage.setItem('cartTotalFinal', total.toFixed(2));
@@ -308,7 +408,9 @@ function calculateAndDisplayTotal() {
       card.style.borderBottom = '1px solid #eee';
 
       card.innerHTML = `
-        <img src="${img}" alt="${item.cardName}" style="width: 80px; height: auto; border-radius: 8px; margin-right: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+        <div class="${item.foil ? 'foil-shimmer' : ''}" style="width: 80px; height: auto; border-radius: 8px; margin-right: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden;">
+          <img src="${img}" alt="${item.cardName}" style="width: 100%; height: auto; border-radius: 8px;">
+        </div>
         <div style="font-size: 14px;">
           <div><strong>${item.cardName}</strong></div>
           <div>${item.set} | ${item.foil ? 'Foil' : 'Non-Foil'} | ${item.condition}</div>
@@ -339,30 +441,71 @@ calculateAndDisplayTotal(); // 🔁 Now this uses correct subtotal
 
 function updatePaymentOptions() {
   const shipping = document.querySelector('input[name="shippingMethod"]:checked')?.value;
+  const storedTotal = localStorage.getItem('cartTotal');
+
+  if (!shipping || !storedTotal || isNaN(parseFloat(storedTotal))) {
+    console.warn('❌ Missing shipping method or cart total.');
+    return;
+  }
 
   const venmoBtn = document.getElementById('venmo-btn');
-  const paypalBtn = document.getElementById('paypal-btn');
   const cashappBtn = document.getElementById('cashapp-btn');
   const venmoNote = document.getElementById('venmo-note');
-
-  if (!venmoBtn || !venmoNote) return; // safeguard
+  const paypalContainer = document.getElementById('paypal-button-container');
+  const paypalBtn = document.getElementById('paypal-btn');
 
   if (shipping === 'pwe') {
-    venmoBtn.style.display = 'flex';
-    if (paypalBtn) paypalBtn.style.display = 'none';
+    if (venmoBtn) venmoBtn.style.display = 'flex';
+    if (venmoNote) venmoNote.style.display = 'inline';
     if (cashappBtn) cashappBtn.style.display = 'none';
-    venmoNote.style.display = 'inline';
-  } else {
-    venmoBtn.style.display = 'flex';
-    if (paypalBtn) paypalBtn.style.display = 'flex';
+    if (paypalContainer) paypalContainer.style.display = 'none';
+    if (paypalBtn) paypalBtn.style.display = 'none';
+  } else if (shipping === 'tracked') {
+    if (venmoBtn) venmoBtn.style.display = 'flex';
+    if (venmoNote) venmoNote.style.display = 'none';
     if (cashappBtn) cashappBtn.style.display = 'flex';
-    venmoNote.style.display = 'none';
+    if (paypalBtn) paypalBtn.style.display = 'flex';
+    if (paypalContainer) paypalContainer.style.display = 'block';
+
+    // Render PayPal button once
+    if (!window.paypalButtonRendered) {
+      window.paypalButtonRendered = true;
+      const total = localStorage.getItem('cartTotalFinal') || '0.00';
+
+      paypal.Buttons({
+        createOrder: function(data, actions) {
+          return actions.order.create({
+            purchase_units: [{ amount: { value: total } }]
+          });
+        },
+        onApprove: function(data, actions) {
+          return actions.order.capture().then(function(details) {
+            alert('✅ Payment completed by ' + details.payer.name.given_name);
+            window.location.href = 'checkout-success.html';
+          });
+        },
+        onError: function(err) {
+          console.error('❌ PayPal Error:', err);
+          alert('Something went wrong with PayPal.');
+        }
+      }).render('#paypal-button-container');
+    }
   }
 
   calculateAndDisplayTotal();
 }
+
 function editAddress() {
-  document.getElementById('address-modal').style.display = 'flex';
+  const modal = document.getElementById('address-modal');
+  modal.style.display = 'flex';
+
+  // Optional: Initialize autocomplete once
+  setTimeout(() => {
+    if (!window._addressAutocompleteInitialized) {
+      initAutocomplete();
+      window._addressAutocompleteInitialized = true;
+    }
+  }, 100);
 }
 
 function closeModal() {
@@ -445,7 +588,9 @@ async function placeOrder() {
     const order = {
       userId,
       firstName: currentUser.firstName,
+      lastName: currentUser.lastName,
       email: currentUser.email,
+      address: [currentUser.address, currentUser.state, currentUser.zip].filter(Boolean).join(', '),
       cards: cart.items,
       shippingMethod,
       paymentMethod: selectedPayment
@@ -458,13 +603,17 @@ async function placeOrder() {
     });
 
     if (res.ok) {
+      const orderData = await res.json(); // Get newly created order
+      const orderId = orderData._id;
+
       await fetch(`${API_BASE}/api/cart/clear`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
       });
-      alert('✅ Order submitted successfully!');
-      window.location.href = 'index.html';
+
+      // ✅ Redirect with orderId in URL
+      window.location.href = `checkout-success.html?orderId=${orderId}`;
     } else {
       alert('❌ Failed to place order.');
     }
@@ -475,37 +624,180 @@ async function placeOrder() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Manually select the default radio input value
+  // ✅ 1. Set default shipping option
   const trackedRadio = document.querySelector('input[name="shippingMethod"][value="tracked"]');
   if (trackedRadio) trackedRadio.checked = true;
+  updatePaymentOptions();
 
-  updatePaymentOptions(); // 🔁 Ensures $5 is added if < $75
+  // ✅ 2. Initialize Stripe
+  const stripe = Stripe('pk_live_51RNUioHtKVHd8k1YyTpWoKsOJ7n8kz5pncSGTTShYjlXwtLMq9Y2OWO1HRS60GpuKIXW9zzUcqWdlsvwouDJ8Deh00KA4Z5ZX6');
+  const elements = stripe.elements();
+  const card = elements.create('card');
+  card.mount('#card-element');
+
+  card.on('change', ({ error }) => {
+    document.getElementById('card-errors').textContent = error ? error.message : '';
+  });
+
+  // ✅ 3. Handle payment and order on submit
+ document.querySelector('.submit-btn').addEventListener('click', async (e) => {
+  e.preventDefault();
+
+  const button = e.target;
+  const overlay = document.getElementById('processing-overlay');
+  const message = document.getElementById('processing-message');
+  
+  button.disabled = true;
+  overlay.style.display = 'flex';
+  message.textContent = 'Processing payment...';
+
+  const totalAmount = localStorage.getItem('cartTotalFinal') || '0.00';
+
+  const response = await fetch(`${API_BASE}/create-payment-intent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: totalAmount })
+  });
+
+  const { clientSecret, error: backendError } = await response.json();
+
+  if (backendError) {
+    overlay.style.display = 'none';
+    alert(`Backend Error: ${backendError}`);
+    button.disabled = false;
+    return;
+  }
+
+  const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
+    payment_method: {
+      card: card,
+      billing_details: {
+        name: `${currentUser.firstName} ${currentUser.lastName}`,
+        email: currentUser.email,
+        address: {
+          line1: currentUser.address,
+          postal_code: currentUser.zip,
+          state: currentUser.state,
+        },
+      },
+    }
+  });
+
+  if (error) {
+    overlay.style.display = 'none';
+    document.getElementById('card-errors').textContent = error.message;
+    button.disabled = false;
+  } else if (paymentIntent.status === 'succeeded') {
+    message.textContent = '✅ Payment successful! Placing your order...';
+    await placeOrder();
+  } else {
+    overlay.style.display = 'none';
+    alert('❌ Payment was not successful.');
+    button.disabled = false;
+  }
+});
 });
 
 
 </script>
 
-<div id="address-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
-  <div style="background:white; padding:20px; border-radius:8px; width:90%; max-width:400px;">
-    <h3 style="color:rebeccapurple; margin-bottom:10px;">Edit Shipping Address</h3>
-    <gmpx-placeautocomplete
-  id="autocomplete"
-  placeholder="Enter your address"
-  style="width:100%; padding:10px; font-size:16px; border-radius:6px; border:1px solid #ccc;">
-</gmpx-placeautocomplete>
-
-    <div style="margin-top:15px; text-align:right;">
-      <button onclick="saveAddress()" style="background:darkgreen; color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer;">Save</button>
-      <button onclick="closeModal()" style="margin-left:10px; background:#ccc; border:none; padding:10px 16px; border-radius:6px; cursor:pointer;">Cancel</button>
+<div id="address-modal" style="
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+">
+  <div style="
+    background: white;
+    padding: 30px 24px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    animation: fadeIn 0.25s ease-out;
+  ">
+    <h3 style="color: rebeccapurple; font-size: 20px; margin-bottom: 20px; text-align: center;">
+      Edit Shipping Address
+    </h3>
+    <input
+      id="autocomplete"
+      type="text"
+      placeholder="Start typing your address..."
+      style="
+        width: 100%;
+        padding: 12px 14px;
+        font-size: 16px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        margin-bottom: 20px;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        box-sizing: border-box;
+      "
+      required
+    />
+    <div style="text-align: right;">
+      <button onclick="saveAddress()" style="
+        background: rebeccapurple;
+        color: white;
+        border: none;
+        padding: 10px 18px;
+        font-size: 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        margin-right: 10px;
+      ">Save</button>
+      <button onclick="closeModal()" style="
+        background: #eee;
+        color: #333;
+        border: none;
+        padding: 10px 18px;
+        font-size: 15px;
+        border-radius: 8px;
+        cursor: pointer;
+      ">Cancel</button>
     </div>
   </div>
 </div>
 
+<div id="processing-overlay" style="
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(255,255,255,0.9);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  font-family: 'Segoe UI', sans-serif;
+  color: rebeccapurple;
+  font-size: 20px;
+  font-weight: bold;
+">
+  <div class="spinner" style="
+    border: 4px solid #eee;
+    border-top: 4px solid rebeccapurple;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+  "></div>
+  <span id="processing-message">Processing payment...</span>
+</div>
+
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
+
 <script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&loading=async">
-</script>
-<script async defer
-  src="https://www.gstatic.com/maps-platform/place-autocomplete-element/v1/placeAutocompleteElement.js">
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initAutocomplete">
 </script>
 </body>
 </html>

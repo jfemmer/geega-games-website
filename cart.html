@@ -164,33 +164,34 @@ h1 {
 
 .foil-shimmer {
   position: relative;
-  border-radius: 10px;
   overflow: hidden;
 }
 
 .foil-shimmer::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: -150%;
-  width: 150%;
-  height: 100%;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
   background: linear-gradient(
-    120deg,
-    rgba(255, 255, 255, 0.1) 0%,
-    rgba(255, 255, 255, 0.5) 50%,
-    rgba(255, 255, 255, 0.1) 100%
+    130deg,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 60%
   );
-  transform: skewX(-20deg);
-  animation: shimmerMove 2s infinite;
+  animation: shimmer 2.5s infinite linear;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
-@keyframes shimmerMove {
-  0% { left: -150%; }
-  50% { left: 150%; }
-  100% { left: 150%; }
+@keyframes shimmer {
+  0% {
+    transform: translate(-100%, -100%) rotate(25deg);
+  }
+  100% {
+    transform: translate(100%, 100%) rotate(25deg);
+  }
 }
 
 .item-image img {

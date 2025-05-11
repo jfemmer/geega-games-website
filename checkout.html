@@ -154,12 +154,6 @@
     }
   }
 </style>
- <script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&loading=async">
-</script>
-<script async defer
-  src="https://www.gstatic.com/maps-platform/place-autocomplete-element/v1/placeAutocompleteElement.js">
-</script>
 </head>
 <body>
   <div class="container">
@@ -367,10 +361,8 @@ function updatePaymentOptions() {
 
   calculateAndDisplayTotal();
 }
-
 function editAddress() {
   document.getElementById('address-modal').style.display = 'flex';
-  document.getElementById('autocomplete').value = '';
 }
 
 function closeModal() {
@@ -378,14 +370,14 @@ function closeModal() {
 }
 
 async function saveAddress() {
-  const placeElement = document.getElementById('autocomplete');
-  const place = placeElement.getPlace?.();
-  if (!place || !place.formatted_address) {
+  const el = document.getElementById('autocomplete');
+  const full = el?.value || el?.getAttribute('value');
+
+  if (!full || full.trim().length < 5) {
     alert('Please select a valid address from the dropdown.');
     return;
   }
 
-  const full = place.formatted_address;
   const userId = localStorage.getItem('userId');
   const parts = full.split(',').map(p => p.trim());
   const [address = '', city = '', stateZip = ''] = parts;
@@ -395,22 +387,19 @@ async function saveAddress() {
   closeModal();
 
   if (currentUser && currentUser._id) {
-    currentUser.address = address;
-    currentUser.state = state;
-    currentUser.zip = zip;
-
     try {
       await fetch(`${API_BASE}/api/users/${currentUser._id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address, state, zip })
       });
-      console.log('✅ Address updated with Google Maps');
+      console.log('✅ Address updated');
     } catch (err) {
       console.error('❌ Failed to update address via API:', err);
     }
   }
 }
+
 
 function redirectTo(method) {
   window.lastSelectedPaymentMethod = method;
@@ -492,18 +481,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   updatePaymentOptions(); // 🔁 Ensures $5 is added if < $75
 });
+
+
 </script>
 
 <div id="address-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
   <div style="background:white; padding:20px; border-radius:8px; width:90%; max-width:400px;">
     <h3 style="color:rebeccapurple; margin-bottom:10px;">Edit Shipping Address</h3>
-
-    <!-- ✅ Updated Autocomplete Component -->
     <gmpx-placeautocomplete
-      id="autocomplete"
-      placeholder="Enter address..."
-      style="width:100%; padding:10px; font-size:16px; border-radius:6px; border:1px solid #ccc;">
-    </gmpx-placeautocomplete>
+  id="autocomplete"
+  placeholder="Enter your address"
+  style="width:100%; padding:10px; font-size:16px; border-radius:6px; border:1px solid #ccc;">
+</gmpx-placeautocomplete>
 
     <div style="margin-top:15px; text-align:right;">
       <button onclick="saveAddress()" style="background:darkgreen; color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer;">Save</button>
@@ -511,5 +500,12 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   </div>
 </div>
+
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&loading=async">
+</script>
+<script async defer
+  src="https://www.gstatic.com/maps-platform/place-autocomplete-element/v1/placeAutocompleteElement.js">
+</script>
 </body>
 </html>

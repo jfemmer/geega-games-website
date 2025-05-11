@@ -630,7 +630,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updatePaymentOptions();
 
   // ✅ 2. Initialize Stripe
-  const stripe = Stripe('pk_live_51RNUioHtKVHd8k1YyTpWoKsOJ7n8kz5pncSGTTShYjlXwtLMq9Y2OWO1HRS60GpuKIXW9zzUcqWdlsvwouDJ8Deh00KA4Z5ZX6');
+  const stripe = Stripe('sk_test_51RNUixQe9DCrM8IiqejutWnZYDRMLKgQB73zrz1DIJZCpnKE3XvMCvrFW8VSctX1SCe9Mb7wyIPLEqvEGHV72bXH00oR8o3eEa');
   const elements = stripe.elements();
   const card = elements.create('card');
   card.mount('#card-element');

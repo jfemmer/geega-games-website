@@ -448,6 +448,27 @@
         </div>
         <button type="submit">Add / Update Card</button>
       </form>
+
+      <h3>Update Card Price</h3>
+
+      <h3>Search Inventory to Update Price</h3>
+<input type="text" id="price-search-input" placeholder="Search inventory by name or set..." autocomplete="off" />
+<div id="price-search-results" style="margin-top: 10px;"></div>
+<form id="price-update-form">
+  <label for="priceCardName">Card Name</label>
+  <input type="hidden" id="priceCardName" required>
+  
+  <label for="priceSet">Set</label>
+  <input type="hidden" id="priceSet" required>
+
+  <label for="priceFoil">Foil?</label>
+  <input type="hidden" id="priceFoil" required>
+
+  <label for="newPrice">New Price (USD)</label>
+  <input type="number" id="newPrice" min="0" step="0.01" required>
+
+  <button type="submit">Update Price</button>
+</form>
   
       <hr style="margin: 30px 0;">
   
@@ -729,10 +750,17 @@ async function loadOrders() {
                    alt="${card.cardName}"
                    style="width: 75px; height: auto; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);" />
               <div>
-                <strong>${card.cardName}</strong> — ${card.quantity}x @ $${(card.priceUsd || 0).toFixed(2)} each<br>
-                <em>Set:</em> ${card.set || 'N/A'}<br>
-                ${card.foil ? '✨ <strong>Foil</strong><br>' : ''}
-                ${card.specialArt ? `<strong>Art:</strong> ${card.specialArt}<br>` : ''}
+                <div style="flex-grow: 1;">
+                <div style="font-weight: bold; font-size: 15px; color: #222;">
+                  ${card.cardName}
+                </div>
+                <div style="font-size: 14px; color: #555;">
+                  ${card.set || 'N/A'} ${card.foil ? '• ✨ Foil' : ''}<br>
+                  Qty: ${card.quantity || 1} &nbsp; | &nbsp; $${(card.priceUsd || 0).toFixed(2)} each
+                  &nbsp; | &nbsp;
+                  <strong style="color: green;">$${((card.priceUsd || 0) * (card.quantity || 1)).toFixed(2)}</strong>
+                </div>
+                ${card.specialArt ? `<div style="font-size: 13px; color: #888;"><strong>Art:</strong> ${card.specialArt}</div>` : ''}
               </div>
             </li>
           `).join('')}
@@ -977,6 +1005,110 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener('DOMContentLoaded', () => {
     calculateInventoryTotals();
   });
+
+  document.getElementById('price-update-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  const cardName = document.getElementById('priceCardName').value.trim();
+  const set = document.getElementById('priceSet').value.trim();
+  const foil = document.getElementById('priceFoil').value === 'true';
+  const price = parseFloat(document.getElementById('newPrice').value);
+
+  if (!cardName || !set || isNaN(price)) {
+    alert('❌ Please fill out all fields correctly.');
+    return;
+  }
+
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/inventory/price', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardName, set, foil, price })
+    });
+
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.message || 'Failed to update price');
+
+    alert('✅ Price updated successfully!');
+    this.reset();
+  } catch (err) {
+    console.error('❌ Price update error:', err);
+    alert('❌ Failed to update card price.');
+  }
+});
+
+let priceSearchTimeout;
+
+document.getElementById('price-search-input').addEventListener('input', function () {
+  clearTimeout(priceSearchTimeout);
+  const query = this.value.trim().toLowerCase();
+  const resultsDiv = document.getElementById('price-search-results');
+
+  if (!query) {
+    resultsDiv.innerHTML = '';
+    return;
+  }
+
+  priceSearchTimeout = setTimeout(() => {
+    searchInventoryForPrice(query);
+  }, 300);
+});
+
+async function searchInventoryForPrice(query) {
+  const resultsDiv = document.getElementById('price-search-results');
+  resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+
+  try {
+    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory");
+    if (!res.ok) throw new Error("Failed to fetch inventory");
+    const cards = await res.json();
+
+    const filtered = cards.filter(card =>
+      card.cardName.toLowerCase().includes(query) ||
+      card.set.toLowerCase().includes(query)
+    );
+
+    if (filtered.length === 0) {
+      resultsDiv.innerHTML = `<p>No matches found for "${query}".</p>`;
+      return;
+    }
+
+    resultsDiv.innerHTML = '';
+    filtered.slice(0, 20).forEach(card => {
+      const displayName = card.cardName + (card.foil ? " (Foil)" : "");
+      const displaySet = card.set.toUpperCase();
+      const price = card.price ?? 0;
+      const imageUrl = card.imageUrl || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
+
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'delete-card-item'; // reuse styles
+      cardDiv.innerHTML = `
+        <img src="${imageUrl}" alt="${displayName}">
+        <div class="delete-card-details">
+          <strong>${displayName}</strong>
+          <span>Set: ${displaySet}</span>
+          <span>Current Price: $${parseFloat(price).toFixed(2)}</span>
+          <button style="background: seagreen;">Load for Update</button>
+        </div>
+      `;
+
+      cardDiv.querySelector('button').addEventListener('click', () => {
+        document.getElementById('priceCardName').value = card.cardName;
+        document.getElementById('priceSet').value = card.set;
+        document.getElementById('priceFoil').value = card.foil;
+        document.getElementById('newPrice').value = parseFloat(price).toFixed(2);
+        alert(`✅ Loaded "${displayName}" for price update.`);
+        document.getElementById('newPrice').scrollIntoView({ behavior: 'smooth' });
+      });
+
+      resultsDiv.appendChild(cardDiv);
+    });
+
+  } catch (err) {
+    console.error('❌ Price search error:', err);
+    resultsDiv.innerHTML = '<p>❌ Failed to search inventory.</p>';
+  }
+}
   </script>
   
 </body>

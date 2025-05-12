@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
+console.log("Stripe key exists?", !!process.env.STRIPE_SECRET_KEY);
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -107,10 +108,15 @@ const orderSchema = new mongoose.Schema({
       cardName: String,
       set: String,
       foil: Boolean,
-      specialArt: String, // e.g., "Showcase", "Borderless", etc.
-      quantity: Number
+      specialArt: String,
+      quantity: Number,
+      imageUrl: String //
+      
     }
   ],
+  shippingMethod: String,
+  paymentMethod: String,
+  orderTotal: Number,
   submittedAt: { type: Date, default: Date.now }
 });
 
@@ -508,17 +514,33 @@ app.post('/api/inventory/price', async (req, res) => {
   }
 });
 
-// ✅ NEW: Batch Fetch Prices
 app.post('/api/inventory/prices', async (req, res) => {
   try {
     const { cards } = req.body;
     if (!Array.isArray(cards)) return res.status(400).json({ error: 'Cards array required.' });
 
     const prices = {};
+
     for (const { cardName, set, foil } of cards) {
       if (!cardName || !set) continue;
-      const match = await CardInventory.findOne({ cardName, set, foil: !!foil });
-      if (match && match.price != null) prices[`${cardName}|${set}|${foil ? '1' : '0'}`] = match.price;
+
+      // Try exact match first
+      let match = await CardInventory.findOne({ cardName, set, foil: !!foil });
+
+      // If not found, try case-insensitive loose match
+      if (!match) {
+        match = await CardInventory.findOne({
+          cardName: { $regex: `^${cardName}$`, $options: 'i' },
+          set: { $regex: `^${set}$`, $options: 'i' },
+          foil: !!foil
+        });
+      }
+
+      // Add to price map if match found
+      if (match && match.price != null) {
+        const key = `${cardName}|${set}|${foil ? '1' : '0'}`;
+        prices[key] = match.price;
+      }
     }
 
     res.json(prices);
@@ -529,13 +551,22 @@ app.post('/api/inventory/prices', async (req, res) => {
 });
 
 app.post('/api/orders', async (req, res) => {
-  const { userId, firstName, lastName, email, address, cards, shippingMethod, paymentMethod } = req.body;
+  console.log('🧾 Incoming order data:', req.body);
 
-  if (!userId || !cards || !Array.isArray(cards)) {
-    return res.status(400).json({ message: 'Missing required fields or invalid format.' });
-  }
+  const {
+    userId,
+    firstName,
+    lastName,
+    email,
+    address,
+    cards,
+    shippingMethod,
+    paymentMethod,
+    orderTotal
+  } = req.body;
 
   try {
+    const parsedOrderTotal = parseFloat(orderTotal);
     const newOrder = new Order({
       userId,
       firstName,
@@ -544,7 +575,8 @@ app.post('/api/orders', async (req, res) => {
       address,
       cards,
       shippingMethod,
-      paymentMethod
+      paymentMethod,
+      orderTotal: isNaN(parsedOrderTotal) ? 0 : parsedOrderTotal  // ✅ this line matters
     });
 
     const savedOrder = await newOrder.save();

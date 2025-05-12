@@ -622,11 +622,8 @@ async function placeOrder() {
       return sum + price * (item.quantity || 1);
     }, 0);
 
-    let finalTotal = baseTotal;
-    if (shippingMethod === 'tracked' && baseTotal < 75) finalTotal += 5;
-    if (shippingMethod === 'pwe') finalTotal += 1.25;
-
-    const orderTotal = parseFloat(finalTotal.toFixed(2));
+    const storedTotal = localStorage.getItem('cartTotalFinal');
+    const orderTotal = parseFloat(storedTotal) || 0;
 
     const order = {
       userId,

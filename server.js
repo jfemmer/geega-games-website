@@ -523,9 +523,16 @@ app.patch('/api/inventory/price', async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
+    const updateFields = {
+      price,
+      ...(foil
+        ? { priceUsdFoil: price }
+        : { priceUsd: price })
+    };
+
     const card = await CardInventory.findOneAndUpdate(
       { cardName, set, foil: !!foil },
-      { price },
+      updateFields,
       { new: true }
     );
 
@@ -539,6 +546,7 @@ app.patch('/api/inventory/price', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
+
 
 app.post('/api/inventory/prices', async (req, res) => {
   try {

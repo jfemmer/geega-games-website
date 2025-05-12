@@ -538,7 +538,10 @@ app.post('/api/inventory/prices', async (req, res) => {
 
       if (match) {
         const key = `${cardName}|${set}|${foil ? '1' : '0'}`;
-        const rawPrice = foil ? match.priceUsdFoil : match.priceUsd;
+        let rawPrice = foil ? match.priceUsdFoil : match.priceUsd;
+        if (rawPrice == null && match.price != null) {
+          rawPrice = match.price;  // fallback to general price if specific one missing
+        }
         prices[key] = parseFloat(rawPrice) || 0;
       }
     }

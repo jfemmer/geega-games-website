@@ -587,18 +587,17 @@ async function placeOrder() {
     const cartItems = cart.items || [];
 
     for (const item of cartItems) {
-  if (!item.imageUrl) {
-    try {
-      const scryRes = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(item.cardName)}`);
-      const scryData = await scryRes.json();
-      item.imageUrl = scryData.image_uris?.normal || scryData.card_faces?.[0]?.image_uris?.normal;
-    } catch (e) {
-      item.imageUrl = 'https://dummyimage.com/75x105/cccccc/000000&text=No+Image';
+      if (!item.imageUrl) {
+        try {
+          const scryRes = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(item.cardName)}`);
+          const scryData = await scryRes.json();
+          item.imageUrl = scryData.image_uris?.normal || scryData.card_faces?.[0]?.image_uris?.normal;
+        } catch (e) {
+          item.imageUrl = 'https://dummyimage.com/75x105/cccccc/000000&text=No+Image';
+        }
+      }
     }
-  }
-}
 
-    // 🔍 Step 1: Fetch prices
     const priceRes = await fetch(`${API_BASE}/api/inventory/prices`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -613,9 +612,9 @@ async function placeOrder() {
 
     const priceMap = await priceRes.json();
 
-    // 💵 Step 2: Calculate total
+    const normalize = str => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
+
     const baseTotal = cartItems.reduce((sum, item) => {
-      const normalize = str => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
       const key = `${normalize(item.cardName)}|${normalize(item.set)}|${item.foil ? '1' : '0'}`;
       const priceFromMap = priceMap[key];
       const fallbackPrice = parseFloat(item.priceUsd) || 0;
@@ -623,13 +622,11 @@ async function placeOrder() {
       return sum + price * (item.quantity || 1);
     }, 0);
 
-const shippingMethod = document.querySelector('input[name="shippingMethod"]:checked')?.value;
-let finalTotal = baseTotal;
+    let finalTotal = baseTotal;
+    if (shippingMethod === 'tracked' && baseTotal < 75) finalTotal += 5;
+    if (shippingMethod === 'pwe') finalTotal += 1.25;
 
-if (shippingMethod === 'tracked' && baseTotal < 75) finalTotal += 5;
-if (shippingMethod === 'pwe') finalTotal += 1.25;
-
-const orderTotal = parseFloat(finalTotal.toFixed(2));
+    const orderTotal = parseFloat(finalTotal.toFixed(2));
 
     const order = {
       userId,
@@ -640,7 +637,7 @@ const orderTotal = parseFloat(finalTotal.toFixed(2));
       cards: cartItems,
       shippingMethod,
       paymentMethod: selectedPayment,
-      orderTotal: parseFloat(orderTotal.toFixed(2)) // ✅ Include total
+      orderTotal
     };
 
     const res = await fetch(`${API_BASE}/api/orders`, {
@@ -668,6 +665,7 @@ const orderTotal = parseFloat(finalTotal.toFixed(2));
     alert('Something went wrong while placing your order.');
   }
 }
+
 document.addEventListener('DOMContentLoaded', () => {
   // ✅ 1. Set default shipping option
   const trackedRadio = document.querySelector('input[name="shippingMethod"][value="tracked"]');

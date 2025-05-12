@@ -615,7 +615,8 @@ async function placeOrder() {
 
     // 💵 Step 2: Calculate total
     const orderTotal = cartItems.reduce((sum, item) => {
-      const key = `${item.cardName}|${item.set}|${item.foil ? '1' : '0'}`;
+      const normalize = str => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
+      const key = `${normalize(item.cardName)}|${normalize(item.set)}|${item.foil ? '1' : '0'}`;
       const price = priceMap[key] || 0;
       return sum + price * (item.quantity || 1);
     }, 0);
@@ -835,4 +836,5 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
 

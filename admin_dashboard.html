@@ -729,7 +729,7 @@ async function loadOrders() {
                    alt="${card.cardName}"
                    style="width: 75px; height: auto; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);" />
               <div>
-                <strong>${card.cardName}</strong> — ${card.quantity}x<br>
+                <strong>${card.cardName}</strong> — ${card.quantity}x @ $${(card.priceUsd || 0).toFixed(2)} each<br>
                 <em>Set:</em> ${card.set || 'N/A'}<br>
                 ${card.foil ? '✨ <strong>Foil</strong><br>' : ''}
                 ${card.specialArt ? `<strong>Art:</strong> ${card.specialArt}<br>` : ''}

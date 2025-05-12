@@ -110,7 +110,8 @@ const orderSchema = new mongoose.Schema({
       foil: Boolean,
       specialArt: String,
       quantity: Number,
-      imageUrl: String //
+      imageUrl: String, //
+      priceUsd: Number
       
     }
   ],

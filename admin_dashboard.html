@@ -987,7 +987,9 @@ document.addEventListener("DOMContentLoaded", () => {
       inventory.forEach(card => {
         const quantity = card.quantity || 0;
         const isFoil = card.foil;
-        const rawPrice = parseFloat(isFoil ? card.priceUsdFoil : card.priceUsd);
+        const rawPrice = card.foil
+        ? parseFloat(card.priceUsdFoil ?? card.priceUsd ?? card.price ?? 0)
+        : parseFloat(card.priceUsd ?? card.price ?? 0);
         const price = isNaN(rawPrice) ? 0 : rawPrice;
         totalValue += price * quantity;
         totalQuantity += quantity;

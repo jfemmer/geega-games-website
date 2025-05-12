@@ -281,6 +281,66 @@
         background-position: 200% center;
       }
     }
+
+    #price-search-results {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 16px;
+  padding: 10px 0;
+  scroll-behavior: smooth;
+}
+
+.price-card {
+  min-width: 160px;
+  max-width: 160px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  padding: 10px;
+  text-align: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.price-card:hover {
+  transform: scale(1.04);
+  background-color: #f2f2ff;
+}
+
+.price-card img {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.price-card strong {
+  display: block;
+  font-size: 1.05em;
+  margin-top: 6px;
+}
+
+.price-card span {
+  display: block;
+  font-size: 0.9em;
+  margin: 4px 0;
+}
+
+.price-card button {
+  margin-top: 8px;
+  background-color: seagreen;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.price-card button:hover {
+  background-color: #146c43;
+}
   </style>
   
 

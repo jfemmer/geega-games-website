@@ -1077,9 +1077,7 @@ async function searchInventoryForPrice(query) {
     filtered.slice(0, 20).forEach(card => {
       const displayName = card.cardName + (card.foil ? " (Foil)" : "");
       const displaySet = card.set.toUpperCase();
-      const price = card.foil
-    ? (card.priceUsdFoil ?? card.price ?? 0)
-    : (card.priceUsd ?? card.price ?? 0);
+      const price = card.price ?? 0;
       const imageUrl = card.imageUrl || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
 
       const cardDiv = document.createElement('div');
@@ -1089,7 +1087,7 @@ async function searchInventoryForPrice(query) {
         <div class="delete-card-details">
           <strong>${displayName}</strong>
           <span>Set: ${displaySet}</span>
-          <span>Current Price: $${adjustedPrice}</span>
+          <span>Current Price: $${parseFloat(price).toFixed(2)}</span>
           <button style="background: seagreen;">Load for Update</button>
         </div>
       `;

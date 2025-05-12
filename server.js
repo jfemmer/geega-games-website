@@ -524,10 +524,10 @@ app.post('/api/inventory/prices', async (req, res) => {
     for (const { cardName, set, foil } of cards) {
       if (!cardName || !set) continue;
 
-      // Try exact match first
+      // Try exact match
       let match = await CardInventory.findOne({ cardName, set, foil: !!foil });
 
-      // If not found, try case-insensitive loose match
+      // Try case-insensitive fallback
       if (!match) {
         match = await CardInventory.findOne({
           cardName: { $regex: `^${cardName}$`, $options: 'i' },
@@ -536,11 +536,10 @@ app.post('/api/inventory/prices', async (req, res) => {
         });
       }
 
-      // Add to price map if match found
       if (match) {
         const key = `${cardName}|${set}|${foil ? '1' : '0'}`;
-        const price = foil ? match.priceUsdFoil : match.priceUsd;
-        prices[key] = parseFloat(price) || 0;
+        const rawPrice = foil ? match.priceUsdFoil : match.priceUsd;
+        prices[key] = parseFloat(rawPrice) || 0;
       }
     }
 

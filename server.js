@@ -515,35 +515,27 @@ app.post('/api/inventory/price', async (req, res) => {
   }
 });
 
-// PATCH: Update inventory price
-app.patch('/api/inventory/price', async (req, res) => {
+app.patch('/api/inventory/update-price', async (req, res) => {
+  const { cardName, set, foil, newPrice } = req.body;
+  if (!cardName || !set || typeof newPrice !== 'number') {
+    return res.status(400).json({ message: 'Missing required fields.' });
+  }
+
   try {
-    const { cardName, set, foil, price } = req.body;
-    if (!cardName || !set || price == null) {
-      return res.status(400).json({ message: 'Missing required fields.' });
-    }
+    const fieldToUpdate = foil ? 'priceUsdFoil' : 'priceUsd';
 
-    const updateFields = {
-      price,
-      ...(foil
-        ? { priceUsdFoil: price }
-        : { priceUsd: price })
-    };
-
-    const card = await CardInventory.findOneAndUpdate(
-      { cardName, set, foil: !!foil },
-      updateFields,
+    const updated = await CardInventory.findOneAndUpdate(
+      { cardName, set, foil },
+      { [fieldToUpdate]: newPrice },
       { new: true }
     );
 
-    if (!card) {
-      return res.status(404).json({ message: 'Card not found.' });
-    }
+    if (!updated) return res.status(404).json({ message: 'Card not found.' });
 
-    res.status(200).json({ message: 'Price updated successfully.', card });
+    res.json({ message: 'Price updated.', updated });
   } catch (err) {
-    console.error('❌ Failed to update price:', err);
-    res.status(500).json({ message: 'Internal server error.' });
+    console.error('❌ Update price error:', err);
+    res.status(500).json({ message: 'Server error.' });
   }
 });
 

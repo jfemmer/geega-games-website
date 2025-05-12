@@ -520,6 +520,7 @@ app.post('/api/inventory/prices', async (req, res) => {
     if (!Array.isArray(cards)) return res.status(400).json({ error: 'Cards array required.' });
 
     const prices = {};
+    const normalize = str => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
 
     for (const { cardName, set, foil } of cards) {
       if (!cardName || !set) continue;
@@ -537,10 +538,10 @@ app.post('/api/inventory/prices', async (req, res) => {
       }
 
       if (match) {
-        const key = `${cardName}|${set}|${foil ? '1' : '0'}`;
+        const key = `${normalize(cardName)}|${normalize(set)}|${foil ? '1' : '0'}`;
         let rawPrice = foil ? match.priceUsdFoil : match.priceUsd;
         if (rawPrice == null && match.price != null) {
-          rawPrice = match.price;  // fallback to general price if specific one missing
+          rawPrice = match.price;  // ✅ fallback to general price
         }
         prices[key] = parseFloat(rawPrice) || 0;
       }

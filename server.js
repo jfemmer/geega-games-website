@@ -82,10 +82,18 @@ const userSchema = new mongoose.Schema({
 const User = db1.model('User', userSchema);
 
 const inventorySchema = new mongoose.Schema({
-  cardName: { type: String, required: true }, quantity: { type: Number, required: true },
-  set: { type: String, required: true }, condition: { type: String, required: true },
-  foil: { type: Boolean, default: false }, imageUrl: String, colors: [String],
-  cardType: String, creatureTypes: [String], price: Number, addedAt: { type: Date, default: Date.now }
+  cardName: { type: String, required: true },
+  quantity: { type: Number, required: true },
+  set: { type: String, required: true },
+  condition: { type: String, required: true },
+  foil: { type: Boolean, default: false },
+  imageUrl: String,
+  colors: [String],
+  cardType: String,
+  creatureTypes: [String],
+  priceUsd: Number,         // ✅ add this
+  priceUsdFoil: Number,     // ✅ and this
+  addedAt: { type: Date, default: Date.now }
 });
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
 

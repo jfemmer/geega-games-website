@@ -270,7 +270,6 @@
       background-size: 200% auto;
       color: white;
       background-clip: text;
-      text-fill-color: transparent;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       animation: shimmer 2s linear infinite;
@@ -399,7 +398,9 @@
     <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
     <h2>Geega Admin</h2>
     <a href="#" onclick="showSection('inventory-section')">Inventory</a>
-    <a href="#" onclick="showSection('orders-section')">Orders</a>
+    <a href="#" onclick="showSection('orders-section'); loadOrders();">
+      Orders <span id="order-count" style="background: white; color: rebeccapurple; font-weight: bold; padding: 2px 6px; border-radius: 8px; font-size: 0.85em;">0</span>
+    </a>
     <a href="#" onclick="showSection('user-management-section')">User Management</a>
     <a href="#" onclick="showSection('announcement-section')">Post Announcement</a>
     <a href="#" onclick="showSection('employee-section')">Add Employee</a>
@@ -423,13 +424,6 @@
       <div id="search-results" style="margin-top: 10px;"></div>
       <hr style="margin: 20px 0;">
 
-      <!-- Orders Section -->
-      <div class="section" id="orders-section" style="display: none;">
-      <h2>Order Management</h2>
-      <div id="orders-list">
-        <p>Loading orders...</p>
-        </div>
-      </div>
   
       <form id="update-card-form">
         <label for="cardName">Card Name</label>
@@ -459,7 +453,7 @@
   
       <h3>Delete Card from Inventory</h3>
       <form id="delete-card-form">
-        <label for="deleteCardName">Card Name</label>
+        <label for="delete-search-input">Card Name</label>
         <input type="text" id="delete-search-input" placeholder="Search inventory..." autocomplete="off" />
         <div id="delete-search-results" style="margin-top: 10px;"></div>
         <input type="hidden" id="deleteCardName" name="deleteCardName" required>
@@ -469,6 +463,14 @@
       </form>
 
     </div>
+
+       <!-- Orders Section -->
+      <div class="section" id="orders-section" style="display: none;">
+      <h2>Order Management</h2>
+      <div id="orders-list">
+        <p>Loading orders...</p>
+        </div>
+      </div>
   
     <!-- User Management Section -->
     <div class="section" id="user-management-section" style="display:none;">
@@ -691,30 +693,56 @@
 
   let debounceTimeout;
 
-  function loadOrders() {
+async function loadOrders() {
   const ordersList = document.getElementById('orders-list');
-  
-  // For now, simulate with sampleOrder from the external file
-  const orders = [sampleOrder]; // You could also manually push this to your fetched results
-  
-  ordersList.innerHTML = orders.map(order => `
-   <div style="border: 1px solid #ccc; border-radius: 10px; margin-bottom: 20px; padding: 15px; background: white;">
-      <h3>${order.firstName} ${order.lastName}</h3>
-      <p><strong>Email:</strong> ${order.email}</p>
-      <p><strong>Address:</strong> ${order.address || '—'}</p>
-      <h4>Cards:</h4>
-      <ul>
-        ${order.cards.map(card => `
-          <li>
-            <strong>${card.cardName}</strong> — ${card.quantity}x
-            <br><em>Set:</em> ${card.set || 'N/A'}
-            ${card.foil ? '<br>✨ <strong>Foil</strong>' : ''}
-            ${card.specialArt ? `<br><strong>Art:</strong> ${card.specialArt}` : ''}
-          </li>
-        `).join('')}
-      </ul>
-    </div>
-  `).join('');
+  const orderCountSpan = document.getElementById('order-count');
+  ordersList.innerHTML = '<p>Loading orders...</p>';
+
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/orders');
+    const orders = await res.json();
+
+    // ✅ Update order count badge
+    if (orderCountSpan) {
+      orderCountSpan.textContent = orders.length;
+    }
+
+    if (!Array.isArray(orders) || orders.length === 0) {
+      ordersList.innerHTML = "<p>No orders yet.</p>";
+      return;
+    }
+
+    ordersList.innerHTML = orders.map(order => `
+      <div style="border: 1px solid #ccc; border-radius: 10px; margin-bottom: 20px; padding: 15px; background: white;">
+        <h3>${order.firstName || '—'} ${order.lastName || ''}</h3>
+        <p><strong>Email:</strong> ${order.email || '—'}</p>
+        <p><strong>Address:</strong> ${order.address || '—'}</p>
+        <p><strong>Shipping:</strong> ${order.shippingMethod || '—'}</p>
+        <p><strong>Payment:</strong> ${order.paymentMethod || '—'}</p>
+        <p><strong>Date:</strong> ${order.submittedAt ? new Date(order.submittedAt).toLocaleString() : '—'}</p>
+        <p><strong>Total:</strong> $${(order.orderTotal || 0).toFixed(2)}</p>
+        <h4>Cards:</h4>
+        <ul style="list-style: none; padding-left: 0;">
+          ${(order.cards || []).map(card => `
+            <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 12px;">
+              <img src="${card.imageUrl || 'https://dummyimage.com/75x105/cccccc/000000&text=No+Image'}"
+                   alt="${card.cardName}"
+                   style="width: 75px; height: auto; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);" />
+              <div>
+                <strong>${card.cardName}</strong> — ${card.quantity}x<br>
+                <em>Set:</em> ${card.set || 'N/A'}<br>
+                ${card.foil ? '✨ <strong>Foil</strong><br>' : ''}
+                ${card.specialArt ? `<strong>Art:</strong> ${card.specialArt}<br>` : ''}
+              </div>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('❌ Error loading orders:', err);
+    ordersList.innerHTML = '<p>❌ Failed to load orders.</p>';
+  }
 }
 
 // 👇 Load when section is clicked
@@ -828,6 +856,20 @@ document.querySelector('a[href="#"][onclick*="orders-section"]').addEventListene
     resultsDiv.innerHTML = `<p>❌ Could not find a card for "<strong>${query}</strong>".</p>`;
   }
 }
+
+async function updateOrderCount() {
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/orders');
+    const orders = await res.json();
+    document.getElementById('order-count').textContent = orders.length;
+  } catch (err) {
+    console.error("❌ Failed to update order count", err);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateOrderCount();
+});
 </script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {

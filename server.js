@@ -515,6 +515,31 @@ app.post('/api/inventory/price', async (req, res) => {
   }
 });
 
+// PATCH: Update inventory price
+app.patch('/api/inventory/price', async (req, res) => {
+  try {
+    const { cardName, set, foil, price } = req.body;
+    if (!cardName || !set || price == null) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
+
+    const card = await CardInventory.findOneAndUpdate(
+      { cardName, set, foil: !!foil },
+      { price },
+      { new: true }
+    );
+
+    if (!card) {
+      return res.status(404).json({ message: 'Card not found.' });
+    }
+
+    res.status(200).json({ message: 'Price updated successfully.', card });
+  } catch (err) {
+    console.error('❌ Failed to update price:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
 app.post('/api/inventory/prices', async (req, res) => {
   try {
     const { cards } = req.body;

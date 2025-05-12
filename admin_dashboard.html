@@ -6,7 +6,1125 @@
   <style>
     * {
       box-sizing: border-box;
+    }<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard | Geega Games</title>
+  <style>
+    * {
+      box-sizing: border-box;
     }
+  
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      margin: 0;
+      background-color: #f4f6f8;
+      color: #333;
+    }
+  
+    .sidebar {
+      background-color: rebeccapurple;
+      color: white;
+      padding: 20px;
+      width: 220px;
+      height: 100vh;
+      transition: width 0.3s ease;
+      overflow-x: hidden;
+    }
+  
+    .sidebar.collapsed {
+      width: 60px;
+    }
+  
+    .sidebar h2 {
+      margin-top: 0;
+      font-size: 1.5rem;
+    }
+  
+    .sidebar a {
+      color: white;
+      text-decoration: none;
+      display: block;
+      margin: 12px 0;
+      font-size: 1rem;
+      transition: padding 0.2s;
+    }
+  
+    .sidebar a:hover {
+      text-decoration: underline;
+      padding-left: 5px;
+    }
+  
+    .sidebar-toggle {
+      background: white;
+      color: rebeccapurple;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 16px;
+      margin-bottom: 15px;
+      cursor: pointer;
+    }
+  
+    .main {
+      flex-grow: 1;
+      padding: 30px;
+      background-color: #ecf0f1;
+    }
+  
+    .section {
+      background-color: white;
+      padding: 24px;
+      margin-bottom: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    }
+  
+    .collapsible {
+      display: none;
+    }
+  
+    .collapsible.active {
+      display: block;
+    }
+  
+    .right-menu {
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100vh;
+      width: 60px;
+      background-color: rebeccapurple;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 20px;
+      z-index: 1100;
+      transition: width 0.3s ease;
+    }
+  
+    .right-menu.expanded {
+      width: 400px;
+      align-items: flex-start;
+      padding: 20px;
+      overflow-y: auto;
+    }
+  
+    .right-menu button.toggle-panel {
+      background: white;
+      color: rebeccapurple;
+      border: none;
+      padding: 8px 12px;
+      margin: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  
+    .right-panel-content {
+      display: none;
+      width: 100%;
+    }
+  
+    .right-menu.expanded .right-panel-content {
+      display: block;
+      color: #333;
+    }
+  
+    #search-results,
+    #delete-search-results {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+  
+    .card-item,
+    .delete-card-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 170px;
+      background: #ffffff;
+      padding: 12px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+  
+    .card-item:hover {
+      transform: scale(1.04);
+      background-color: #f2e7ff;
+    }
+  
+    .delete-card-item:hover {
+      transform: scale(1.04);
+      background-color: #ffe7e7;
+    }
+  
+    .card-item img,
+    .delete-card-item img {
+      width: 100%;
+      height: auto;
+      border-radius: 6px;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+    }
+  
+    .card-details,
+    .delete-card-details {
+      margin-top: 10px;
+      text-align: center;
+    }
+  
+    .card-details strong,
+    .delete-card-details strong {
+      font-size: 1.05em;
+      display: block;
+    }
+  
+    .card-details span,
+    .delete-card-details span {
+      display: block;
+      font-size: 0.9em;
+      margin: 4px 0;
+    }
+  
+    .card-details label {
+      font-size: 0.9em;
+      color: #444;
+      display: block;
+      margin-top: 4px;
+    }
+  
+    .card-details select {
+      margin-top: 4px;
+      padding: 4px;
+      font-size: 0.9em;
+      width: 100%;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+  
+    .card-details .add-button {
+      margin-top: 8px;
+      background-color: rebeccapurple;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  
+    .card-details .add-button:hover {
+      background-color: #6a2f9c;
+    }
+  
+    .delete-card-details button {
+      margin-top: 8px;
+      background-color: crimson;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  
+    .delete-card-details button:hover {
+      background-color: #a30000;
+    }
+  
+    label {
+      display: block;
+      margin: 12px 0 6px;
+      font-weight: 600;
+    }
+  
+    input, textarea, button, select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+  
+    button {
+      background-color: rebeccapurple;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+  
+    button:hover {
+      background-color: #5a2d85;
+    }
+  
+    input::-webkit-autofill,
+    input:-webkit-autofill {
+      box-shadow: 0 0 0px 1000px white inset !important;
+      -webkit-box-shadow: 0 0 0px 1000px white inset !important;
+    }
+  
+    .shimmer {
+      background: linear-gradient(to right, rebeccapurple 4%, #ffffff 25%, rebeccapurple 36%);
+      background-size: 200% auto;
+      color: white;
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 2s linear infinite;
+      font-weight: bold;
+    }
+  
+    @keyframes shimmer {
+      to {
+        background-position: 200% center;
+      }
+    }
+  </style>
+  
+
+  
+<!-- 🔐 Login Logic
+<script>
+  //document.getElementById("admin-login-form").addEventListener("submit", function (e) {
+   // e.preventDefault();
+
+    const passwordInput = document.getElementById("admin-password-input");
+    const errorMessage = document.getElementById("login-error");
+    const loginOverlay = document.getElementById("admin-login");
+
+    const password = passwordInput.value.trim();
+
+    // 🔐 Replace with secure logic or backend validation
+    if (password === "yourSecretPassword") {
+      loginOverlay.style.display = "none";
+      errorMessage.textContent = "";
+      console.log("✅ Admin logged in.");
+      // window.location.href = "/admin_dashboard.html"; // Optional redirect
+    } else {
+      errorMessage.textContent = "❌ Incorrect password";
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+  });
+</script>-->
+</head>
+<body>
+  <!-- 🔐 Login Logic
+  <div id="admin-login" style="
+  position: fixed;
+  inset: 0;
+  background: #ecf0f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+">
+  <div style="
+    background: white;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    width: 320px;
+    text-align: center;
+  ">
+    <h2 style="color: rebeccapurple; margin-bottom: 20px;">Admin Login</h2>
+
+    <form id="admin-login-form" style="margin-bottom: 20px;">
+      <input 
+        type="password"
+        id="admin-password-input"
+        placeholder="Enter password"
+        style="
+          padding: 10px;
+          font-size: 16px;
+          width: 93%;
+          margin-bottom: 15px;
+          border-radius: 6px;
+          border: 1px solid #ccc;
+        "
+        required
+      />
+      <button
+        type="submit"
+        style="
+          padding: 10px 20px;
+          font-size: 16px;
+          background-color: rebeccapurple;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+        "
+      >
+        Login
+      </button>
+    </form>
+
+    <p id="login-error" style="color: crimson; margin-top: 10px;"></p>
+  </div>
+</div>
+
+<script>
+  document.getElementById("admin-login-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    const passwordInput = document.getElementById("admin-password-input");
+    const errorMessage = document.getElementById("login-error");
+    const loginOverlay = document.getElementById("admin-login");
+
+    const password = passwordInput.value.trim();
+
+    // 🔐 Replace with secure logic or backend validation
+    if (password === "yourSecretPassword") {
+      loginOverlay.style.display = "none";
+      errorMessage.textContent = "";
+      console.log("✅ Admin logged in.");
+      // window.location.href = "/admin_dashboard.html"; // Optional redirect
+    } else {
+      errorMessage.textContent = "❌ Incorrect password";
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+  });
+</script> -->
+
+  <!-- Existing HTML remains unchanged below this line -->
+    
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+    <h2>Geega Admin</h2>
+    <a href="#" onclick="showSection('inventory-section')">Inventory</a>
+    <a href="#" onclick="showSection('orders-section'); loadOrders();">
+      Orders <span id="order-count" style="background: white; color: rebeccapurple; font-weight: bold; padding: 2px 6px; border-radius: 8px; font-size: 0.85em;">0</span>
+    </a>
+    <a href="#" onclick="showSection('user-management-section')">User Management</a>
+    <a href="#" onclick="showSection('announcement-section')">Post Announcement</a>
+    <a href="#" onclick="showSection('employee-section')">Add Employee</a>
+    <a href="#">Logout</a>
+  </div>
+  
+  <!-- Main Content -->
+  <div class="main">
+
+    <!-- Inventory Section -->
+    <div class="section" id="inventory-section">
+      <div id="inventory-summary" style="padding: 20px; background-color: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center;">
+        <h3 style="color: rebeccapurple;">Inventory Summary</h3>
+        <p><strong>Total Cards:</strong> <span id="total-card-count">Loading...</span></p>
+        <p><strong>Total Inventory Value:</strong> $<span id="total-inventory-value">Loading...</span></p>
+      </div>  
+
+      <h2>Add Inventory</h2>
+      <h3>Search Magic Card</h3>
+      <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
+      <div id="search-results" style="margin-top: 10px;"></div>
+      <hr style="margin: 20px 0;">
+
+  
+      <form id="update-card-form">
+        <label for="cardName">Card Name</label>
+        <input type="text" id="cardName" name="cardName" required>
+        <label for="quantity">Quantity</label>
+        <input type="number" id="quantity" name="quantity" min="0" required>
+        <label for="set">Set</label>
+        <input type="text" id="set" name="set" required>
+        <label for="condition">Condition</label>
+        <select id="condition" name="condition" required>
+          <option value="">Select Condition</option>
+          <option value="NM">Near Mint</option>
+          <option value="LP">Lightly Played</option>
+          <option value="MP">Moderately Played</option>
+          <option value="HP">Heavily Played</option>
+          <option value="DMG">Damaged</option>
+        </select>
+        <input type="hidden" id="imageUrl" name="imageUrl">
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+          <input type="checkbox" id="foil" name="foil" style="width: 20px; height: 20px;">
+          <label for="foil" class="shimmer" style="margin: 0; font-size: 1.1rem;">Foil</label>
+        </div>
+        <button type="submit">Add / Update Card</button>
+      </form>
+
+      <h3>Update Card Price</h3>
+
+      <h3>Search Inventory to Update Price</h3>
+<input type="text" id="price-search-input" placeholder="Search inventory by name or set..." autocomplete="off" />
+<div id="price-search-results" style="margin-top: 10px;"></div>
+<form id="price-update-form">
+  <label for="priceCardName">Card Name</label>
+  <input type="hidden" id="priceCardName" required>
+  
+  <label for="priceSet">Set</label>
+  <input type="hidden" id="priceSet" required>
+
+  <label for="priceFoil">Foil?</label>
+  <input type="hidden" id="priceFoil" required>
+
+  <label for="newPrice">New Price (USD)</label>
+  <input type="number" id="newPrice" min="0" step="0.01" required>
+
+  <button type="submit">Update Price</button>
+</form>
+  
+      <hr style="margin: 30px 0;">
+  
+      <h3>Delete Card from Inventory</h3>
+      <form id="delete-card-form">
+        <label for="delete-search-input">Card Name</label>
+        <input type="text" id="delete-search-input" placeholder="Search inventory..." autocomplete="off" />
+        <div id="delete-search-results" style="margin-top: 10px;"></div>
+        <input type="hidden" id="deleteCardName" name="deleteCardName" required>
+        <input type="hidden" id="deleteSet" name="deleteSet" required>
+        <input type="hidden" id="deleteFoil" name="deleteFoil" required>
+        <button type="submit" style="background-color: crimson;">Delete Card</button>
+      </form>
+
+    </div>
+
+       <!-- Orders Section -->
+      <div class="section" id="orders-section" style="display: none;">
+      <h2>Order Management</h2>
+      <div id="orders-list">
+        <p>Loading orders...</p>
+        </div>
+      </div>
+  
+    <!-- User Management Section -->
+    <div class="section" id="user-management-section" style="display:none;">
+      <h2>User Management</h2>
+      <div id="user-list">
+        <p>Loading users...</p>
+      </div>
+    </div>
+  
+    <!-- Post Announcement Section -->
+    <div class="section" id="announcement-section" style="display:none;">
+      <h2>Post Announcement</h2>
+      <form id="announcement-form">
+        <label for="announcement">Message</label>
+        <textarea id="announcement" rows="4" required></textarea>
+        <label for="announcement-type">Send via:</label>
+        <select id="announcement-type" required>
+          <option value="email">Email Only</option>
+          <option value="sms">SMS Only</option>
+          <option value="both">Both Email & SMS</option>
+        </select>
+        <button type="submit">Post Announcement</button>
+      </form>
+    </div>
+  
+    <!-- Add Employee Section -->
+    <div class="section" id="employee-section" style="display:none;">
+      <h2>Add Employee</h2>
+        <label for="employeeRole">Role</label>
+        <select id="employeeRole" name="employeeRole" required>
+          <option value="">Select Role</option>
+          <option value="Admin">Admin</option>
+          <option value="Buyback Buddy">Buyback Buddy</option>
+          <option value="Card Slinger">Card Slinger</option>
+          <option value="Event Coordinator">Event Coordinator</option>
+          <option value="Inventory Management">Inventory Management</option>
+          <option value="Manager">Manager</option>
+        </select>
+        <label for="employeeFirstName">First Name</label>
+        <input type="text" id="employeeFirstName" name="employeeFirstName" required>
+        <label for="employeeLastName">Last Name</label>
+        <input type="text" id="employeeLastName" name="employeeLastName" required>
+        <label for="employeePhone">Phone</label>
+        <input type="tel" id="employeePhone" name="employeePhone" required>
+        <label for="employeeEmail">Email</label>
+        <input type="email" id="employeeEmail" name="employeeEmail" required>
+        <label for="emergencyContact">Emergency Contact</label>
+        <input type="text" id="emergencyContact" name="emergencyContact" required>
+        <button type="submit">Add Employee</button>
+      </form>
+    </div>
+  </div>
+  
+  <!-- JS for Sidebar and Section Switching -->
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+  
+    function showSection(sectionId) {
+      document.querySelectorAll('.main .section').forEach(section => {
+        section.style.display = 'none';
+      });
+      document.getElementById(sectionId).style.display = 'block';
+    }
+  
+    // Show inventory on initial load
+    document.addEventListener('DOMContentLoaded', () => {
+      showSection('inventory-section');
+    });
+  </script>
+  
+   <script>
+  let deleteDebounceTimeout;
+
+  document.getElementById('delete-search-input').addEventListener('input', function () {
+    clearTimeout(deleteDebounceTimeout);
+    const query = this.value.trim().toLowerCase();
+    const resultsDiv = document.getElementById('delete-search-results');
+    if (query.length === 0) {
+      resultsDiv.innerHTML = '';
+      return;
+    }
+
+    deleteDebounceTimeout = setTimeout(() => {
+      searchInventoryCards(query);
+    }, 300);
+  });
+
+  async function searchInventoryCards(query) {
+  const resultsDiv = document.getElementById('delete-search-results');
+  resultsDiv.innerHTML = `<p>Searching inventory for "<strong>${query}</strong>"...</p>`;
+
+  try {
+    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory");
+    if (!res.ok) throw new Error("Error fetching inventory");
+
+    const cards = await res.json();
+    const filtered = cards.filter(card =>
+      card.cardName.toLowerCase().includes(query) ||
+      card.set.toLowerCase().includes(query)
+    );
+
+    if (filtered.length === 0) {
+      resultsDiv.innerHTML = `<p>No matches in inventory for "${query}".</p>`;
+      return;
+    }
+
+    resultsDiv.innerHTML = '';
+
+    filtered.slice(0, 20).forEach(card => {
+      const displayName = card.cardName + (card.foil ? " (Foil)" : "");
+      const displaySet = card.set.toUpperCase();
+      const condition = card.condition || "Unknown";
+      const cardImage = card.imageUrl || '';
+
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'delete-card-item';
+      cardDiv.innerHTML = `
+        <img src="${cardImage}" alt="${displayName}">
+        <div class="delete-card-details">
+          <strong>${displayName}</strong>
+          <span>Set: ${displaySet}</span>
+          <span>Condition: ${condition}</span>
+          <button style="margin-top: 8px; background-color: crimson; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold;">Remove from Inventory</button>
+        </div>
+      `;
+
+      cardDiv.querySelector('button').addEventListener('click', async () => {
+        const confirmed = confirm(`Are you sure you want to delete 1x of "${displayName}" from ${displaySet}?`);
+        if (!confirmed) return;
+
+        document.getElementById('deleteCardName').value = card.cardName;
+        document.getElementById('deleteSet').value = card.set;
+        document.getElementById('deleteFoil').value = card.foil;
+
+        document.getElementById('delete-card-form').requestSubmit();
+      });
+
+      resultsDiv.appendChild(cardDiv);
+    });
+
+  } catch (err) {
+    console.error('❌ Inventory search error:', err);
+    resultsDiv.innerHTML = '<p>❌ Could not search inventory.</p>';
+  }
+}
+
+  // 🔥 Moved outside the async function!
+  document.getElementById('delete-card-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  const cardName = document.getElementById('deleteCardName').value.trim();
+  const cardSet = document.getElementById('deleteSet').value.trim();
+  const isFoil = document.getElementById('deleteFoil').value === 'true';
+
+  console.log({ cardName, cardSet, isFoil });
+
+  if (!cardName || !cardSet) return alert("Missing card name or set.");
+
+  try {
+    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory/decrement", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardName, set: cardSet, foil: isFoil })
+    });
+
+    if (!res.ok) throw new Error(`Decrement failed with status ${res.status}`);
+    alert("✅ Card quantity updated or removed.");
+    document.getElementById('delete-card-form').reset();
+  } catch (err) {
+    console.error("❌ Delete Error:", err);
+    alert("❌ Error updating inventory.");
+  }
+});
+</script>
+
+
+  <script>
+    async function loadUsers() {
+      const userList = document.getElementById('user-list');
+      try {
+        const res = await fetch('https://geega-games-website-production.up.railway.app/api/users');
+        if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+        const users = await res.json();
+
+        if (!Array.isArray(users) || users.length === 0) {
+          userList.innerHTML = "<p>No users found.</p>";
+          return;
+        }
+
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th style="text-align:left;">Name</th>
+              <th style="text-align:left;">Email</th>
+              <th style="text-align:left;">Phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(user => `
+              <tr>
+                <td>${user.firstName || ''} ${user.lastName || ''}</td>
+                <td>${user.email || ''}</td>
+                <td>${user.phone || ''}</td>
+              </tr>`).join('')}
+          </tbody>
+        `;
+        userList.innerHTML = '';
+        userList.appendChild(table);
+      } catch (error) {
+        userList.innerHTML = "<p>❌ Error loading users.</p>";
+        console.error('❌ Fetch or render error:', error);
+      }
+    }
+
+    loadUsers();
+
+  let debounceTimeout;
+
+async function loadOrders() {
+  const ordersList = document.getElementById('orders-list');
+  const orderCountSpan = document.getElementById('order-count');
+  ordersList.innerHTML = '<p>Loading orders...</p>';
+
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/orders');
+    const orders = await res.json();
+
+    // ✅ Update order count badge
+    if (orderCountSpan) {
+      orderCountSpan.textContent = orders.length;
+    }
+
+    if (!Array.isArray(orders) || orders.length === 0) {
+      ordersList.innerHTML = "<p>No orders yet.</p>";
+      return;
+    }
+
+    ordersList.innerHTML = orders.map(order => `
+      <div style="border: 1px solid #ccc; border-radius: 10px; margin-bottom: 20px; padding: 15px; background: white;">
+        <h3>${order.firstName || '—'} ${order.lastName || ''}</h3>
+        <p><strong>Email:</strong> ${order.email || '—'}</p>
+        <p><strong>Address:</strong> ${order.address || '—'}</p>
+        <p><strong>Shipping:</strong> ${order.shippingMethod || '—'}</p>
+        <p><strong>Payment:</strong> ${order.paymentMethod || '—'}</p>
+        <p><strong>Date:</strong> ${order.submittedAt ? new Date(order.submittedAt).toLocaleString() : '—'}</p>
+        <p><strong>Total:</strong> $${(order.orderTotal || 0).toFixed(2)}</p>
+        <h4>Cards:</h4>
+        <ul style="list-style: none; padding-left: 0;">
+          ${(order.cards || []).map(card => `
+            <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 12px;">
+              <img src="${card.imageUrl || 'https://dummyimage.com/75x105/cccccc/000000&text=No+Image'}"
+                   alt="${card.cardName}"
+                   style="width: 75px; height: auto; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);" />
+              <div>
+                <div style="flex-grow: 1;">
+                <div style="font-weight: bold; font-size: 15px; color: #222;">
+                  ${card.cardName}
+                </div>
+                <div style="font-size: 14px; color: #555;">
+                  ${card.set || 'N/A'} ${card.foil ? '• ✨ Foil' : ''}<br>
+                  Qty: ${card.quantity || 1} &nbsp; | &nbsp; $${(card.priceUsd || 0).toFixed(2)} each
+                  &nbsp; | &nbsp;
+                  <strong style="color: green;">$${((card.priceUsd || 0) * (card.quantity || 1)).toFixed(2)}</strong>
+                </div>
+                ${card.specialArt ? `<div style="font-size: 13px; color: #888;"><strong>Art:</strong> ${card.specialArt}</div>` : ''}
+              </div>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('❌ Error loading orders:', err);
+    ordersList.innerHTML = '<p>❌ Failed to load orders.</p>';
+  }
+}
+
+// 👇 Load when section is clicked
+document.querySelector('a[href="#"][onclick*="orders-section"]').addEventListener('click', loadOrders);
+
+  document.getElementById('search-input').addEventListener('input', function () {
+    clearTimeout(debounceTimeout);
+    const query = this.value.trim();
+    const resultsDiv = document.getElementById('search-results');
+    if (query.length === 0) {
+      resultsDiv.innerHTML = '';
+      return;
+    }
+
+    debounceTimeout = setTimeout(() => {
+      searchScryfall(query);
+    }, 300);
+  });
+
+  async function searchScryfall(query) {
+  const resultsDiv = document.getElementById('search-results');
+  resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+
+  try {
+    const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
+    if (!searchRes.ok) throw new Error('Card not found');
+
+    const baseCard = await searchRes.json();
+    const printsRes = await fetch(baseCard.prints_search_uri);
+    const printsData = await printsRes.json();
+
+    const cards = [baseCard, ...printsData.data];
+    resultsDiv.innerHTML = '';
+
+    cards.slice(0, 20).forEach(card => {
+      const imageUrl = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
+      let displayName = card.name;
+      const treatments = [];
+
+      if (card.frame_effects?.includes('showcase')) treatments.push('Showcase');
+      if (card.frame_effects?.includes('extendedart')) treatments.push('Extended Art');
+      if (card.frame_effects?.includes('borderless')) treatments.push('Borderless');
+      if (card.promo_types?.includes('fullart')) treatments.push('Full-Art');
+      if (card.promo_types?.includes('retro')) treatments.push('Retro Frame');
+      if (card.promo_types?.includes('textless')) treatments.push('Textless');
+      if (card.promo_types?.includes('phyrexian')) treatments.push('Phyrexian');
+      if (card.finishes?.includes('etched')) treatments.push('Etched Foil');
+      if (card.finishes?.includes('gilded')) treatments.push('Gilded Foil');
+      if (card.finishes?.includes('rainbow_foil')) treatments.push('Rainbow Foil');
+      if (card.promo_types?.includes('serialized')) treatments.push('Serialized');
+
+      if (treatments.length > 0) {
+        displayName += ` (${treatments.join(', ')})`;
+      }
+
+      const set = card.set_name;
+      const foilId = `foil-${Math.random().toString(36).substr(2, 9)}`;
+      const conditionId = `condition-${Math.random().toString(36).substr(2, 9)}`;
+
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'card-item';
+      cardDiv.innerHTML = `
+        <img src="${imageUrl}" alt="${displayName}">
+        <div class="card-details">
+          <strong>${displayName}</strong>
+          <span>Set: ${set}</span>
+          ${
+            card.finishes?.length === 1 && card.finishes[0] === 'foil'
+              ? '<span style="font-size: 0.9em; color: #6a2f9c;">✨ Foil Only</span>'
+              : card.finishes?.includes('foil') && card.finishes?.includes('nonfoil')
+                ? `<label><input type="checkbox" id="${foilId}" class="foil-checkbox"> Foil</label>`
+                : ''
+          }
+          <label for="${conditionId}">Condition:</label>
+          <select id="${conditionId}" class="condition-select">
+            <option value="NM">Near Mint</option>
+            <option value="LP">Lightly Played</option>
+            <option value="MP">Moderately Played</option>
+            <option value="HP">Heavily Played</option>
+            <option value="DMG">Damaged</option>
+          </select>
+          <button class="add-button">Add / Update</button>
+        </div>
+      `;
+
+      cardDiv.querySelector('.add-button').addEventListener('click', () => {
+        const isFoil = card.finishes?.length === 1 && card.finishes[0] === 'foil'
+          ? true
+          : cardDiv.querySelector('.foil-checkbox')?.checked || false;
+        const condition = cardDiv.querySelector('.condition-select')?.value || 'NM';
+
+        // Populate form fields
+        document.getElementById('cardName').value = displayName;
+        document.getElementById('set').value = set;
+        document.getElementById('foil').checked = isFoil;
+        document.getElementById('condition').value = condition;
+        document.getElementById('imageUrl').value = imageUrl;
+        document.getElementById('quantity').value = 1;
+
+        // Clear UI
+        document.getElementById('search-input').value = '';
+        resultsDiv.innerHTML = '';
+
+        document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
+      });
+
+      resultsDiv.appendChild(cardDiv);
+    });
+  } catch (err) {
+    console.error('Scryfall error:', err);
+    resultsDiv.innerHTML = `<p>❌ Could not find a card for "<strong>${query}</strong>".</p>`;
+  }
+}
+
+async function updateOrderCount() {
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/orders');
+    const orders = await res.json();
+    document.getElementById('order-count').textContent = orders.length;
+  } catch (err) {
+    console.error("❌ Failed to update order count", err);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateOrderCount();
+});
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("update-card-form");
+  if (!form) {
+    console.warn("Form not found");
+    return;
+  }
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const cardData = {
+      cardName: document.getElementById("cardName").value.trim(),
+      quantity: parseInt(document.getElementById("quantity").value),
+      set: document.getElementById("set").value.trim(),
+      condition: document.getElementById("condition").value,
+      foil: document.getElementById("foil").checked,
+      imageUrl: document.getElementById("imageUrl").value  // ✅ Include image URL
+    };
+
+    try {
+      const response = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cardData)
+      });
+
+      if (!response.ok) throw new Error(`Failed to add card: ${response.status}`);
+      const result = await response.json();
+      alert("✅ Card added/updated successfully!");
+      console.log("✅ Server Response:", result);
+      form.reset();
+    } catch (error) {
+      alert("❌ Error adding card.");
+      console.error("❌ Add Card Error:", error);
+    }
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const employeeForm = document.getElementById("add-employee-form");
+  if (!employeeForm) return;
+
+  employeeForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const employeeData = {
+      role: document.getElementById("employeeRole").value.trim(),
+      firstName: document.getElementById("employeeFirstName").value.trim(),
+      lastName: document.getElementById("employeeLastName").value.trim(),
+      phone: document.getElementById("employeePhone").value.trim(),
+      email: document.getElementById("employeeEmail").value.trim(),
+      emergencyContact: document.getElementById("emergencyContact").value.trim()
+    };
+
+    try {
+      const res = await fetch("https://geega-games-website-production.up.railway.app/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(employeeData)
+      });
+
+      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      const result = await res.json();
+      alert("✅ Employee added!");
+      employeeForm.reset();
+      console.log("✅ Employee response:", result);
+    } catch (err) {
+      console.error("❌ Error adding employee:", err);
+      alert("❌ Error adding employee.");
+    }
+  });
+});
+</script>
+
+<script>
+  async function calculateInventoryTotals() {
+    try {
+      const res = await fetch('https://geega-games-website-production.up.railway.app/api/inventory');
+      if (!res.ok) throw new Error('Failed to fetch inventory');
+  
+      const inventory = await res.json();
+      let totalValue = 0;
+      let totalQuantity = 0;
+  
+      inventory.forEach(card => {
+        const quantity = card.quantity || 0;
+        const isFoil = card.foil;
+        const rawPrice = parseFloat(isFoil ? card.priceUsdFoil : card.priceUsd);
+        const price = isNaN(rawPrice) ? 0 : rawPrice;
+        totalValue += price * quantity;
+        totalQuantity += quantity;
+      });
+  
+      document.getElementById('total-card-count').textContent = totalQuantity;
+      document.getElementById('total-inventory-value').textContent = totalValue.toFixed(2);
+    } catch (err) {
+      console.error('❌ Error calculating inventory totals:', err);
+      document.getElementById('inventory-summary').innerHTML = '<p style="color:red;">❌ Could not load inventory summary.</p>';
+    }
+  }
+  
+  // Auto-calculate when page loads
+  document.addEventListener('DOMContentLoaded', () => {
+    calculateInventoryTotals();
+  });
+
+document.getElementById('price-update-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  const cardName = document.getElementById('priceCardName').value.trim();
+  const set = document.getElementById('priceSet').value.trim();
+  const foil = document.getElementById('priceFoil').value === 'true';
+  const newPrice = parseFloat(document.getElementById('newPrice').value);
+
+  if (!cardName || !set || isNaN(newPrice)) {
+    alert('❌ Missing or invalid input.');
+    return;
+  }
+
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/inventory/update-price', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardName, set, foil, newPrice })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Error updating price');
+
+    alert('✅ Price updated successfully.');
+    document.getElementById('price-update-form').reset();
+  } catch (err) {
+    console.error('❌ Update price error:', err);
+    alert('❌ Failed to update price.');
+  }
+});
+
+let priceSearchTimeout;
+
+document.getElementById('price-search-input').addEventListener('input', function () {
+  clearTimeout(priceSearchTimeout);
+  const query = this.value.trim().toLowerCase();
+  const resultsDiv = document.getElementById('price-search-results');
+
+  if (!query) {
+    resultsDiv.innerHTML = '';
+    return;
+  }
+
+  priceSearchTimeout = setTimeout(() => {
+    searchInventoryForPrice(query);
+  }, 300);
+});
+
+async function searchInventoryForPrice(query) {
+  const resultsDiv = document.getElementById('price-search-results');
+  resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+
+  try {
+    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory");
+    if (!res.ok) throw new Error("Failed to fetch inventory");
+    const cards = await res.json();
+
+    const filtered = cards.filter(card =>
+      card.cardName.toLowerCase().includes(query) ||
+      card.set.toLowerCase().includes(query)
+    );
+
+    if (filtered.length === 0) {
+      resultsDiv.innerHTML = `<p>No matches found for "${query}".</p>`;
+      return;
+    }
+
+    resultsDiv.innerHTML = '';
+    filtered.slice(0, 20).forEach(card => {
+      const displayName = card.cardName + (card.foil ? " (Foil)" : "");
+      const displaySet = card.set.toUpperCase();
+      const imageUrl = card.imageUrl || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
+
+      // 🟣 Same price logic as customer site
+      const rawPrice = parseFloat(card.price);
+      const adjustedPrice = isNaN(rawPrice) ? 'N/A' : (rawPrice < 0.5 ? '0.50' : rawPrice.toFixed(2));
+
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'delete-card-item'; // reuse styles
+      cardDiv.innerHTML = `
+        <img src="${imageUrl}" alt="${displayName}">
+        <div class="delete-card-details">
+          <strong>${displayName}</strong>
+          <span>Set: ${displaySet}</span>
+          <span>Current Price: $${adjustedPrice}</span>
+          <button style="background: seagreen;">Load for Update</button>
+        </div>
+      `;
+
+      cardDiv.querySelector('button').addEventListener('click', () => {
+        document.getElementById('priceCardName').value = card.cardName;
+        document.getElementById('priceSet').value = card.set;
+        document.getElementById('priceFoil').value = card.foil;
+        document.getElementById('newPrice').value = isNaN(rawPrice) ? '' : rawPrice.toFixed(2);
+        alert(`✅ Loaded "${displayName}" for price update.`);
+        document.getElementById('newPrice').scrollIntoView({ behavior: 'smooth' });
+      });
+
+      resultsDiv.appendChild(cardDiv);
+    });
+
+  } catch (err) {
+    console.error('❌ Price search error:', err);
+    resultsDiv.innerHTML = '<p>❌ Failed to search inventory.</p>';
+  }
+}
+  </script>
+  
+</body>
+</html>
+
   
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;

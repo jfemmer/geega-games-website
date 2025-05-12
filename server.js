@@ -537,9 +537,10 @@ app.post('/api/inventory/prices', async (req, res) => {
       }
 
       // Add to price map if match found
-      if (match && match.price != null) {
+      if (match) {
         const key = `${cardName}|${set}|${foil ? '1' : '0'}`;
-        prices[key] = match.price;
+        const price = foil ? match.priceUsdFoil : match.priceUsd;
+        prices[key] = parseFloat(price) || 0;
       }
     }
 

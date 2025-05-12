@@ -369,6 +369,7 @@ app.get('/api/inventory/creature-types', async (req, res) => {
   }
 });
 
+
 // Signup
 app.post('/signup', async (req, res) => {
   try {

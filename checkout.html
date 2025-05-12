@@ -584,6 +584,41 @@ async function placeOrder() {
   try {
     const cartRes = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
     const cart = await cartRes.json();
+    const cartItems = cart.items || [];
+
+    for (const item of cartItems) {
+  if (!item.imageUrl) {
+    try {
+      const scryRes = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(item.cardName)}`);
+      const scryData = await scryRes.json();
+      item.imageUrl = scryData.image_uris?.normal || scryData.card_faces?.[0]?.image_uris?.normal;
+    } catch (e) {
+      item.imageUrl = 'https://dummyimage.com/75x105/cccccc/000000&text=No+Image';
+    }
+  }
+}
+
+    // 🔍 Step 1: Fetch prices
+    const priceRes = await fetch(`${API_BASE}/api/inventory/prices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cards: cartItems.map(item => ({
+          cardName: item.cardName,
+          set: item.set,
+          foil: item.foil
+        }))
+      })
+    });
+
+    const priceMap = await priceRes.json();
+
+    // 💵 Step 2: Calculate total
+    const orderTotal = cartItems.reduce((sum, item) => {
+      const key = `${item.cardName}|${item.set}|${item.foil ? '1' : '0'}`;
+      const price = priceMap[key] || 0;
+      return sum + price * (item.quantity || 1);
+    }, 0);
 
     const order = {
       userId,
@@ -591,9 +626,10 @@ async function placeOrder() {
       lastName: currentUser.lastName,
       email: currentUser.email,
       address: [currentUser.address, currentUser.state, currentUser.zip].filter(Boolean).join(', '),
-      cards: cart.items,
+      cards: cartItems,
       shippingMethod,
-      paymentMethod: selectedPayment
+      paymentMethod: selectedPayment,
+      orderTotal: parseFloat(orderTotal.toFixed(2)) // ✅ Include total
     };
 
     const res = await fetch(`${API_BASE}/api/orders`, {
@@ -603,7 +639,7 @@ async function placeOrder() {
     });
 
     if (res.ok) {
-      const orderData = await res.json(); // Get newly created order
+      const orderData = await res.json();
       const orderId = orderData._id;
 
       await fetch(`${API_BASE}/api/cart/clear`, {
@@ -612,7 +648,6 @@ async function placeOrder() {
         body: JSON.stringify({ userId })
       });
 
-      // ✅ Redirect with orderId in URL
       window.location.href = `checkout-success.html?orderId=${orderId}`;
     } else {
       alert('❌ Failed to place order.');
@@ -622,7 +657,6 @@ async function placeOrder() {
     alert('Something went wrong while placing your order.');
   }
 }
-
 document.addEventListener('DOMContentLoaded', () => {
   // ✅ 1. Set default shipping option
   const trackedRadio = document.querySelector('input[name="shippingMethod"][value="tracked"]');

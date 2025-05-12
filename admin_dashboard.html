@@ -1077,8 +1077,11 @@ async function searchInventoryForPrice(query) {
     filtered.slice(0, 20).forEach(card => {
       const displayName = card.cardName + (card.foil ? " (Foil)" : "");
       const displaySet = card.set.toUpperCase();
-      const price = card.price ?? 0;
       const imageUrl = card.imageUrl || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
+
+      // 🟣 Same price logic as customer site
+      const rawPrice = parseFloat(card.price);
+      const adjustedPrice = isNaN(rawPrice) ? 'N/A' : (rawPrice < 0.5 ? '0.50' : rawPrice.toFixed(2));
 
       const cardDiv = document.createElement('div');
       cardDiv.className = 'delete-card-item'; // reuse styles
@@ -1087,7 +1090,7 @@ async function searchInventoryForPrice(query) {
         <div class="delete-card-details">
           <strong>${displayName}</strong>
           <span>Set: ${displaySet}</span>
-          <span>Current Price: $${parseFloat(price).toFixed(2)}</span>
+          <span>Current Price: $${adjustedPrice}</span>
           <button style="background: seagreen;">Load for Update</button>
         </div>
       `;
@@ -1096,7 +1099,7 @@ async function searchInventoryForPrice(query) {
         document.getElementById('priceCardName').value = card.cardName;
         document.getElementById('priceSet').value = card.set;
         document.getElementById('priceFoil').value = card.foil;
-        document.getElementById('newPrice').value = parseFloat(price).toFixed(2);
+        document.getElementById('newPrice').value = isNaN(rawPrice) ? '' : rawPrice.toFixed(2);
         alert(`✅ Loaded "${displayName}" for price update.`);
         document.getElementById('newPrice').scrollIntoView({ behavior: 'smooth' });
       });

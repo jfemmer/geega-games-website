@@ -614,12 +614,20 @@ async function placeOrder() {
     const priceMap = await priceRes.json();
 
     // 💵 Step 2: Calculate total
-    const orderTotal = cartItems.reduce((sum, item) => {
-      const normalize = str => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
-      const key = `${normalize(item.cardName)}|${normalize(item.set)}|${item.foil ? '1' : '0'}`;
-      const price = priceMap[key] || 0;
-      return sum + price * (item.quantity || 1);
-    }, 0);
+    const baseTotal = cartItems.reduce((sum, item) => {
+  const normalize = str => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
+  const key = `${normalize(item.cardName)}|${normalize(item.set)}|${item.foil ? '1' : '0'}`;
+  const price = priceMap[key] || 0;
+  return sum + price * (item.quantity || 1);
+}, 0);
+
+const shippingMethod = document.querySelector('input[name="shippingMethod"]:checked')?.value;
+let finalTotal = baseTotal;
+
+if (shippingMethod === 'tracked' && baseTotal < 75) finalTotal += 5;
+if (shippingMethod === 'pwe') finalTotal += 1.25;
+
+const orderTotal = parseFloat(finalTotal.toFixed(2));
 
     const order = {
       userId,
@@ -836,5 +844,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-
 

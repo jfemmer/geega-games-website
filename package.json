@@ -19,7 +19,9 @@
     "google-auth-library": "^9.15.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.13.2",
-    "stripe": "^18.1.0"
+    "nodemailer": "^7.0.3",
+    "stripe": "^18.1.0",
+    "twilio": "^5.6.0"
   },
   "repository": {
     "type": "git",

@@ -29,13 +29,10 @@ const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
 
 // ✅ Middleware
 app.use(cors({
-  origin: [
-    'http://localhost:5500',
-    'https://jfemmer.github.io',
-    'https://www.geega-games.com'
-  ],
+  origin: ['http://localhost:5500', 'https://jfemmer.github.io', 'https://www.geega-games.com'],
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type']
+  allowedHeaders: ['Content-Type'],
+  credentials: true
 }));
 
 // ✅ Scryfall Image Fetch Helper

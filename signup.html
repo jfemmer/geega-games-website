@@ -256,9 +256,11 @@
         address: fullAddress,
 
         // 🆕 Announcement preferences
-        announcementOptIn: document.getElementById('opt-in-announcements').checked,
-        notifyByEmail: document.getElementById('notify-email').checked,
-        notifyByText: document.getElementById('notify-text').checked,
+        announcementNotifications: {
+          enabled: document.getElementById('opt-in-announcements').checked,
+          byEmail: document.getElementById('notify-email').checked,
+          byText: document.getElementById('notify-text').checked
+        },
 
         // 🆕 Shipping preferences
         shippingNotifications: {

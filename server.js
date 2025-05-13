@@ -602,7 +602,7 @@ app.post('/api/inventory/prices', async (req, res) => {
 });
 
 app.post('/api/orders', async (req, res) => {
-  console.log('🧾 Incoming order data:', JSON.stringify(req.body, null, 2));
+  console.log('🧾 Incoming order data:', req.body);
 
   const {
     userId,
@@ -618,30 +618,17 @@ app.post('/api/orders', async (req, res) => {
 
   try {
     const parsedOrderTotal = parseFloat(orderTotal);
-
-    // ✅ Ensure each card includes "condition"
-    const sanitizedCards = (cards || []).map(card => ({
-      cardName: card.cardName,
-      set: card.set,
-      foil: card.foil,
-      specialArt: card.specialArt || '',
-      quantity: card.quantity,
-      imageUrl: card.imageUrl,
-      priceUsd: card.priceUsd,
-      condition: card.condition || 'Unknown' // default if missing
-    }));
-
     const newOrder = new Order({
       userId,
       firstName,
       lastName,
       email,
       address,
-      cards: sanitizedCards,
+      cards,
       shippingMethod,
       paymentMethod,
       orderTotal: isNaN(parsedOrderTotal) ? 0 : parsedOrderTotal,
-      status: req.body.status || 'Pending'
+      status: req.body.status || 'Pending'  // ✅ this line ensures status gets saved
     });
 
     const savedOrder = await newOrder.save();
@@ -649,6 +636,16 @@ app.post('/api/orders', async (req, res) => {
   } catch (err) {
     console.error('❌ Error saving order:', err);
     res.status(500).json({ message: 'Server error while saving order.' });
+  }
+});
+
+app.get('/api/orders', async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ submittedAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    console.error('❌ Fetch orders error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
@@ -731,16 +728,6 @@ app.patch('/api/orders/backfill-status', async (req, res) => {
   } catch (err) {
     console.error('❌ Backfill error:', err);
     res.status(500).json({ message: 'Failed to backfill status field.' });
-  }
-});
-
-app.get('/api/orders', async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ submittedAt: -1 });
-    res.json(orders);
-  } catch (err) {
-    console.error('❌ Fetch orders error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
   }
 });
 

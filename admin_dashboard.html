@@ -341,6 +341,86 @@
 .price-card button:hover {
   background-color: #146c43;
 }
+
+.order-card {
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.order-header h3 {
+  margin: 0;
+  color: #4b0082;
+}
+
+.order-details p {
+  margin: 6px 0;
+  font-size: 0.95rem;
+}
+
+.order-status {
+  margin-top: 10px;
+}
+
+.order-status select {
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  border: 1px solid #ccc;
+}
+
+.order-tracking {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.order-tracking input {
+  width: 200px;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.card-list {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 15px;
+}
+
+.card-item-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.card-item-summary img {
+  width: 75px;
+  height: auto;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-info {
+  flex-grow: 1;
+}
+
+.card-info div {
+  font-size: 14px;
+  margin: 2px 0;
+}
   </style>
   
 
@@ -794,47 +874,52 @@ async function loadOrders() {
     }
 
     ordersList.innerHTML = orders.map(order => `
-      <div style="border: 1px solid #ccc; border-radius: 10px; margin-bottom: 20px; padding: 15px; background: white;">
-        <h3>${order.firstName || '—'} ${order.lastName || ''}</h3>
-        <p><strong>Email:</strong> ${order.email || '—'}</p>
-        <p><strong>Address:</strong> ${order.address || '—'}</p>
-        <p><strong>Shipping:</strong> ${order.shippingMethod || '—'}</p>
-        <p><strong>Payment:</strong> ${order.paymentMethod || '—'}</p>
-        <p><strong>Date:</strong> ${order.submittedAt ? new Date(order.submittedAt).toLocaleString() : '—'}</p>
-        <p><strong>Total:</strong> $${(order.orderTotal || 0).toFixed(2)}</p>
-        <p><strong>Status:</strong> 
-  <select onchange="updateOrderStatus('${order._id}', this.value)">
-    ${['Pending', 'Packing', 'Dropped Off', 'Shipped'].map(status => `
-      <option value="${status}" ${order.status === status || (!order.status && status === 'Pending') ? 'selected' : ''}>${status}</option>
-    `).join('')}
-  </select>
-</p>
-<p><strong>Tracking #:</strong> <input type="text" id="tracking-${order._id}" value="${order.trackingNumber || ''}" placeholder="Optional..." style="width: 200px;" />
-  <button onclick="saveTracking('${order._id}')">Save</button>
-</p>
-        <h4>Cards:</h4>
-        <ul style="list-style: none; padding-left: 0;">
+      <div class="order-card">
+        <div class="order-header">
+          <h3>${order.firstName || '—'} ${order.lastName || ''}</h3>
+          <div><strong>Total:</strong> $${(order.orderTotal || 0).toFixed(2)}</div>
+        </div>
+
+        <div class="order-details">
+          <p><strong>Email:</strong> ${order.email || '—'}</p>
+          <p><strong>Address:</strong> ${order.address || '—'}</p>
+          <p><strong>Shipping:</strong> ${order.shippingMethod || '—'}</p>
+          <p><strong>Payment:</strong> ${order.paymentMethod || '—'}</p>
+          <p><strong>Date:</strong> ${order.submittedAt ? new Date(order.submittedAt).toLocaleString() : '—'}</p>
+        </div>
+
+        <h4 style="margin-top: 20px;">Cards:</h4>
+        <ul class="card-list">
           ${(order.cards || []).map(card => `
-            <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 12px;">
+            <li class="card-item-summary">
               <img src="${card.imageUrl || 'https://dummyimage.com/75x105/cccccc/000000&text=No+Image'}"
-                   alt="${card.cardName}"
-                   style="width: 75px; height: auto; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);" />
-              <div>
-                <div style="flex-grow: 1;">
-                <div style="font-weight: bold; font-size: 15px; color: #222;">
-                  ${card.cardName}
-                </div>
-                <div style="font-size: 14px; color: #555;">
-                  ${card.set || 'N/A'} ${card.foil ? '• ✨ Foil' : ''}<br>
-                  Qty: ${card.quantity || 1} &nbsp; | &nbsp; $${(card.priceUsd || 0).toFixed(2)} each
-                  &nbsp; | &nbsp;
-                  <strong style="color: green;">$${((card.priceUsd || 0) * (card.quantity || 1)).toFixed(2)}</strong>
-                </div>
-                ${card.specialArt ? `<div style="font-size: 13px; color: #888;"><strong>Art:</strong> ${card.specialArt}</div>` : ''}
-              </div>
+                   alt="${card.cardName}" />
+              <div class="card-info">
+              <div><strong>${card.cardName}</strong></div>
+              <div>${card.set || 'N/A'} ${card.foil ? '• ✨ Foil' : ''}</div>
+              <div>Condition: ${card.condition || 'N/A'}</div>
+              <div>Qty: ${card.quantity || 1} | $${(card.priceUsd || 0).toFixed(2)} each</div>
+              <div><strong>Total:</strong> $${((card.priceUsd || 0) * (card.quantity || 1)).toFixed(2)}</strong></div>
+              ${card.specialArt ? `<div><em>${card.specialArt}</em></div>` : ''}
+            </div>
             </li>
           `).join('')}
         </ul>
+
+        <div class="order-status" style="margin-top: 16px;">
+          <strong>Status:</strong>
+          <select onchange="updateOrderStatus('${order._id}', this.value)">
+            ${['Pending', 'Packing', 'Dropped Off', 'Shipped'].map(status => `
+              <option value="${status}" ${order.status === status || (!order.status && status === 'Pending') ? 'selected' : ''}>${status}</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="order-tracking" style="margin-top: 10px;">
+          <strong>Tracking #:</strong>
+          <input type="text" id="tracking-${order._id}" value="${order.trackingNumber || ''}" placeholder="Optional..." />
+          <button onclick="saveTracking('${order._id}')">Save</button>
+        </div>
       </div>
     `).join('');
   } catch (err) {

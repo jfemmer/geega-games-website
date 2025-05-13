@@ -11,6 +11,22 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 
+const nodemailer = require('nodemailer');
+const twilio = require('twilio');
+
+// 📧 Email transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.NOTIFY_EMAIL,
+    pass: process.env.NOTIFY_PASSWORD,
+  }
+});
+
+// 📱 Twilio client
+const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
+
+
 // ✅ Middleware
 app.use(cors({
   origin: ['http://localhost:5500', 'https://jfemmer.github.io'], // ✅ allow local + GitHub
@@ -754,25 +770,47 @@ app.post('/api/employees', async (req, res) => {
 });
 
 
-app.patch('/api/orders/:id/status', async (req, res) => {
+aapp.patch('/api/orders/:id/status', async (req, res) => {
   const { id } = req.params;
   const { status, trackingNumber } = req.body;
 
   try {
-    const update = {};
-    if (status) update.status = status;
-    if (trackingNumber) update.trackingNumber = trackingNumber;
-
-    const order = await Order.findByIdAndUpdate(id, update, { new: true });
+    const order = await Order.findById(id);
     if (!order) return res.status(404).json({ message: 'Order not found.' });
 
-    res.json({ message: 'Order updated.', order });
+    if (status) order.status = status;
+    if (trackingNumber) order.trackingNumber = trackingNumber;
+    await order.save();
+
+    const user = await User.findById(order.userId);
+    if (user?.shippingNotifications?.enabled) {
+      const message = `📦 Your Geega Games order is now: ${status}` +
+        (trackingNumber ? ` (Tracking #: ${trackingNumber})` : '');
+
+      if (user.shippingNotifications.byEmail && user.email) {
+        await transporter.sendMail({
+          from: `"Geega Games" <${process.env.NOTIFY_EMAIL}>`,
+          to: user.email,
+          subject: '🧙 Order Status Update',
+          text: message
+        });
+      }
+
+      if (user.shippingNotifications.byText && user.phone) {
+        await twilioClient.messages.create({
+          body: message,
+          from: process.env.TWILIO_PHONE,
+          to: user.phone
+        });
+      }
+    }
+
+    res.json({ message: 'Order updated and notification sent.', order });
   } catch (err) {
     console.error('❌ Order update error:', err);
     res.status(500).json({ message: 'Server error.' });
   }
 });
-
 app.patch('/api/orders/backfill-status', async (req, res) => {
   try {
     const result = await Order.updateMany(

@@ -802,6 +802,16 @@ async function loadOrders() {
         <p><strong>Payment:</strong> ${order.paymentMethod || '—'}</p>
         <p><strong>Date:</strong> ${order.submittedAt ? new Date(order.submittedAt).toLocaleString() : '—'}</p>
         <p><strong>Total:</strong> $${(order.orderTotal || 0).toFixed(2)}</p>
+        <p><strong>Status:</strong> 
+  <select onchange="updateOrderStatus('${order._id}', this.value)">
+    ${['Pending', 'Packing', 'Dropped Off', 'Shipped'].map(status => `
+      <option value="${status}" ${order.status === status || (!order.status && status === 'Pending') ? 'selected' : ''}>${status}</option>
+    `).join('')}
+  </select>
+</p>
+<p><strong>Tracking #:</strong> <input type="text" id="tracking-${order._id}" value="${order.trackingNumber || ''}" placeholder="Optional..." style="width: 200px;" />
+  <button onclick="saveTracking('${order._id}')">Save</button>
+</p>
         <h4>Cards:</h4>
         <ul style="list-style: none; padding-left: 0;">
           ${(order.cards || []).map(card => `
@@ -1175,6 +1185,50 @@ async function searchInventoryForPrice(query) {
   }
 }
   </script>
+
+  <script>
+async function updateOrderStatus(orderId, status) {
+  const trackingInput = document.getElementById(`tracking-${orderId}`);
+  const trackingNumber = trackingInput ? trackingInput.value.trim() : '';
+
+  try {
+    const res = await fetch(`https://geega-games-website-production.up.railway.app/api/orders/${orderId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, trackingNumber })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Error updating order.');
+
+    alert('✅ Order status updated.');
+    console.log('✅ Updated order:', data.order);
+  } catch (err) {
+    console.error('❌ Failed to update order:', err);
+    alert('❌ Could not update order.');
+  }
+}
+
+async function saveTracking(orderId) {
+  const trackingInput = document.getElementById(`tracking-${orderId}`);
+  const trackingNumber = trackingInput.value.trim();
+
+  try {
+    const res = await fetch(`https://geega-games-website-production.up.railway.app/api/orders/${orderId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackingNumber })
+    });
+
+    if (!res.ok) throw new Error();
+    alert('✅ Tracking number saved!');
+    loadOrders(); // Refresh order list
+  } catch (err) {
+    console.error('❌ Failed to save tracking:', err);
+    alert('❌ Could not save tracking number.');
+  }
+}
+</script>
   
 </body>
 </html>

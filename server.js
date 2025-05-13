@@ -770,7 +770,7 @@ app.post('/api/employees', async (req, res) => {
 });
 
 
-aapp.patch('/api/orders/:id/status', async (req, res) => {
+app.patch('/api/orders/:id/status', async (req, res) => {
   const { id } = req.params;
   const { status, trackingNumber } = req.body;
 

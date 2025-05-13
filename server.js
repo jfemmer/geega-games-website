@@ -601,7 +601,7 @@ app.post('/api/inventory/prices', async (req, res) => {
   }
 });
 
-pp.post('/api/orders', async (req, res) => {
+app.post('/api/orders', async (req, res) => {
   console.log('🧾 Incoming order data:', JSON.stringify(req.body, null, 2));
 
   const {

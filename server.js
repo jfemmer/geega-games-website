@@ -73,12 +73,30 @@ const Cart = createCartModel(db1);
   db.on('error', (err) => console.error(`❌ MongoDB connection error #${i+1}:`, err.message));
 });
 
-// ✅ Schemas and Models
 const userSchema = new mongoose.Schema({
-  firstName: String, lastName: String, username: { type: String, required: true, unique: true },
-  email: { type: String, required: true, unique: true }, password: { type: String, required: true },
-  phone: String, address: String, state: String, zip: String, createdAt: { type: Date, default: Date.now }
+  firstName: String,
+  lastName: String,
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  phone: String,
+  address: String,
+  state: String,
+  zip: String,
+  createdAt: { type: Date, default: Date.now },
+
+  // ✅ Notification Preferences
+  announcementOptIn: { type: Boolean, default: false },
+  notifyByEmail: { type: Boolean, default: true },
+  notifyByText: { type: Boolean, default: false },
+
+  shippingNotifications: {
+    enabled: { type: Boolean, default: true },
+    byEmail: { type: Boolean, default: true },
+    byText: { type: Boolean, default: false }
+  }
 });
+
 const User = db1.model('User', userSchema);
 
 const inventorySchema = new mongoose.Schema({
@@ -382,17 +400,52 @@ app.get('/api/inventory/creature-types', async (req, res) => {
 });
 
 
-// Signup
 app.post('/signup', async (req, res) => {
   try {
-    const { firstName, lastName, username, email, password, phone, address, state, zip } = req.body;
-    if (!username || !email || !password) return res.status(400).json({ message: 'Missing required fields.' });
+    const {
+      firstName,
+      lastName,
+      username,
+      email,
+      password,
+      phone,
+      address,
+      state,
+      zip,
+      announcementOptIn,
+      notifyByEmail,
+      notifyByText,
+      shippingNotifications
+    } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
 
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing) return res.status(409).json({ message: 'User already exists.' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await new User({ firstName, lastName, username, email, password: hashedPassword, phone, address, state, zip }).save();
+
+    await new User({
+      firstName,
+      lastName,
+      username,
+      email,
+      password: hashedPassword,
+      phone,
+      address,
+      state,
+      zip,
+      announcementOptIn: !!announcementOptIn,
+      notifyByEmail: !!notifyByEmail,
+      notifyByText: !!notifyByText,
+      shippingNotifications: {
+      enabled: shippingNotifications?.enabled ?? true,
+      byEmail: shippingNotifications?.byEmail ?? true,
+      byText: shippingNotifications?.byText ?? false
+      }
+    }).save();
 
     res.status(201).json({ message: '🐶 Welcome to the Pack!' });
   } catch (err) {

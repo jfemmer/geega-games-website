@@ -118,15 +118,26 @@ const orderSchema = new mongoose.Schema({
       foil: Boolean,
       specialArt: String,
       quantity: Number,
-      imageUrl: String, //
+      imageUrl: String,
       priceUsd: Number
-      
     }
   ],
   shippingMethod: String,
   paymentMethod: String,
   orderTotal: Number,
-  submittedAt: { type: Date, default: Date.now }
+  submittedAt: { type: Date, default: Date.now },
+
+  // 🆕 Status + Tracking Fields
+  status: { type: String, default: 'Pending' }, // e.g. 'Packing', 'Dropped Off', 'Shipped'
+  trackingNumber: String,
+  trackingCarrier: String, // e.g., 'USPS', 'UPS'
+  trackingHistory: [
+    {
+      timestamp: Date,
+      status: String,
+      details: String
+    }
+  ]
 });
 
 const Order = db1.model('Order', orderSchema, 'Orders');
@@ -615,7 +626,8 @@ app.post('/api/orders', async (req, res) => {
       cards,
       shippingMethod,
       paymentMethod,
-      orderTotal: isNaN(parsedOrderTotal) ? 0 : parsedOrderTotal  // ✅ this line matters
+      orderTotal: isNaN(parsedOrderTotal) ? 0 : parsedOrderTotal,
+      status: req.body.status || 'Pending'  // ✅ this line ensures status gets saved
     });
 
     const savedOrder = await newOrder.save();
@@ -685,6 +697,38 @@ app.post('/api/employees', async (req, res) => {
   }
 });
 
+
+app.patch('/api/orders/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status, trackingNumber } = req.body;
+
+  try {
+    const update = {};
+    if (status) update.status = status;
+    if (trackingNumber) update.trackingNumber = trackingNumber;
+
+    const order = await Order.findByIdAndUpdate(id, update, { new: true });
+    if (!order) return res.status(404).json({ message: 'Order not found.' });
+
+    res.json({ message: 'Order updated.', order });
+  } catch (err) {
+    console.error('❌ Order update error:', err);
+    res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+app.patch('/api/orders/backfill-status', async (req, res) => {
+  try {
+    const result = await Order.updateMany(
+      { status: { $exists: false } },
+      { $set: { status: 'Pending' } }
+    );
+    res.json({ message: `✅ Backfilled ${result.modifiedCount} orders with 'Pending' status.` });
+  } catch (err) {
+    console.error('❌ Backfill error:', err);
+    res.status(500).json({ message: 'Failed to backfill status field.' });
+  }
+});
 
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

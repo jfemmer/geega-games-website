@@ -734,5 +734,15 @@ app.patch('/api/orders/backfill-status', async (req, res) => {
   }
 });
 
+app.get('/api/orders', async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ submittedAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    console.error('❌ Fetch orders error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

@@ -783,46 +783,50 @@ app.patch('/api/orders/:id/status', async (req, res) => {
     await order.save();
 
     const user = await User.findById(order.userId);
+    if (!user) {
+      console.warn('⚠️ User not found for order.userId:', order.userId);
+      return res.json({ message: 'Order updated, but user not found.' });
+    }
+
     if (user?.shippingNotifications?.enabled) {
       const message = `📦 Your Geega Games order is now: ${status}` +
         (trackingNumber ? ` (Tracking #: ${trackingNumber})` : '');
 
-      if (user.shippingNotifications.byEmail && user.email) {
-        await transporter.sendMail({
-          from: `"Geega Games" <${process.env.NOTIFY_EMAIL}>`,
-          to: user.email,
-          subject: '🧙 Order Status Update',
-          text: message
-        });
-      }
+      try {
+        // ✅ Email
+        if (user.shippingNotifications.byEmail && user.email) {
+          console.log('📧 Sending email to', user.email);
+          await transporter.sendMail({
+            from: `"Geega Games" <${process.env.NOTIFY_EMAIL}>`,
+            to: user.email,
+            subject: '🧙 Order Status Update',
+            text: message
+          });
+        }
 
-      if (user.shippingNotifications.byText && user.phone) {
-        await twilioClient.messages.create({
-          body: message,
-          from: process.env.TWILIO_PHONE,
-          to: user.phone
-        });
+        // ✅ SMS
+        if (user.shippingNotifications.byText && user.phone) {
+          const formattedPhone = user.phone.startsWith('+') ? user.phone : `+1${user.phone}`;
+          console.log('📱 Sending SMS to', formattedPhone);
+          await twilioClient.messages.create({
+            body: message,
+            from: process.env.TWILIO_PHONE,
+            to: formattedPhone
+          });
+        }
+      } catch (notifyErr) {
+        console.error('❌ Notification error:', notifyErr.message);
+        // Optionally log notifyErr.stack if needed
       }
     }
 
-    res.json({ message: 'Order updated and notification sent.', order });
+    res.json({ message: 'Order updated and notification (if enabled) sent.', order });
   } catch (err) {
-    console.error('❌ Order update error:', err);
+    console.error('❌ Order update error:', err.stack || err);
     res.status(500).json({ message: 'Server error.' });
   }
 });
-app.patch('/api/orders/backfill-status', async (req, res) => {
-  try {
-    const result = await Order.updateMany(
-      { status: { $exists: false } },
-      { $set: { status: 'Pending' } }
-    );
-    res.json({ message: `✅ Backfilled ${result.modifiedCount} orders with 'Pending' status.` });
-  } catch (err) {
-    console.error('❌ Backfill error:', err);
-    res.status(500).json({ message: 'Failed to backfill status field.' });
-  }
-});
+
 
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

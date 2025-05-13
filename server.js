@@ -26,6 +26,8 @@ const transporter = nodemailer.createTransport({
 // 📱 Twilio client
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
 
+// ✅ MUST BE FIRST
+app.use(express.json());
 
 // ✅ Middleware
 app.use(cors({

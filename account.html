@@ -151,6 +151,24 @@
   background-color: #7a3cb7;
   transform: translateY(-1px);
 }
+
+.status-packing {
+  background-color: orange;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  font-weight: bold;
+}
+
+.status-dropped-off {
+  background-color: #4169e1; /* Royal Blue */
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  font-weight: bold;
+}
   </style>
 </head>
 <body>
@@ -328,18 +346,31 @@ async function saveAddress() {
     console.error('❌ Error loading user info:', err);
   }
 
-  try {
-    const res = await fetch(`${API_BASE}/api/orders`);
-    const allOrders = await res.json();
-    const myOrders = allOrders.filter(o => o.userId === userId);
-    const container = document.getElementById('order-list');
-    if (myOrders.length === 0) {
-      container.innerHTML = '<p>No orders found.</p>';
-    } else {
-      container.innerHTML = myOrders.map((o) => `
+try {
+  const res = await fetch(`${API_BASE}/api/orders`);
+  const allOrders = await res.json();
+  const myOrders = allOrders.filter(o => o.userId === userId);
+  const container = document.getElementById('order-list');
+  
+  if (myOrders.length === 0) {
+    container.innerHTML = '<p>No orders found.</p>';
+  } else {
+    container.innerHTML = myOrders.map((o) => {
+      const status = o.status?.toLowerCase();
+      let statusClass = '';
+
+      if (status === 'packing') statusClass = 'status-packing';
+      else if (status === 'dropped off') statusClass = 'status-dropped-off';
+
+      return `
         <div class="order-summary">
           <span>Placed:</span><div>${new Date(o.submittedAt).toLocaleDateString()}</div><br>
-          <span>Status:</span><div>${o.status}</div><br>
+          <span>Status:</span>
+          <div class="${statusClass}">
+            ${status === 'dropped off' && o.droppedOffAt
+              ? `Dropped off on ${new Date(o.droppedOffAt).toLocaleDateString()}`
+              : o.status}
+          </div><br><br>
           <span>Total:</span><div>$${o.orderTotal.toFixed(2)}</div><br>
           <button data-order-id="${o._id}" class="small-button view-details-btn">View Details</button>
         </div>
@@ -351,26 +382,31 @@ async function saveAddress() {
               <p>Price: $${c.priceUsd?.toFixed(2) || '0.00'}</p>
             </div>
           `).join('')}
-        </div>`).join('');
+        </div>
+      `;
+    }).join('');
 
-      // ✅ Attach event listeners AFTER rendering
-      document.querySelectorAll('.view-details-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-order-id');
-          toggleDetails(id);
-        });
+    document.querySelectorAll('.view-details-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-order-id');
+        toggleDetails(id);
       });
-    }
-  } catch (err) {
-    console.error('❌ Error loading orders:', err);
+    });
   }
+} catch (err) {
+  console.error('❌ Error loading orders:', err);
 }
+
+
+    }
     function toggleDetails(index) {
       const el = document.getElementById(`details-${index}`);
       if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
 
     document.addEventListener('DOMContentLoaded', loadAccountInfo);
+
+
   </script>
 
   <script async defer

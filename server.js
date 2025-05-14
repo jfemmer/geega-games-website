@@ -168,6 +168,7 @@ const orderSchema = new mongoose.Schema({
 
   // 🆕 Status + Tracking Fields
   status: { type: String, default: 'Pending' }, // e.g. 'Packing', 'Dropped Off', 'Shipped'
+  packedAt: Date,
   droppedOffAt: Date, // ✅ Add this line
   trackingNumber: String,
   trackingCarrier: String, // e.g., 'USPS', 'UPS'
@@ -783,6 +784,10 @@ app.patch('/api/orders/:id/status', async (req, res) => {
 
     if (status) {
   order.status = status;
+
+  if (status.toLowerCase() === 'packing') {
+    order.packedAt = new Date();
+  }
 
   if (status.toLowerCase() === 'dropped off') {
     order.droppedOffAt = new Date(); // ✅ Save current time

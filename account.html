@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Account | Geega Games</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+
+    header {
+      background-color: rebeccapurple;
+      color: white;
+      padding: 24px;
+      text-align: center;
+      font-size: 1.5rem;
+    }
+
+    .account-container {
+      max-width: 900px;
+      margin: 40px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+      color: rebeccapurple;
+      margin-bottom: 20px;
+      font-size: 22px;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 6px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .info-row span {
+      font-weight: 600;
+      color: #555;
+      width: 160px;
+    }
+
+    .info-row div {
+      flex: 1;
+    }
+
+    .order-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: space-between;
+      padding: 16px 0;
+      border-bottom: 1px solid #ddd;
+      align-items: center;
+    }
+
+    .order-summary span {
+      font-weight: 600;
+      color: #555;
+    }
+
+    .order-summary div {
+      font-size: 0.95rem;
+      color: #333;
+    }
+
+    .order-list {
+      margin-top: 20px;
+    }
+
+    .order-details {
+      margin-top: 10px;
+      padding: 12px 20px;
+      background: #fafafa;
+      border-left: 4px solid rebeccapurple;
+      display: none;
+      border-radius: 8px;
+    }
+
+    .order-details p {
+      margin: 4px 0;
+      font-size: 0.9rem;
+    }
+
+    .order-item {
+      padding: 6px 0;
+      border-bottom: 1px dashed #ccc;
+    }
+
+    .actions {
+      text-align: center;
+      margin-top: 40px;
+    }
+
+    .actions button {
+      background-color: rebeccapurple;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .actions button:hover {
+      background-color: #7a3cb7;
+    }
+
+    .back-link {
+      display: block;
+      margin-top: 24px;
+      text-align: center;
+      color: rebeccapurple;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .small-button {
+  background-color: rebeccapurple;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.25s ease, transform 0.15s ease;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(102, 51, 153, 0.1);
+}
+
+.small-button:hover {
+  background-color: #7a3cb7;
+  transform: translateY(-1px);
+}
+  </style>
+</head>
+<body>
+  <header>
+    <h1><i class="fa-solid fa-user-circle"></i> My Account</h1>
+  </header>
+
+  <div class="account-container">
+    <h2>Account Details</h2>
+    <div class="info-row"><span>Email:</span><div id="account-email">—</div></div>
+    <div class="info-row">
+      <span>Shipping Address:</span>
+      <div>
+        <span id="account-address">—</span><br />
+        <button onclick="editAddress()" class="small-button">Edit Address</button>
+      </div>
+    </div>
+
+    <h2>Order History</h2>
+    <div id="order-list" class="order-list">Loading...</div>
+
+    <div class="actions">
+      <button onclick="logout()">Log Out</button>
+    </div>
+
+    <a href="index.html" class="back-link">← Back to Home</a>
+  </div>
+
+  <!-- Address Modal -->
+  <div id="address-modal" style="
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  ">
+    <div style="
+      background: white;
+      padding: 30px 24px;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 420px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      animation: fadeIn 0.25s ease-out;
+    ">
+      <h3 style="color: rebeccapurple; font-size: 20px; margin-bottom: 20px; text-align: center;">
+        Edit Shipping Address
+      </h3>
+      <input
+        id="autocomplete"
+        type="text"
+        placeholder="Start typing your address..."
+        style="
+          width: 100%;
+          padding: 12px 14px;
+          font-size: 16px;
+          border-radius: 8px;
+          border: 1px solid #ccc;
+          margin-bottom: 20px;
+          box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+          box-sizing: border-box;
+        "
+        required
+      />
+      <div style="text-align: right;">
+        <button onclick="saveAddress()" style="
+          background: rebeccapurple;
+          color: white;
+          border: none;
+          padding: 10px 18px;
+          font-size: 15px;
+          border-radius: 8px;
+          cursor: pointer;
+          margin-right: 10px;
+        ">Save</button>
+        <button onclick="closeModal()" style="
+          background: #eee;
+          color: #333;
+          border: none;
+          padding: 10px 18px;
+          font-size: 15px;
+          border-radius: 8px;
+          cursor: pointer;
+        ">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'https://geega-games-website-production.up.railway.app';
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = "index.html";
+    }
+
+    function editAddress() {
+      document.getElementById('address-modal').style.display = 'flex';
+
+      setTimeout(() => {
+        if (!window._accountAutocompleteInit) {
+          initAutocomplete();
+          window._accountAutocompleteInit = true;
+        }
+      }, 100);
+    }
+
+    function closeModal() {
+      document.getElementById('address-modal').style.display = 'none';
+    }
+
+    function initAutocomplete() {
+      const input = document.getElementById('autocomplete');
+      const autocomplete = new google.maps.places.Autocomplete(input, {
+        types: ['address'],
+        componentRestrictions: { country: 'us' },
+        fields: ['formatted_address']
+      });
+
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place.formatted_address) {
+          input.value = place.formatted_address;
+        }
+      });
+    }
+
+async function saveAddress() {
+  const input = document.getElementById('autocomplete');
+  const full = input?.value;
+
+  if (!full || full.trim().length < 5) {
+    alert('Please select a valid address.');
+    return;
+  }
+
+  const userId = localStorage.getItem('userId');
+  if (!userId) return;
+
+  // Update UI
+  document.getElementById('account-address').textContent = full;
+  closeModal();
+
+  try {
+    await fetch(`${API_BASE}/api/users/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: full }) // ✅ just save the full address string
+    });
+    console.log('✅ Address updated');
+  } catch (err) {
+    console.error('❌ Failed to update address:', err);
+  }
+}
+
+
+    async function loadAccountInfo() {
+  const userId = localStorage.getItem('userId');
+  if (!userId) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/users`);
+    const users = await res.json();
+    const user = users.find(u => u._id === userId);
+
+    // ✅ Set email and address
+    document.getElementById('account-email').textContent = user?.email || '—';
+    document.getElementById('account-address').textContent = user?.address || '—';
+
+    // ✅ Load profile image (or fallback)
+  } catch (err) {
+    console.error('❌ Error loading user info:', err);
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/orders`);
+    const allOrders = await res.json();
+    const myOrders = allOrders.filter(o => o.userId === userId);
+    const container = document.getElementById('order-list');
+    if (myOrders.length === 0) {
+      container.innerHTML = '<p>No orders found.</p>';
+    } else {
+      container.innerHTML = myOrders.map((o) => `
+        <div class="order-summary">
+          <span>Placed:</span><div>${new Date(o.submittedAt).toLocaleDateString()}</div><br>
+          <span>Status:</span><div>${o.status}</div><br>
+          <span>Total:</span><div>$${o.orderTotal.toFixed(2)}</div><br>
+          <button data-order-id="${o._id}" class="small-button view-details-btn">View Details</button>
+        </div>
+        <div class="order-details" id="details-${o._id}">
+          ${o.cards.map(c => `
+            <div class="order-item">
+              <p><strong>${c.cardName}</strong> (${c.set})</p>
+              <p>Qty: ${c.quantity} | Condition: ${c.condition}${c.foil ? ' | Foil' : ''}</p>
+              <p>Price: $${c.priceUsd?.toFixed(2) || '0.00'}</p>
+            </div>
+          `).join('')}
+        </div>`).join('');
+
+      // ✅ Attach event listeners AFTER rendering
+      document.querySelectorAll('.view-details-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-order-id');
+          toggleDetails(id);
+        });
+      });
+    }
+  } catch (err) {
+    console.error('❌ Error loading orders:', err);
+  }
+}
+    function toggleDetails(index) {
+      const el = document.getElementById(`details-${index}`);
+      if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', loadAccountInfo);
+  </script>
+
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initAutocomplete">
+  </script>
+</body>
+</html>

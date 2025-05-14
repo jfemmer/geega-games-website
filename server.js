@@ -168,6 +168,7 @@ const orderSchema = new mongoose.Schema({
 
   // 🆕 Status + Tracking Fields
   status: { type: String, default: 'Pending' }, // e.g. 'Packing', 'Dropped Off', 'Shipped'
+  droppedOffAt: Date, // ✅ Add this line
   trackingNumber: String,
   trackingCarrier: String, // e.g., 'USPS', 'UPS'
   trackingHistory: [
@@ -780,7 +781,13 @@ app.patch('/api/orders/:id/status', async (req, res) => {
     const order = await Order.findById(id);
     if (!order) return res.status(404).json({ message: 'Order not found.' });
 
-    if (status) order.status = status;
+    if (status) {
+  order.status = status;
+
+  if (status.toLowerCase() === 'dropped off') {
+    order.droppedOffAt = new Date(); // ✅ Save current time
+  }
+}
     if (trackingNumber) order.trackingNumber = trackingNumber;
     await order.save();
 
@@ -828,6 +835,7 @@ app.patch('/api/orders/:id/status', async (req, res) => {
     res.status(500).json({ message: 'Server error.' });
   }
 });
+
 
 
 

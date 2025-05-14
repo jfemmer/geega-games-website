@@ -367,9 +367,13 @@ try {
           <span>Placed:</span><div>${new Date(o.submittedAt).toLocaleDateString()}</div><br>
           <span>Status:</span>
           <div class="${statusClass}">
-            ${status === 'dropped off' && o.droppedOffAt
-              ? `Dropped off on ${new Date(o.droppedOffAt).toLocaleDateString()}`
-              : o.status}
+            ${
+              status === 'packing' && o.packedAt
+                ? `Packing started on ${new Date(o.packedAt).toLocaleString()}`
+              : status === 'dropped off' && o.droppedOffAt
+                ? `Dropped off on ${new Date(o.droppedOffAt).toLocaleString()}`
+              : o.status
+            }
           </div><br><br>
           <span>Total:</span><div>$${o.orderTotal.toFixed(2)}</div><br>
           <button data-order-id="${o._id}" class="small-button view-details-btn">View Details</button>

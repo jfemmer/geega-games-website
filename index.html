@@ -374,16 +374,40 @@
 }
 
 
-#welcome-banner {
-  animation: slideFade 0.5s ease-in-out;
+.welcome-banner {
+  background: linear-gradient(to right, #d6b3ff, #f3e1ff);
+  color: rebeccapurple;
+  padding: 14px 20px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 17px;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 4px 8px rgba(106, 13, 173, 0.1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  animation: slideFade 0.6s ease-in-out;
+}
+
+.welcome-icon {
+  font-size: 22px;
+  animation: popBounce 0.9s ease-in-out;
+}
+
+@keyframes popBounce {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); }
 }
   </style>
 </head>
 
 <body>  
-  <div id="welcome-banner" style="display: none; background-color: #e5d1ff; color: rebeccapurple; padding: 12px; text-align: center; font-weight: bold;">
-    👋 Welcome!
-  </div>
+  <div id="welcome-banner" class="welcome-banner" style="display: none;">
+  <span class="welcome-icon">🎉</span>
+  <span class="welcome-text">Welcome back to Geega Games!</span>
+</div>
   <header class="top-banner">
     <div class="header-inner">
       <div class="logo-container">

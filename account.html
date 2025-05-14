@@ -369,7 +369,7 @@ try {
           <div class="${statusClass}">
             ${
               status === 'packing' && o.packedAt
-                ? `Packing started on ${new Date(o.packedAt).toLocaleString()}`
+                ? `Packing started ${new Date(o.packedAt).toLocaleString()}`
               : status === 'dropped off' && o.droppedOffAt
                 ? `Dropped off on ${new Date(o.droppedOffAt).toLocaleString()}`
               : o.status

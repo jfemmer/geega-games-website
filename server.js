@@ -8,13 +8,21 @@ require('dotenv').config();
 console.log("Stripe key exists?", !!process.env.STRIPE_SECRET_KEY);
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
 const app = express();
 
+// 🆕 NEW: Multer + Tesseract
+const multer = require('multer');
+const Tesseract = require('tesseract.js');
+const path = require('path');
+const fs = require('fs');
+
+// Setup for multer file uploads
+const upload = multer({ dest: 'uploads/' });
+
+// Email + Twilio
 const nodemailer = require('nodemailer');
 const twilio = require('twilio');
 
-// 📧 Email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -23,19 +31,18 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// 📱 Twilio client
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
 
-// ✅ MUST BE FIRST
+// Middleware
 app.use(express.json());
 
-// ✅ Middleware
 app.use(cors({
   origin: ['http://localhost:5500', 'https://jfemmer.github.io', 'https://www.geega-games.com'],
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type'],
   credentials: true
 }));
+
 
 // ✅ Scryfall Image Fetch Helper
 const fetchScryfallImageUrl = async (name, set, options = {}) => {
@@ -838,6 +845,28 @@ app.patch('/api/orders/:id/status', async (req, res) => {
   } catch (err) {
     console.error('❌ Order update error:', err.stack || err);
     res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
+  try {
+    const imagePath = path.resolve(req.file.path);
+    const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
+    const firstLine = text.split('\n').find(line => line.trim().length > 0);
+
+    const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(firstLine)}`);
+    const cardData = response.data;
+
+    res.json({
+      recognizedText: firstLine,
+      matchedCard: cardData.name,
+      set: cardData.set_name,
+      image: cardData.image_uris?.normal,
+      price: cardData.prices.usd || 'N/A',
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not recognize card or fetch from Scryfall.' });
   }
 });
 

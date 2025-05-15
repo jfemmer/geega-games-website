@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MTG Card Recognizer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f9f9f9;
+    }
+    h2 {
+      color: rebeccapurple;
+    }
+    form {
+      margin-bottom: 20px;
+    }
+    button {
+      background: rebeccapurple;
+      color: white;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    pre {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 12px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h2>Upload MTG Card Image</h2>
+  <form id="upload-form" enctype="multipart/form-data">
+    <input type="file" name="cardImage" accept="image/*" required />
+    <button type="submit">Analyze</button>
+  </form>
+  <pre id="result">🪄 Upload a card to begin OCR + pricing...</pre>
+
+  <script>
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const resultEl = document.getElementById('result');
+      resultEl.textContent = '⏳ Analyzing...';
+
+      try {
+        const res = await fetch('https://geega-games-website-production.up.railway.app/upload-card-image', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Server error (${res.status}): ${errText}`);
+        }
+
+        const data = await res.json();
+        resultEl.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        resultEl.textContent = '❌ Error: ' + err.message;
+        console.error('Upload failed:', err);
+      }
+    });
+  </script>
+</body>
+</html>

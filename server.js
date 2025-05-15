@@ -848,11 +848,18 @@ app.patch('/api/orders/:id/status', async (req, res) => {
   }
 });
 
+
 app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
+  const imagePath = path.resolve(req.file.path);
+
   try {
-    const imagePath = path.resolve(req.file.path);
     const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
+    console.log('🧠 Full OCR Text:\n', text);
+
     const firstLine = text.split('\n').find(line => line.trim().length > 0);
+    console.log('🧾 First line used for Scryfall:', firstLine);
+
+    if (!firstLine) throw new Error('OCR returned empty or unusable text.');
 
     const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(firstLine)}`);
     const cardData = response.data;
@@ -865,8 +872,13 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
       price: cardData.prices.usd || 'N/A',
     });
   } catch (err) {
-    console.error(err);
+    console.error('❌ OCR or Scryfall error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Could not recognize card or fetch from Scryfall.' });
+  } finally {
+    // 🧹 Always cleanup
+    if (fs.existsSync(imagePath)) {
+      fs.unlinkSync(imagePath);
+    }
   }
 });
 

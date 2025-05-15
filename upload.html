@@ -23,12 +23,26 @@
       border-radius: 6px;
       cursor: pointer;
     }
-    pre {
+    #result {
       background: #fff;
       border: 1px solid #ccc;
       padding: 12px;
       border-radius: 6px;
       white-space: pre-wrap;
+    }
+    .card-result {
+      margin-bottom: 16px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 12px;
+    }
+    .card-result img {
+      max-height: 150px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .error-message {
+      color: red;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -38,41 +52,42 @@
     <input type="file" name="cardImage" accept="image/*" required />
     <button type="submit">Analyze</button>
   </form>
-  <pre id="result">🪄 Upload a card to begin OCR + pricing...</pre>
+  <div id="result">🪄 Upload an image containing up to 10 Magic cards for OCR + pricing!</div>
 
   <script>
     const resultEl = document.getElementById('result');
 
-document.getElementById('upload-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const formData = new FormData(e.target);
-  resultEl.textContent = '⏳ Analyzing image for up to 10 cards...';
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      resultEl.innerHTML = '⏳ Analyzing image for up to 10 cards...';
 
-  try {
-    const res = await fetch('https://geega-games-website-production.up.railway.app/upload-card-image', {
-      method: 'POST',
-      body: formData
+      try {
+        const res = await fetch('https://geega-games-website-production.up.railway.app/upload-card-image', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Server error (${res.status}): ${errText}`);
+        }
+
+        const { cards } = await res.json();
+
+        resultEl.innerHTML = cards.map(card => `
+          <div class="card-result">
+            <img src="${card.image}" alt="${card.matchedCard}">
+            <strong>${card.matchedCard}</strong> — ${card.set}<br>
+            Price: $${card.price}
+          </div>
+        `).join('');
+
+      } catch (err) {
+        resultEl.innerHTML = `<div class="error-message">❌ Error: ${err.message}</div>`;
+        console.error('Upload failed:', err);
+      }
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Server error (${res.status}): ${errText}`);
-    }
-
-    const { cards } = await res.json();
-    resultEl.innerHTML = cards.map(card => `
-      <div style="margin-bottom: 16px; border-bottom: 1px solid #ccc; padding-bottom: 12px;">
-        <img src="${card.image}" alt="${card.matchedCard}" style="max-height: 150px;"><br>
-        <strong>${card.matchedCard}</strong> — ${card.set}<br>
-        Price: $${card.price}
-      </div>
-    `).join('');
-
-  } catch (err) {
-    resultEl.textContent = '❌ Error: ' + err.message;
-    console.error('Upload failed:', err);
-  }
-});
   </script>
 </body>
 </html>

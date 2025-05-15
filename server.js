@@ -853,47 +853,44 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
 
   try {
     const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
-    console.log('🧠 OCR Full Text:\n', text);
+    console.log('🧠 OCR Raw Text:\n', text);
 
-    const lines = text
+    const candidates = text
       .split('\n')
       .map(line => line.trim())
-      .filter(line => line.length > 2 && /^[a-zA-Z0-9 ',:-]+$/.test(line)); // basic name filter
+      .filter(line => line.length >= 3 && /^[a-zA-Z0-9 ',:-]+$/.test(line));
 
-    const uniqueNames = [...new Set(lines)];
-    console.log('🔍 Unique candidate card names:', uniqueNames);
+    const uniqueNames = [...new Set(candidates)].slice(0, 10); // max 10
 
     const results = [];
 
     for (const name of uniqueNames) {
       try {
         const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
-        const cardData = response.data;
+        const card = response.data;
+
         results.push({
-          inputName: name,
-          matchedCard: cardData.name,
-          set: cardData.set_name,
-          image: cardData.image_uris?.normal,
-          price: cardData.prices.usd || 'N/A',
+          input: name,
+          matchedCard: card.name,
+          set: card.set_name,
+          image: card.image_uris?.normal || '',
+          price: card.prices.usd || 'N/A',
         });
       } catch (err) {
-        console.warn(`⚠️ No match for "${name}" on Scryfall.`);
+        console.warn(`⚠️ No match for "${name}"`);
       }
     }
 
     if (results.length === 0) {
-      return res.status(404).json({ error: 'No recognizable cards found in image.' });
+      return res.status(404).json({ error: 'No cards recognized. Try a clearer image.' });
     }
 
     res.json({ count: results.length, cards: results });
-
   } catch (err) {
-    console.error('❌ OCR or Scryfall error:', err.response?.data || err.message);
+    console.error('❌ Processing error:', err.message || err);
     res.status(500).json({ error: 'Could not process image or fetch card data.' });
   } finally {
-    if (fs.existsSync(imagePath)) {
-      fs.unlinkSync(imagePath); // cleanup uploaded file
-    }
+    if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath); // cleanup
   }
 });
 

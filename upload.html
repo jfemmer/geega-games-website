@@ -41,30 +41,38 @@
   <pre id="result">🪄 Upload a card to begin OCR + pricing...</pre>
 
   <script>
-    document.getElementById('upload-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      const resultEl = document.getElementById('result');
-      resultEl.textContent = '⏳ Analyzing...';
+    const resultEl = document.getElementById('result');
 
-      try {
-        const res = await fetch('https://geega-games-website-production.up.railway.app/upload-card-image', {
-          method: 'POST',
-          body: formData
-        });
+document.getElementById('upload-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  resultEl.textContent = '⏳ Analyzing image for up to 10 cards...';
 
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`Server error (${res.status}): ${errText}`);
-        }
-
-        const data = await res.json();
-        resultEl.textContent = JSON.stringify(data, null, 2);
-      } catch (err) {
-        resultEl.textContent = '❌ Error: ' + err.message;
-        console.error('Upload failed:', err);
-      }
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/upload-card-image', {
+      method: 'POST',
+      body: formData
     });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Server error (${res.status}): ${errText}`);
+    }
+
+    const { cards } = await res.json();
+    resultEl.innerHTML = cards.map(card => `
+      <div style="margin-bottom: 16px; border-bottom: 1px solid #ccc; padding-bottom: 12px;">
+        <img src="${card.image}" alt="${card.matchedCard}" style="max-height: 150px;"><br>
+        <strong>${card.matchedCard}</strong> — ${card.set}<br>
+        Price: $${card.price}
+      </div>
+    `).join('');
+
+  } catch (err) {
+    resultEl.textContent = '❌ Error: ' + err.message;
+    console.error('Upload failed:', err);
+  }
+});
   </script>
 </body>
 </html>

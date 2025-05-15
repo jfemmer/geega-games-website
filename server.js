@@ -852,10 +852,16 @@ app.patch('/api/orders/:id/status', async (req, res) => {
 app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
   const imagePath = path.resolve(req.file.path);
 
-  // Helper: slice image into 10 grid regions (2 rows × 5 columns)
+  // 🧩 Helper: Slice image into 10 grid regions (2 rows × 5 columns)
   async function sliceIntoCards(filePath) {
     const image = sharp(filePath);
     const { width, height } = await image.metadata();
+    console.log(`📏 Image size: ${width} x ${height}`);
+
+    if (!width || !height || width < 500 || height < 300) {
+      throw new Error(`Image too small to slice: ${width}x${height}`);
+    }
+
     const cols = 5;
     const rows = 2;
     const cardWidth = Math.floor(width / cols);
@@ -867,13 +873,22 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
       for (let col = 0; col < cols; col++) {
         const left = col * cardWidth;
         const top = row * cardHeight;
+
+        // Clamp dimensions to avoid going out of bounds on last row/column
+        const cropWidth = (col === cols - 1) ? width - left : cardWidth;
+        const cropHeight = (row === rows - 1) ? height - top : cardHeight;
+
         const outputPath = `${filePath}-slice-${row}-${col}.png`;
 
-        await image
-          .extract({ left, top, width: cardWidth, height: cardHeight })
-          .toFile(outputPath);
+        try {
+          await image
+            .extract({ left, top, width: cropWidth, height: cropHeight })
+            .toFile(outputPath);
 
-        cardPaths.push(outputPath);
+          cardPaths.push(outputPath);
+        } catch (err) {
+          console.warn(`⚠️ Skipped invalid slice (${row},${col}): ${err.message}`);
+        }
       }
     }
 
@@ -886,12 +901,16 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
 
     for (const slice of slicedPaths) {
       try {
+        console.log(`🔍 Running OCR on: ${slice}`);
         const { data: { text } } = await Tesseract.recognize(slice, 'eng');
+        console.log('🧠 OCR Text:', text);
+
         const cardLine = text
           .split('\n')
           .map(l => l.trim())
           .find(l => l.length >= 3 && /^[a-zA-Z0-9 ',:-]+$/.test(l));
 
+        console.log('🧾 Candidate line:', cardLine);
         if (!cardLine) continue;
 
         const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardLine)}`);
@@ -905,9 +924,9 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
           price: card.prices.usd || 'N/A',
         });
       } catch (err) {
-        console.warn(`⚠️ Slice failed or no match: ${err.message}`);
+        console.warn(`⚠️ OCR or Scryfall failed for slice ${slice}:`, err.message);
       } finally {
-        if (fs.existsSync(slice)) fs.unlinkSync(slice); // delete slice
+        if (fs.existsSync(slice)) fs.unlinkSync(slice);
       }
     }
 
@@ -921,7 +940,7 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
     console.error('❌ Full processing error:', err.message || err);
     res.status(500).json({ error: 'Could not process image or fetch card data.' });
   } finally {
-    if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath); // delete original
+    if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
   }
 });
 

@@ -15,6 +15,7 @@ const multer = require('multer');
 const Tesseract = require('tesseract.js');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 
 // Setup for multer file uploads
 const upload = multer({ dest: 'uploads/' });
@@ -851,33 +852,62 @@ app.patch('/api/orders/:id/status', async (req, res) => {
 app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
   const imagePath = path.resolve(req.file.path);
 
+  // Helper: slice image into 10 grid regions (2 rows × 5 columns)
+  async function sliceIntoCards(filePath) {
+    const image = sharp(filePath);
+    const { width, height } = await image.metadata();
+    const cols = 5;
+    const rows = 2;
+    const cardWidth = Math.floor(width / cols);
+    const cardHeight = Math.floor(height / rows);
+
+    const cardPaths = [];
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const left = col * cardWidth;
+        const top = row * cardHeight;
+        const outputPath = `${filePath}-slice-${row}-${col}.png`;
+
+        await image
+          .extract({ left, top, width: cardWidth, height: cardHeight })
+          .toFile(outputPath);
+
+        cardPaths.push(outputPath);
+      }
+    }
+
+    return cardPaths;
+  }
+
   try {
-    const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
-    console.log('🧠 OCR Raw Text:\n', text);
-
-    const candidates = text
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length >= 3 && /^[a-zA-Z0-9 ',:-]+$/.test(line));
-
-    const uniqueNames = [...new Set(candidates)].slice(0, 10); // max 10
-
+    const slicedPaths = await sliceIntoCards(imagePath);
     const results = [];
 
-    for (const name of uniqueNames) {
+    for (const slice of slicedPaths) {
       try {
-        const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
+        const { data: { text } } = await Tesseract.recognize(slice, 'eng');
+        const cardLine = text
+          .split('\n')
+          .map(l => l.trim())
+          .find(l => l.length >= 3 && /^[a-zA-Z0-9 ',:-]+$/.test(l));
+
+        if (!cardLine) continue;
+
+        const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardLine)}`);
         const card = response.data;
 
         results.push({
-          input: name,
+          input: cardLine,
           matchedCard: card.name,
           set: card.set_name,
           image: card.image_uris?.normal || '',
           price: card.prices.usd || 'N/A',
         });
       } catch (err) {
-        console.warn(`⚠️ No match for "${name}"`);
+        console.warn(`⚠️ Slice failed or no match: ${err.message}`);
+      } finally {
+        if (fs.existsSync(slice)) fs.unlinkSync(slice); // delete slice
       }
     }
 
@@ -886,11 +916,12 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
     }
 
     res.json({ count: results.length, cards: results });
+
   } catch (err) {
-    console.error('❌ Processing error:', err.message || err);
+    console.error('❌ Full processing error:', err.message || err);
     res.status(500).json({ error: 'Could not process image or fetch card data.' });
   } finally {
-    if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath); // cleanup
+    if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath); // delete original
   }
 });
 

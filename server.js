@@ -848,36 +848,51 @@ app.patch('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-
 app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
   const imagePath = path.resolve(req.file.path);
 
   try {
     const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
-    console.log('🧠 Full OCR Text:\n', text);
+    console.log('🧠 OCR Full Text:\n', text);
 
-    const firstLine = text.split('\n').find(line => line.trim().length > 0);
-    console.log('🧾 First line used for Scryfall:', firstLine);
+    const lines = text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 2 && /^[a-zA-Z0-9 ',:-]+$/.test(line)); // basic name filter
 
-    if (!firstLine) throw new Error('OCR returned empty or unusable text.');
+    const uniqueNames = [...new Set(lines)];
+    console.log('🔍 Unique candidate card names:', uniqueNames);
 
-    const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(firstLine)}`);
-    const cardData = response.data;
+    const results = [];
 
-    res.json({
-      recognizedText: firstLine,
-      matchedCard: cardData.name,
-      set: cardData.set_name,
-      image: cardData.image_uris?.normal,
-      price: cardData.prices.usd || 'N/A',
-    });
+    for (const name of uniqueNames) {
+      try {
+        const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
+        const cardData = response.data;
+        results.push({
+          inputName: name,
+          matchedCard: cardData.name,
+          set: cardData.set_name,
+          image: cardData.image_uris?.normal,
+          price: cardData.prices.usd || 'N/A',
+        });
+      } catch (err) {
+        console.warn(`⚠️ No match for "${name}" on Scryfall.`);
+      }
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'No recognizable cards found in image.' });
+    }
+
+    res.json({ count: results.length, cards: results });
+
   } catch (err) {
     console.error('❌ OCR or Scryfall error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Could not recognize card or fetch from Scryfall.' });
+    res.status(500).json({ error: 'Could not process image or fetch card data.' });
   } finally {
-    // 🧹 Always cleanup
     if (fs.existsSync(imagePath)) {
-      fs.unlinkSync(imagePath);
+      fs.unlinkSync(imagePath); // cleanup uploaded file
     }
   }
 });

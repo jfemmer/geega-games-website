@@ -114,21 +114,19 @@
 
 .checkbox-suboptions {
   display: flex;
-  flex-direction: row;
   flex-wrap: wrap;
   gap: 12px;
   width: 100%;
 }
-  
+
 .checkbox-suboptions label {
-  display: flex;
+  display: inline-flex; /* ✅ keeps checkbox + label tight */
   align-items: center;
-  gap: 6px;
+  gap: 6px;             /* ✅ minimal space between checkbox and label text */
   font-size: 14px;
   font-weight: 500;
   color: #555;
   white-space: nowrap;
-  flex: 1 1 45%; /* Two per row on desktop, full width on mobile */
 }
 
 input[type="checkbox"] {
@@ -138,19 +136,17 @@ input[type="checkbox"] {
 }
 
 @media (max-width: 480px) {
-  .signup-container {
-    width: 90%;
-    padding: 20px;
-  }
-
-  .checkbox-section {
-    padding: 14px 12px;
+  .checkbox-suboptions {
+    flex-direction: column;
+    gap: 10px;
   }
 
   .checkbox-suboptions label {
-    flex: 1 1 100%;
+    width: 100%;           /* ✅ stack one per row on small screens */
+    justify-content: flex-start;
   }
 }
+
 </style>
 
   <!-- ✅ Autocomplete Setup Script BEFORE loading Maps -->

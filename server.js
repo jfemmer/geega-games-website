@@ -949,6 +949,7 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
 
 app.get('/api/track-usps/:trackingNumber', async (req, res) => {
   const { trackingNumber } = req.params;
+  const uspsUserID = process.env.USPS_USER_ID;
 
   const xml = `
     <TrackFieldRequest USERID="${uspsUserID}">
@@ -964,16 +965,36 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
       },
     });
 
-    const match = uspsRes.data.match(/<TrackSummary>(.*?)<\/TrackSummary>/);
-    const statusText = match ? match[1] : 'Tracking unavailable';
-    const dateMatch = statusText.match(/on (.*?)\./i);
+    const body = uspsRes.data;
 
-    res.json({
-      status: statusText.split(',')[0],
-      date: dateMatch ? dateMatch[1] : 'N/A',
-    });
+    let statusText = '';
+    let dateText = '';
+
+    // Try to pull from TrackSummary first
+    const summaryMatch = body.match(/<TrackSummary>(.*?)<\/TrackSummary>/);
+    if (summaryMatch) {
+      statusText = summaryMatch[1];
+    } else {
+      // Fallback: Try TrackDetail
+      const detailMatch = body.match(/<TrackDetail>(.*?)<\/TrackDetail>/);
+      if (detailMatch) {
+        statusText = detailMatch[1];
+      }
+    }
+
+    if (statusText) {
+      const dateMatch = statusText.match(/on (.*?)\./i);
+      dateText = dateMatch ? dateMatch[1] : 'N/A';
+
+      return res.json({
+        status: statusText.split(',')[0],
+        date: dateText,
+      });
+    }
+
+    res.json({ status: 'Tracking info not yet available', date: 'N/A' });
   } catch (err) {
-    console.error('❌ USPS tracking error:', err);
+    console.error('❌ USPS tracking error:', err.message || err);
     res.status(500).json({ status: 'Error', date: '' });
   }
 });

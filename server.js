@@ -852,18 +852,17 @@ app.patch('/api/orders/:id/status', async (req, res) => {
 app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
   const imagePath = path.resolve(req.file.path);
 
-  // 🧩 Helper: Slice image into 10 grid regions (2 rows × 5 columns)
   async function sliceIntoCards(filePath) {
     const image = sharp(filePath);
     const { width, height } = await image.metadata();
     console.log(`📏 Image size: ${width} x ${height}`);
 
-    if (!width || !height || width < 500 || height < 300) {
-      throw new Error(`Image too small to slice: ${width}x${height}`);
+    if (!width || !height || width < 900 || height < 900) {
+      throw new Error(`Image too small to slice: ${width}x${height} (min: 900x900 for 3x3 binder layout)`);
     }
 
-    const cols = 5;
-    const rows = 2;
+    const cols = 3;
+    const rows = 3;
     const cardWidth = Math.floor(width / cols);
     const cardHeight = Math.floor(height / rows);
 
@@ -873,8 +872,6 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
       for (let col = 0; col < cols; col++) {
         const left = col * cardWidth;
         const top = row * cardHeight;
-
-        // Clamp dimensions to avoid going out of bounds on last row/column
         const cropWidth = (col === cols - 1) ? width - left : cardWidth;
         const cropHeight = (row === rows - 1) ? height - top : cardHeight;
 
@@ -901,46 +898,81 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
 
     for (const slice of slicedPaths) {
       try {
-        console.log(`🔍 Running OCR on: ${slice}`);
+        console.log(`🔍 OCR on: ${slice}`);
         const { data: { text } } = await Tesseract.recognize(slice, 'eng');
-        console.log('🧠 OCR Text:', text);
+        console.log(`🧠 OCR text:\n${text}`);
 
-        const cardLine = text
+        const lines = text
           .split('\n')
           .map(l => l.trim())
-          .find(l => l.length >= 3 && /^[a-zA-Z0-9 ',:-]+$/.test(l));
+          .filter(l => l.length >= 2);
 
-        console.log('🧾 Candidate line:', cardLine);
-        if (!cardLine) continue;
+        for (const line of lines) {
+          try {
+            console.log(`🔗 Trying Scryfall for: "${line}"`);
+            const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(line)}`);
+            const card = response.data;
 
-        const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardLine)}`);
-        const card = response.data;
-
-        results.push({
-          input: cardLine,
-          matchedCard: card.name,
-          set: card.set_name,
-          image: card.image_uris?.normal || '',
-          price: card.prices.usd || 'N/A',
-        });
+            results.push({
+              input: line,
+              matchedCard: card.name,
+              set: card.set_name,
+              image: card.image_uris?.normal || '',
+              price: card.prices.usd || 'N/A',
+            });
+            break; // stop after first valid match per slice
+          } catch (err) {
+            console.warn(`❌ No match on Scryfall for "${line}"`);
+          }
+        }
       } catch (err) {
-        console.warn(`⚠️ OCR or Scryfall failed for slice ${slice}:`, err.message);
+        console.warn(`⚠️ OCR or parsing failed on ${slice}: ${err.message}`);
       } finally {
         if (fs.existsSync(slice)) fs.unlinkSync(slice);
       }
     }
 
     if (results.length === 0) {
-      return res.status(404).json({ error: 'No cards recognized. Try a clearer image.' });
+      return res.status(404).json({ error: 'No cards recognized. Try a clearer photo of your binder page.' });
     }
 
     res.json({ count: results.length, cards: results });
-
   } catch (err) {
     console.error('❌ Full processing error:', err.message || err);
     res.status(500).json({ error: 'Could not process image or fetch card data.' });
   } finally {
     if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+  }
+});
+
+app.get('/api/track-usps/:trackingNumber', async (req, res) => {
+  const { trackingNumber } = req.params;
+
+  const xml = `
+    <TrackFieldRequest USERID="${uspsUserID}">
+      <TrackID ID="${trackingNumber}"></TrackID>
+    </TrackFieldRequest>
+  `.trim();
+
+  try {
+    const uspsRes = await axios.get('https://secure.shippingapis.com/ShippingAPI.dll', {
+      params: {
+        API: 'TrackV2',
+        XML: xml,
+      },
+    });
+
+    const match = uspsRes.data.match(/<TrackSummary>(.*?)<\/TrackSummary>/);
+    const statusText = match ? match[1] : 'Tracking unavailable';
+    const dateMatch = statusText.match(/on (.*?)\./i);
+
+    res.json({
+      status: statusText.split(',')[0],
+      date: dateMatch ? dateMatch[1] : 'N/A',
+    });
+  } catch (err) {
+    console.error('❌ USPS tracking error:', err);
+    res.status(500).json({ status: 'Error', date: '' });
   }
 });
 

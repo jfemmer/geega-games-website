@@ -340,41 +340,44 @@ async function saveAddress() {
     // ✅ Set email and address
     document.getElementById('account-email').textContent = user?.email || '—';
     document.getElementById('account-address').textContent = user?.address || '—';
-
-    // ✅ Load profile image (or fallback)
   } catch (err) {
     console.error('❌ Error loading user info:', err);
   }
 
-try {
-  const res = await fetch(`${API_BASE}/api/orders`);
-  const allOrders = await res.json();
-  const myOrders = allOrders.filter(o => o.userId === userId);
-  const container = document.getElementById('order-list');
-  
-  if (myOrders.length === 0) {
-    container.innerHTML = '<p>No orders found.</p>';
-  } else {
-    container.innerHTML = myOrders.map((o) => {
+  try {
+    const res = await fetch(`${API_BASE}/api/orders`);
+    const allOrders = await res.json();
+    const myOrders = allOrders.filter(o => o.userId === userId);
+    const container = document.getElementById('order-list');
+
+    if (myOrders.length === 0) {
+      container.innerHTML = '<p>No orders found.</p>';
+      return;
+    }
+
+    const orderHtmlArr = await Promise.all(myOrders.map(async (o) => {
       const status = o.status?.toLowerCase();
       let statusClass = '';
+      let statusText = o.status;
 
-      if (status === 'packing') statusClass = 'status-packing';
-      else if (status === 'dropped off') statusClass = 'status-dropped-off';
+      if (status === 'packing') {
+        statusClass = 'status-packing';
+        if (o.packedAt) {
+          statusText = `Packing started ${new Date(o.packedAt).toLocaleString()}`;
+        }
+      } else if (status === 'dropped off') {
+        statusClass = 'status-dropped-off';
+        if (o.droppedOffAt) {
+          const trackingHtml = await getTrackingUpdate(o.trackingNumber);
+          statusText = `Dropped off on ${new Date(o.droppedOffAt).toLocaleString()}<br>${trackingHtml}`;
+        }
+      }
 
       return `
         <div class="order-summary">
           <span>Placed:</span><div>${new Date(o.submittedAt).toLocaleDateString()}</div><br>
           <span>Status:</span>
-          <div class="${statusClass}">
-            ${
-              status === 'packing' && o.packedAt
-                ? `Packing started ${new Date(o.packedAt).toLocaleString()}`
-              : status === 'dropped off' && o.droppedOffAt
-                ? `Dropped off on ${new Date(o.droppedOffAt).toLocaleString()}`
-              : o.status
-            }
-          </div><br><br>
+          <div class="${statusClass}">${statusText}</div><br><br>
           <span>Total:</span><div>$${o.orderTotal.toFixed(2)}</div><br>
           <button data-order-id="${o._id}" class="small-button view-details-btn">View Details</button>
         </div>
@@ -388,7 +391,9 @@ try {
           `).join('')}
         </div>
       `;
-    }).join('');
+    }));
+
+    container.innerHTML = orderHtmlArr.join('');
 
     document.querySelectorAll('.view-details-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -396,13 +401,29 @@ try {
         toggleDetails(id);
       });
     });
+
+  } catch (err) {
+    console.error('❌ Error loading orders:', err);
   }
-} catch (err) {
-  console.error('❌ Error loading orders:', err);
 }
 
+async function getTrackingUpdate(trackingNumber) {
+  if (!trackingNumber) return '<em>No tracking number available.</em>';
+  try {
+    const res = await fetch(`${API_BASE}/api/track-usps/${trackingNumber}`);
+    const data = await res.json();
 
+    if (data.status === 'Delivered') {
+      return `<span style="color:green; font-weight:bold;">📦 Delivered on ${data.date}</span>`;
+    } else {
+      return `<span style="color:orange;">📬 ${data.status}: ${data.date}</span>`;
     }
+  } catch (err) {
+    console.error('❌ Failed to fetch tracking info:', err);
+    return '<em>Tracking info unavailable.</em>';
+  }
+}
+
     function toggleDetails(index) {
       const el = document.getElementById(`details-${index}`);
       if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';

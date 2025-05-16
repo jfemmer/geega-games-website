@@ -5,7 +5,7 @@
   <title>Sign Up - Geega Games</title>
   <link rel="stylesheet" href="style.css">
 
-<style>
+  <style>
   body {
     background-color: #f5f5f5;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -30,22 +30,23 @@
   }
 
   .signup-container form {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-  }
+      display: flex;
+      flex-direction: column;
+      align-items: center;        /* ✅ center child elements */
+      gap: 16px;
+    }
 
   .signup-container input,
-  .signup-container gmp-place-autocomplete {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    padding: 14px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    font-size: 15px;
-  }
+    .signup-container gmp-place-autocomplete,
+    .signup-container .checkbox-section {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+    }
 
   .signup-container button {
     width: 100%;
@@ -92,61 +93,53 @@
     margin-top: -8px;
   }
 
-  /* ✅ Checkbox Section Styling */
-  .checkbox-section {
+ .checkbox-section {
+  padding: 16px 20px;
   background-color: #f8f9fc;
   border: 1px solid #dcdde0;
   border-radius: 10px;
-  padding: 16px 20px;
-  width: 100%;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
-.section-label {
-  font-size: 15px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-}
+  .checkbox-section > label {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 8px;
+    display: block;
+  }
 
-.checkbox-suboptions {
+ .checkbox-suboptions {
   display: flex;
+  justify-content: center; /* ✅ center horizontally */
+  gap: 30px;
   flex-wrap: wrap;
-  gap: 12px;
-  width: 100%;
+  padding-left: 0;
 }
-
 .checkbox-suboptions label {
-  display: inline-flex; /* ✅ keeps checkbox + label tight */
-  align-items: center;
-  gap: 6px;             /* ✅ minimal space between checkbox and label text */
-  font-size: 14px;
   font-weight: 500;
+  font-size: 14px;
   color: #555;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-input[type="checkbox"] {
-  transform: scale(1.2);
-  accent-color: rebeccapurple;
-  cursor: pointer;
-}
-
-@media (max-width: 480px) {
-  .checkbox-suboptions {
-    flex-direction: column;
-    gap: 10px;
+  input[type="checkbox"] {
+    transform: scale(1.2);
+    accent-color: rebeccapurple;
+    cursor: pointer;
   }
 
-  .checkbox-suboptions label {
-    width: 100%;           /* ✅ stack one per row on small screens */
-    justify-content: flex-start;
-  }
+  .section-label {
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #333;
 }
-
 </style>
 
   <!-- ✅ Autocomplete Setup Script BEFORE loading Maps -->
@@ -191,19 +184,24 @@ input[type="checkbox"] {
 
       <!-- ✅ Announcement Opt-In -->
       <!-- ✅ Announcement Opt-In -->
-<!-- Announcements -->
 <div class="checkbox-section">
-  <div class="section-label">I want to receive announcements</div>
-  <div class="checkbox-suboptions">
+  <label class="section-label">
+    <input type="checkbox" id="opt-in-announcements" checked>
+    I want to receive announcements
+  </label>
+  <div id="announcement-options" class="checkbox-suboptions" style="display: none;">
     <label><input type="checkbox" id="notify-email" checked> Email</label>
     <label><input type="checkbox" id="notify-text" checked> Text</label>
   </div>
 </div>
 
-<!-- Shipping -->
+<!-- ✅ Shipping Notifications -->
 <div class="checkbox-section">
-  <div class="section-label">I want shipping updates</div>
-  <div class="checkbox-suboptions">
+  <label class="section-label">
+    <input type="checkbox" id="opt-in-shipping" checked>
+    I want shipping updates
+  </label>
+  <div id="shipping-options" class="checkbox-suboptions">
     <label><input type="checkbox" id="ship-email" checked> Email</label>
     <label><input type="checkbox" id="ship-text"> Text</label>
   </div>

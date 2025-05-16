@@ -92,36 +92,30 @@
     margin-top: -8px;
   }
 
-  /* ✅ Checkbox Styling */
+  /* ✅ Checkbox Section Styling */
   .checkbox-section {
-    padding: 16px 20px;
     background-color: #f8f9fc;
     border: 1px solid #dcdde0;
     border-radius: 10px;
+    padding: 16px 20px;
+    width: 100%;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: 12px;
   }
 
   .section-label {
-    font-weight: 600;
     font-size: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    font-weight: 600;
     color: #333;
     margin-bottom: 4px;
-  }
-
-  .section-label input[type="checkbox"] {
-    margin-right: 6px;
   }
 
   .checkbox-suboptions {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    width: 100%;
   }
 
   .checkbox-suboptions label {
@@ -129,8 +123,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-weight: 500;
     font-size: 14px;
+    font-weight: 500;
     color: #555;
     padding: 4px 0;
   }
@@ -200,24 +194,19 @@
 
       <!-- ✅ Announcement Opt-In -->
       <!-- ✅ Announcement Opt-In -->
+<!-- Announcements -->
 <div class="checkbox-section">
-  <label class="section-label">
-    <input type="checkbox" id="opt-in-announcements" checked>
-    I want to receive announcements
-  </label>
-  <div id="announcement-options" class="checkbox-suboptions" style="display: none;">
+  <div class="section-label">I want to receive announcements</div>
+  <div class="checkbox-suboptions">
     <label><input type="checkbox" id="notify-email" checked> Email</label>
     <label><input type="checkbox" id="notify-text" checked> Text</label>
   </div>
 </div>
 
-<!-- ✅ Shipping Notifications -->
+<!-- Shipping -->
 <div class="checkbox-section">
-  <label class="section-label">
-    <input type="checkbox" id="opt-in-shipping" checked>
-    I want shipping updates
-  </label>
-  <div id="shipping-options" class="checkbox-suboptions">
+  <div class="section-label">I want shipping updates</div>
+  <div class="checkbox-suboptions">
     <label><input type="checkbox" id="ship-email" checked> Email</label>
     <label><input type="checkbox" id="ship-text"> Text</label>
   </div>

@@ -17,6 +17,8 @@ const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
 
+const uspsUserID = process.env.USPS_USER_ID;
+
 // Setup for multer file uploads
 const upload = multer({ dest: 'uploads/' });
 

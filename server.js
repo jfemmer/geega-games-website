@@ -953,7 +953,7 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
 app.get('/api/track-usps/:trackingNumber', async (req, res) => {
   const { trackingNumber } = req.params;
   const uspsUserID = process.env.USPS_USER_ID;
-  const debug = req.query.debug === 'true'; // enable log dump
+  const debug = req.query.debug === 'true';
 
   const xml = `
     <TrackFieldRequest USERID="${uspsUserID}">
@@ -963,18 +963,20 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
 
   try {
     const uspsRes = await axios.get('https://secure.shippingapis.com/ShippingAPI.dll', {
-      params: {
-        API: 'TrackV2',
-        XML: xml,
-      },
+      params: { API: 'TrackV2', XML: xml },
     });
 
     const parsed = await parser.parseStringPromise(uspsRes.data);
-    if (debug) console.dir(parsed, { depth: null }); // 🔍 dump whole structure
-
     const trackInfo = parsed?.TrackResponse?.TrackInfo?.[0];
+
+    if (debug) {
+      console.log('📦 FULL USPS RESPONSE:');
+      console.dir(trackInfo, { depth: null });
+      return res.json(trackInfo); // return entire object for inspection
+    }
+
     const summary = trackInfo?.TrackSummary?.[0];
-    const details = trackInfo?.TrackDetail?.[0];
+    const details = Array.isArray(trackInfo?.TrackDetail) ? trackInfo.TrackDetail[0] : null;
 
     const statusText = summary || details || 'Tracking info not yet available';
     const dateMatch = statusText.match(/on (.*?)\./i);
@@ -982,7 +984,7 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
 
     res.json({
       status: statusText.split(',')[0],
-      date: dateText
+      date: dateText,
     });
   } catch (err) {
     console.error('❌ USPS tracking parse error:', err.message || err);

@@ -26,6 +26,9 @@ const upload = multer({ dest: 'uploads/' });
 const nodemailer = require('nodemailer');
 const twilio = require('twilio');
 
+const xml2js = require('xml2js');
+const parser = new xml2js.Parser();
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -965,35 +968,22 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
       },
     });
 
-    const body = uspsRes.data;
-    console.log('📨 Raw USPS XML:', body); // ✅ Add this log
+    const parsed = await parser.parseStringPromise(uspsRes.data);
+    const trackInfo = parsed?.TrackResponse?.TrackInfo?.[0];
 
-    let statusText = '';
-    let dateText = '';
+    const summary = trackInfo?.TrackSummary?.[0];
+    const details = trackInfo?.TrackDetail?.[0];
 
-    const summaryMatch = body.match(/<TrackSummary>(.*?)<\/TrackSummary>/);
-    if (summaryMatch) {
-      statusText = summaryMatch[1];
-    } else {
-      const detailMatch = body.match(/<TrackDetail>(.*?)<\/TrackDetail>/);
-      if (detailMatch) {
-        statusText = detailMatch[1];
-      }
-    }
+    const statusText = summary || details || 'Tracking info not yet available';
+    const dateMatch = statusText.match(/on (.*?)\./i);
+    const dateText = dateMatch ? dateMatch[1] : 'N/A';
 
-    if (statusText) {
-      const dateMatch = statusText.match(/on (.*?)\./i);
-      dateText = dateMatch ? dateMatch[1] : 'N/A';
-
-      return res.json({
-        status: statusText.split(',')[0],
-        date: dateText,
-      });
-    }
-
-    res.json({ status: 'Tracking info not yet available', date: 'N/A' });
+    res.json({
+      status: statusText.split(',')[0],
+      date: dateText
+    });
   } catch (err) {
-    console.error('❌ USPS tracking error:', err.message || err);
+    console.error('❌ USPS tracking parse error:', err.message || err);
     res.status(500).json({ status: 'Error', date: '' });
   }
 });

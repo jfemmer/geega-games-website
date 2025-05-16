@@ -140,6 +140,14 @@
   gap: 10px;
   color: #333;
 }
+
+@media (max-width: 600px) {
+  .checkbox-suboptions {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+}
 </style>
 
   <!-- ✅ Autocomplete Setup Script BEFORE loading Maps -->
@@ -191,7 +199,6 @@
   </label>
   <div id="announcement-options" class="checkbox-suboptions" style="display: none;">
     <label><input type="checkbox" id="notify-email" checked> Email</label>
-    </div>
     <label><input type="checkbox" id="notify-text" checked> Text</label>
   </div>
 </div>

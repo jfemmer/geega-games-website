@@ -113,21 +113,22 @@
 .checkbox-suboptions {
   display: flex;
   justify-content: space-between;
-  gap: 30px;
-  flex-wrap: wrap;
-  padding-left: 0;
+  gap: 20px;
   width: 100%;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .checkbox-suboptions label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
   font-weight: 500;
   font-size: 14px;
   color: #555;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;               /* ⚡ Make each take equal space */
-  min-width: 120px;      /* ✅ Prevents cramping */
+  white-space: nowrap;
 }
 
   input[type="checkbox"] {

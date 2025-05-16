@@ -140,6 +140,19 @@
   gap: 10px;
   color: #333;
 }
+
+@media (max-width: 480px) {
+  .signup-container {
+    width: 90%;
+    padding: 20px;
+  }
+
+  .checkbox-suboptions {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+}
 </style>
 
   <!-- ✅ Autocomplete Setup Script BEFORE loading Maps -->
@@ -252,7 +265,7 @@
         username: document.getElementById('new-username').value.trim(),
         email: document.getElementById('new-email').value.trim(),
         password: password,
-        phone: document.getElementById('phone').value.trim(),
+        phone: formatPhoneForTwilio(document.getElementById('phone').value.trim()),
         address: fullAddress,
 
         // 🆕 Announcement preferences
@@ -313,6 +326,20 @@
         console.error("Google Sign-In autofill error:", err);
       }
     }
+
+    function formatPhoneForTwilio(phone) {
+  const digitsOnly = phone.replace(/\D/g, ''); // Remove all non-digits
+  if (digitsOnly.length === 10) {
+    return `+1${digitsOnly}`; // US-based 10-digit number
+  } else if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+    return `+${digitsOnly}`; // Already US with leading 1
+  } else if (digitsOnly.startsWith('+' || digitsOnly.length >= 11)) {
+    return phone; // Assume already formatted correctly
+  } else {
+    console.warn("⚠️ Invalid phone number:", phone);
+    return phone;
+  }
+}
 
     const optInCheckbox = document.getElementById('opt-in-announcements');
   const optionsDiv = document.getElementById('announcement-options');

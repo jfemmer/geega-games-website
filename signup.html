@@ -110,13 +110,15 @@
     display: block;
   }
 
- .checkbox-suboptions {
+.checkbox-suboptions {
   display: flex;
-  justify-content: flex-start; /* ✅ align left */
+  justify-content: space-between;
   gap: 30px;
   flex-wrap: wrap;
   padding-left: 0;
+  width: 100%;
 }
+
 .checkbox-suboptions label {
   font-weight: 500;
   font-size: 14px;
@@ -124,6 +126,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 1;               /* ⚡ Make each take equal space */
+  min-width: 120px;      /* ✅ Prevents cramping */
 }
 
   input[type="checkbox"] {

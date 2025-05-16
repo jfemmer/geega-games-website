@@ -966,16 +966,15 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
     });
 
     const body = uspsRes.data;
+    console.log('📨 Raw USPS XML:', body); // ✅ Add this log
 
     let statusText = '';
     let dateText = '';
 
-    // Try to pull from TrackSummary first
     const summaryMatch = body.match(/<TrackSummary>(.*?)<\/TrackSummary>/);
     if (summaryMatch) {
       statusText = summaryMatch[1];
     } else {
-      // Fallback: Try TrackDetail
       const detailMatch = body.match(/<TrackDetail>(.*?)<\/TrackDetail>/);
       if (detailMatch) {
         statusText = detailMatch[1];
@@ -998,6 +997,7 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
     res.status(500).json({ status: 'Error', date: '' });
   }
 });
+
 
 
 

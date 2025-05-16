@@ -953,6 +953,7 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
 app.get('/api/track-usps/:trackingNumber', async (req, res) => {
   const { trackingNumber } = req.params;
   const uspsUserID = process.env.USPS_USER_ID;
+  const debug = req.query.debug === 'true'; // enable log dump
 
   const xml = `
     <TrackFieldRequest USERID="${uspsUserID}">
@@ -969,8 +970,9 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
     });
 
     const parsed = await parser.parseStringPromise(uspsRes.data);
-    const trackInfo = parsed?.TrackResponse?.TrackInfo?.[0];
+    if (debug) console.dir(parsed, { depth: null }); // 🔍 dump whole structure
 
+    const trackInfo = parsed?.TrackResponse?.TrackInfo?.[0];
     const summary = trackInfo?.TrackSummary?.[0];
     const details = trackInfo?.TrackDetail?.[0];
 

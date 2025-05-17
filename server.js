@@ -717,24 +717,48 @@ app.post('/api/orders', async (req, res) => {
       shippingMethod,
       paymentMethod,
       orderTotal: isNaN(parsedOrderTotal) ? 0 : parsedOrderTotal,
-      status: req.body.status || 'Pending'  // ✅ this line ensures status gets saved
+      status: req.body.status || 'Pending'
     });
 
     const savedOrder = await newOrder.save();
+
+    // 🔻 Decrement inventory for each card in the order
+for (const item of cards) {
+  const match = await CardInventory.findOne({
+    cardName: item.cardName,
+    set: item.set,
+    foil: !!item.foil,
+    condition: item.condition
+  });
+
+  if (!match) continue;
+
+  // 🛡️ Inventory safety check
+  if (match.quantity < item.quantity) {
+    return res.status(400).json({
+      message: `Not enough stock for ${item.cardName}. Available: ${match.quantity}, Requested: ${item.quantity}`
+    });
+  }
+
+  match.quantity -= item.quantity;
+
+  if (match.quantity <= 0) {
+    await CardInventory.deleteOne({ _id: match._id });
+  } else {
+    await match.save();
+  }
+}
+
+    // 🧹 Clear cart after successful order
+    await Cart.findOneAndUpdate(
+      { userId },
+      { items: [], updatedAt: new Date() }
+    );
+
     res.status(201).json(savedOrder);
   } catch (err) {
     console.error('❌ Error saving order:', err);
     res.status(500).json({ message: 'Server error while saving order.' });
-  }
-});
-
-app.get('/api/orders', async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ submittedAt: -1 });
-    res.json(orders);
-  } catch (err) {
-    console.error('❌ Fetch orders error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
   }
 });
 

@@ -1081,6 +1081,17 @@ app.post('/api/shippo/label', async (req, res) => {
 });
 
 
+app.get('/api/orders/:id', async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    res.json(order);
+  } catch (err) {
+    console.error('❌ Error fetching order:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 
 
 // Start Server

@@ -919,6 +919,7 @@ async function loadOrders() {
           <strong>Tracking #:</strong>
           <input type="text" id="tracking-${order._id}" value="${order.trackingNumber || ''}" placeholder="Optional..." />
           <button onclick="saveTracking('${order._id}')">Save</button>
+          <button onclick="printLabel('${order._id}')" style="background: seagreen; margin-left: 6px;">Print Label</button>
         </div>
       </div>
     `).join('');
@@ -1127,6 +1128,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+async function printLabel(orderId) {
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/shippo/label', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to create label');
+
+    alert(`✅ Label created! Tracking #: ${data.trackingNumber}`);
+    window.open(data.labelUrl, '_blank'); // Open label in a new tab
+  } catch (err) {
+    console.error('❌ Print label error:', err);
+    alert('❌ Failed to generate label.');
+  }
+}
 </script>
 
 <script>

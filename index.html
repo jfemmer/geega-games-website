@@ -10,389 +10,410 @@
 
   <style>
   body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #f5f5f5;
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f5f5;
+}
+
+.page-layout {
+  display: flex;
+  min-height: 100vh;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.main-content {
+  flex: 1;
+  padding: 30px 40px;
+  transition: all 0.3s ease-in-out;
+  width: 100%;
+}
+
+.open-sidebar {
+  background-color: rebeccapurple;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  z-index: 1000;
+  font-weight: bold;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.1);
+  display: none;
+  white-space: nowrap;
+}
+
+.open-sidebar i {
+  margin-right: 6px;
+}
+
+/* === HEADER === */
+header.top-banner {
+  background-color: rebeccapurple;
+  color: white;
+  padding: 8px 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.logo-container img {
+  height: 100px;
+  max-width: 100%;
+  display: block;
+}
+
+.search-bar-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin: 4px 0;
+}
+
+.search-bar-container {
+  display: flex;
+  width: 100%;
+  max-width: 500px;
+}
+
+.search-bar-container input {
+  flex: 1;
+  padding: 10px;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px 0 0 6px;
+}
+
+.search-bar-container button {
+  padding: 10px 16px;
+  font-size: 16px;
+  border: none;
+  background-color: white;
+  color: rebeccapurple;
+  border-radius: 0 6px 6px 0;
+  cursor: pointer;
+}
+
+.account-login-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.account-login-container a#login-button {
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: transparent;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.account-login-container a#login-button i {
+  font-size: 20px;
+  color: white;
+  line-height: 0;
+  transition: color 0.2s ease;
+}
+
+.account-login-container a#login-button:hover {
+  background-color: white;
+}
+
+.account-login-container a#login-button:hover i {
+  color: rebeccapurple;
+}
+
+/* === NAVBAR === */
+.nav-bar {
+  background-color: #6a0dad;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 15px;
+  flex-wrap: wrap;
+}
+
+.hamburger-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+.hamburger-menu {
+  position: relative;
+}
+
+#hamburger-icon {
+  font-size: 28px;
+  color: white;
+  cursor: pointer;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 40px;
+  left: 0;
+  background-color: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 160px;
+  z-index: 1001;
+}
+
+.dropdown-menu a {
+  display: block;
+  padding: 12px 16px;
+  text-decoration: none;
+  color: rebeccapurple;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.dropdown-menu a:hover {
+  background-color: #eee;
+}
+
+.filter-sidebar {
+  width: 260px;
+  background: #ffffff;
+  padding: 20px;
+  border-right: 2px solid #eee;
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.04);
+  transition: transform 0.3s ease-in-out;
+  overflow-y: auto;
+  font-family: 'Segoe UI', sans-serif;
+  z-index: 100;
+}
+
+.filter-sidebar.open {
+  transform: translateX(0);
+}
+
+.filter-sidebar:not(.open) {
+  transform: translateX(-100%);
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  color: rebeccapurple;
+  font-size: 18px;
+  margin-bottom: 24px;
+}
+
+.close-sidebar {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #aaa;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.close-sidebar:hover {
+  color: rebeccapurple;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.filter-group label {
+  font-weight: bold;
+  color: rebeccapurple;
+  margin-bottom: 4px;
+}
+
+/* === DROPDOWNS === */
+.styled-dropdown {
+  padding: 10px 12px;
+  font-size: 15px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background-color: white;
+  color: #333;
+  width: 100%;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+
+.sort-dropdown-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  background: transparent;
+  max-width: 200px;
+  padding: 0;
+  margin: 0;
+}
+
+.sort-label {
+  font-size: 14px;
+  color: white;
+  font-weight: bold;
+}
+
+.styled-dropdown option {
+  background-color: white;
+  color: rebeccapurple;
+}
+
+.styled-dropdown option:disabled {
+  color: gray;
+}
+
+.styled-dropdown:focus {
+  border-color: rebeccapurple;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(106, 13, 173, 0.15);
+}
+
+/* === CARD GRID === */
+#card-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+}
+
+.card {
+  background: white;
+  padding: 15px;
+  border-radius: 16px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  max-width: 220px;
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  border: 2px solid #e6e6fa;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 24px rgba(106, 13, 173, 0.2);
+  border-color: rebeccapurple;
+}
+
+.card img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+/* === FOIL SHIMMER === */
+.foil-shimmer {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.foil-shimmer img {
+  position: relative;
+  z-index: 1;
+  opacity: 0.96;
+  border: 2px solid white;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+}
+
+.foil-shimmer::after {
+  content: '';
+  z-index: 2;
+  pointer-events: none;
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0) 60%);
+  animation: shimmer 2.5s infinite linear;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translate(-100%, -100%) rotate(25deg);
   }
-
-  header.top-banner {
-    background-color: rebeccapurple;
-    color: white;
-    padding: 8px 10px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    position: relative;
+  100% {
+    transform: translate(100%, 100%) rotate(25deg);
   }
+}
 
-  .welcome-banner {
-    background: linear-gradient(to right, #d6b3ff, #f3e1ff);
-    color: rebeccapurple;
-    padding: 14px 20px;
-    text-align: center;
-    font-weight: 600;
-    font-size: 17px;
-    border-radius: 0 0 10px 10px;
-    box-shadow: 0 4px 8px rgba(106, 13, 173, 0.1);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-    animation: slideFade 0.6s ease-in-out;
-  }
+/* === UTILS === */
+.card-title {
+  font-size: 17px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: rebeccapurple;
+}
 
-  .welcome-icon {
-    font-size: 22px;
-    animation: popBounce 0.9s ease-in-out;
-  }
+.card-text,
+.card-condition,
+.card p {
+  font-size: 14px;
+  color: #555;
+  margin: 4px 0;
+}
 
-  @keyframes popBounce {
-    0% { transform: scale(0.8); opacity: 0; }
-    50% { transform: scale(1.2); opacity: 1; }
-    100% { transform: scale(1); }
-  }
+.add-to-cart-button {
+  margin-top: 8px;
+  background-color: rebeccapurple;
+  color: white;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
 
-  @keyframes slideFade {
-    0% { opacity: 0; transform: translateY(-10px); }
-    100% { opacity: 1; transform: translateY(0); }
-  }
+.icon-button {
+  font-size: 22px;
+  color: white;
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 10px;
+  text-decoration: none;
+}
 
-  .header-inner {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
+.icon-button:hover {
+  background-color: white;
+  color: rebeccapurple;
+}
 
-  .logo-container {
-    margin-left: 0;
-    padding-left: 0;
-  }
-
-  .logo-container img {
-    height: 100px;
-    max-width: 100%;
-    display: block;
-  }
-
-  .search-bar-wrapper {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    margin: 4px 0;
-  }
-
-  .search-bar-container {
-    display: flex;
-    width: 100%;
-    max-width: 500px;
-  }
-
-  .search-bar-container input {
-    flex: 1;
-    padding: 10px;
-    font-size: 16px;
-    border: none;
-    border-radius: 6px 0 0 6px;
-  }
-
-  .search-bar-container button {
-    padding: 10px 16px;
-    font-size: 16px;
-    border: none;
-    background-color: white;
-    color: rebeccapurple;
-    border-radius: 0 6px 6px 0;
-    cursor: pointer;
-  }
-
-  .account-login-container {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px;
-  }
-
-  .account-login-container a#login-button {
-    border: 2px solid white;
-    border-radius: 50%;
-    width: 42px;
-    height: 42px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-right: 15px;
-    background-color: transparent;
-    text-decoration: none;
-    transition: background-color 0.2s ease, color 0.2s ease;
-  }
-
-  .account-login-container a#login-button i {
-    font-size: 20px;
-    color: white;
-    line-height: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    transition: color 0.2s ease;
-  }
-
-  .account-login-container a#login-button:hover {
-    background-color: white;
-  }
-
-  .account-login-container a#login-button:hover i {
-    color: rebeccapurple;
-  }
-
-  .nav-bar {
-    background-color: #6a0dad;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 15px;
-  }
-
-  .hamburger-menu {
-    position: relative;
-  }
-
-  #hamburger-icon {
-    font-size: 28px;
-    color: white;
-    cursor: pointer;
-  }
-
-  .dropdown-menu {
-    display: none;
-    position: absolute;
-    top: 40px;
-    left: 0;
-    background-color: white;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    overflow: hidden;
-    min-width: 160px;
-    z-index: 100;
-  }
-
-  .dropdown-menu a {
-    display: block;
-    padding: 12px 16px;
-    text-decoration: none;
-    color: rebeccapurple;
-    font-weight: bold;
-    white-space: nowrap;
-  }
-
-  .dropdown-menu a:hover {
-    background-color: #eee;
-  }
-
-  .request-button {
-    color: white;
-    border: 2px solid white;
-    border-radius: 12px;
-    padding: 6px 12px;
-    font-size: 14px;
-    font-weight: bold;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease-in-out;
-    background: transparent;
-    white-space: nowrap;
-  }
-
-  .request-button i {
-    margin-right: 6px;
-  }
-
-  .request-button:hover {
-    background-color: white;
-    color: rebeccapurple;
-  }
-
-  .filter-sort-container {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 40px;
-    margin: 30px 0 10px;
-  }
-
-  .dropdown-block {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .dropdown-block label {
-    margin-bottom: 6px;
-    font-weight: bold;
-    color: rebeccapurple;
-  }
-
-  .styled-dropdown {
-    padding: 8px 12px;
-    font-size: 16px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    background-color: white;
-    color: rebeccapurple;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    margin-bottom: 10px;
-  }
-
-  .styled-dropdown option {
-    background-color: white;
-    color: rebeccapurple;
-  }
-
-  #card-container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 20px;
-    padding: 20px;
-  }
-
-  .card {
-    background: white;
-    padding: 15px;
-    border-radius: 16px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-    max-width: 220px;
-    text-align: center;
-    transition: transform 0.2s ease, box-shadow 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    overflow: hidden;
-    border: 2px solid #e6e6fa;
-  }
-
-  .card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 24px rgba(106, 13, 173, 0.2);
-    border-color: rebeccapurple;
-  }
-
-  .card img {
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-    margin-bottom: 10px;
-  }
-
-  .foil-shimmer {
-    position: relative;
-    overflow: hidden;
-    border-radius: 8px;
-  }
-
-  .foil-shimmer img {
-    position: relative;
-    z-index: 1;
-    opacity: 0.96;
-    border: 2px solid white;
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
-  }
-
-  .foil-shimmer::after {
-    content: '';
-    z-index: 2;
-    pointer-events: none;
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(130deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0) 60%);
-    animation: shimmer 2.5s infinite linear;
-  }
-
-  @keyframes shimmer {
-    0% {
-      transform: translate(-100%, -100%) rotate(25deg);
-    }
-    100% {
-      transform: translate(100%, 100%) rotate(25deg);
-    }
-  }
-
-  .image-wrapper img {
-    width: 100%;
-    height: auto;
-    display: block;
-    border-radius: 8px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .icon-button {
-    font-size: 22px;
-    color: white;
-    text-decoration: none;
-    border: 2px solid white;
-    border-radius: 50%;
-    width: 42px;
-    height: 42px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-right: 10px;
-  }
-
-  .icon-button:hover {
-    background-color: white;
-    color: rebeccapurple;
-  }
-
-  .card-title {
-    font-size: 17px;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: rebeccapurple;
-  }
-
-  .card-text,
-  .card-condition,
-  .card p {
-    font-size: 14px;
-    color: #555;
-    margin: 4px 0;
-  }
-
-  .add-to-cart-button {
-    margin-top: 8px;
-    background-color: rebeccapurple;
-    color: white;
-    border: none;
-    padding: 8px;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-  }
-
-  @media (min-width: 768px) {
-    .header-inner {
-      flex-direction: row;
-      justify-content: space-between;
-    }
-
-    .search-bar-wrapper {
-      flex: 1;
-    }
-  }
-
-  .profile-dropdown {
+.profile-dropdown {
   display: none;
   position: absolute;
   top: 48px;
@@ -418,81 +439,135 @@
   background-color: #f3eaff;
 }
 
-.filter-sidebar {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin: 20px 20px 0;
-  max-width: 280px;
-}
-
-.sort-wrapper {
-  width: 100%;
-  margin-bottom: 10px;
-}
-
-.sort-wrapper label {
-  font-weight: bold;
+.welcome-banner {
+  background: linear-gradient(to right, #d6b3ff, #f3e1ff);
   color: rebeccapurple;
-  margin-bottom: 6px;
-  display: block;
-}
-
-.filter-dropdown-wrapper {
-  position: relative;
-  width: 100%;
-}
-
-.filter-toggle {
-  width: 100%;
-  background-color: rebeccapurple;
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
+  padding: 14px 20px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 17px;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 4px 8px rgba(106, 13, 173, 0.1);
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  animation: slideFade 0.6s ease-in-out;
 }
 
-.filter-toggle:hover {
-  background-color: #5a00a0;
+.welcome-icon {
+  font-size: 22px;
+  animation: popBounce 0.9s ease-in-out;
 }
 
-.filter-menu {
-  display: none;
-  background: white;
-  border: 2px solid #e0d2f7;
+@keyframes popBounce {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@keyframes slideFade {
+  0% { opacity: 0; transform: translateY(-10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.request-button {
+  color: white;
+  border: 2px solid white;
   border-radius: 12px;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-  padding: 20px;
-  margin-top: 10px;
-  width: 100%;
-  z-index: 10;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: bold;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+  background: transparent;
+  white-space: nowrap;
 }
 
-.filter-group {
-  display: flex;
-  flex-direction: column;
+.request-button i {
+  margin-right: 6px;
+}
+
+.request-button:hover {
+  background-color: white;
+  color: rebeccapurple;
+}
+
+/* === SIGN IN BUTTON (Header icon style) === */
+#signin-button {
+  border: 2px solid white;
+  border-radius: 12px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+  text-decoration: none;
+}
+
+#signin-button i {
+  margin-right: 6px;
+}
+
+#signin-button:hover {
+  background-color: white;
+  color: rebeccapurple;
+}
+
+.filter-section {
+  background: #f9f6ff;
+  border-radius: 12px;
+  padding: 14px 16px;
   margin-bottom: 16px;
+  box-shadow: 0 2px 6px rgba(106, 13, 173, 0.06);
+  transition: all 0.3s ease-in-out;
 }
 
-.filter-group label {
+.filter-section:hover {
+  background: #f1ebff;
+}
+
+.filter-section label {
+  display: block;
   font-weight: bold;
   color: rebeccapurple;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .filter-sidebar {
+    position: absolute;
+    z-index: 10;
+    left: 0;
+    top: 0;
+    height: 100vh;
+  }
+
+  .open-sidebar {
+    display: inline-block;
+  }
+}
+
+@media (min-width: 768px) {
+  .header-inner {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .search-bar-wrapper {
+    flex: 1;
+  }
 }
 </style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-6NPDFLEXW8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-XXXXXXXXXX');
-</script>
 </head>
 
 <body>  
@@ -551,86 +626,85 @@
     </div>
   </header>
   
-  <!-- SECOND NAV BAR -->
-  <div class="nav-bar">
-    <!-- Hamburger -->
+ <!-- SECOND NAV BAR -->
+<div class="nav-bar">
+  <!-- Left side: Hamburger + Filters -->
+  <div class="hamburger-container">
     <div class="hamburger-menu">
       <i class="fa fa-bars" id="hamburger-icon"></i>
       <div class="dropdown-menu" id="dropdown-menu">
         <a href="index.html">Home</a>
-          <a href="login.html">Login</a>
-          <a href="request.html">Request Card</a>
-          <a href="tradeIn.html">Trade-In</a>
+        <a href="login.html">Login</a>
+        <a href="request.html">Request Card</a>
+        <a href="tradeIn.html">Trade-In</a>
       </div>
     </div>
-  
-    <!-- Request Button -->
-    <a href="request.html" class="request-button">
-      <i class="fa-solid fa-plus"></i> Request a Card
-    </a>
-  </div>
-  
-<div class="toolbar-row">
-  <!-- Filters (Left) -->
-  <div class="filter-sidebar">
-    <div class="filter-dropdown-wrapper">
-      <button class="filter-toggle" onclick="toggleFilterMenu()">
-        <i class="fa fa-filter"></i> Filters
-      </button>
-      <div id="filter-menu" class="filter-menu">
-        <div class="filter-group">
-          <label for="color-filter">Color:</label>
-          <select id="color-filter" class="styled-dropdown">
-            <option value="">All Colors</option>
-            <option value="W">White</option>
-            <option value="U">Blue</option>
-            <option value="B">Black</option>
-            <option value="R">Red</option>
-            <option value="G">Green</option>
-            <option value="C">Colorless</option>
-            <option value="M">Multicolor</option>
-            <option value="L">Land</option>
-          </select>
-        </div>
 
-        <div class="filter-group">
-          <label for="type-filter">Card Type:</label>
-          <select id="type-filter" class="styled-dropdown">
-            <option value="">All Types</option>
-            <option value="Creature">Creature</option>
-            <option value="Instant">Instant</option>
-            <option value="Sorcery">Sorcery</option>
-            <option value="Artifact">Artifact</option>
-            <option value="Enchantment">Enchantment</option>
-            <option value="Planeswalker">Planeswalker</option>
-            <option value="Land">Land</option>
-          </select>
-        </div>
-
-        <div class="filter-group">
-          <label for="creature-filter">Creature Type:</label>
-          <select id="creature-filter" class="styled-dropdown">
-            <option value="">All Types</option>
-          </select>
-        </div>
-      </div>
-    </div>
+    <!-- Filters button next to hamburger -->
+    <button id="open-sidebar-btn" class="open-sidebar" onclick="toggleSidebar()">
+      <i class="fa fa-filter"></i> Filters
+    </button>
   </div>
 
-  <!-- Sort (Right) -->
-  <div class="sort-sidebar">
-    <label for="sort-dropdown">Sort by:</label>
+  <!-- ✅ Sort dropdown should stay in nav bar -->
+  <div class="sort-dropdown-wrapper">
     <select id="sort-dropdown" class="styled-dropdown">
+      <option disabled selected hidden>Sort By</option>
       <option value="name-asc">Name A → Z</option>
       <option value="name-desc">Name Z → A</option>
       <option value="price-asc">Price Low → High</option>
       <option value="price-desc">Price High → Low</option>
     </select>
   </div>
-</div>
+</div> <!-- ✅ CLOSE .nav-bar HERE -->
   
-  <!-- Card Grid -->
-  <div id="card-container"></div>
+<div class="page-layout">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="filter-sidebar open">
+    <div class="filter-header">
+      <span>Filters</span>
+      <button class="close-sidebar" onclick="toggleSidebar()">✖</button>
+    </div>
+    <div class="filter-group">
+      <label for="color-filter">Color:</label>
+      <select id="color-filter" class="styled-dropdown">
+        <option value="">All Colors</option>
+        <option value="W">White</option>
+        <option value="U">Blue</option>
+        <option value="B">Black</option>
+        <option value="R">Red</option>
+        <option value="G">Green</option>
+        <option value="C">Colorless</option>
+        <option value="M">Multicolor</option>
+        <option value="L">Land</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="type-filter">Card Type:</label>
+      <select id="type-filter" class="styled-dropdown">
+        <option value="">All Types</option>
+        <option value="Creature">Creature</option>
+        <option value="Instant">Instant</option>
+        <option value="Sorcery">Sorcery</option>
+        <option value="Artifact">Artifact</option>
+        <option value="Enchantment">Enchantment</option>
+        <option value="Planeswalker">Planeswalker</option>
+        <option value="Land">Land</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="creature-filter">Creature Type:</label>
+      <select id="creature-filter" class="styled-dropdown">
+        <option value="">All Types</option>
+      </select>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div id="card-container"></div>
+  </main>
+</div>
 
   <script>
        let renderSessionToken = 0;
@@ -925,26 +999,30 @@ function applyFilters() {
 
   // ... sorting logic stays the same
   filteredCards.sort((a, b) => {
-    const getEffectivePrice = (card, descending = false) => {
-      const isFoil = card.foil || !!card.foilType;
-      let price = parseFloat(isFoil ? card.priceUsdFoil : card.priceUsd);
-      if (isFoil && (isNaN(price) || price === 0)) {
-        price = parseFloat(card.priceUsd);
-      }
-      return isNaN(price) ? (descending ? -Infinity : Infinity) : price;
-    };
-
-    if (sortDir === 'price-asc' || sortDir === 'price-desc') {
-      const descending = sortDir === 'price-desc';
-      const priceA = getEffectivePrice(a, descending);
-      const priceB = getEffectivePrice(b, descending);
-      return descending ? priceB - priceA : priceA - priceB;
+  const getEffectivePrice = (card) => {
+    const isFoil = card.foil || !!card.foilType;
+    let price = parseFloat(isFoil ? card.priceUsdFoil : card.priceUsd);
+    if (isFoil && (isNaN(price) || price === 0)) {
+      price = parseFloat(card.priceUsd);
     }
+    return isNaN(price) ? 0 : price;
+  };
 
-    const aTitle = a.foil ? `${a.cardName} (Foil)` : a.cardName;
-    const bTitle = b.foil ? `${b.cardName} (Foil)` : b.cardName;
-    return sortDir === 'name-asc' ? aTitle.localeCompare(bTitle) : bTitle.localeCompare(aTitle);
-  });
+  if (sortDir === 'price-asc') {
+    return getEffectivePrice(a) - getEffectivePrice(b);
+  }
+  if (sortDir === 'price-desc') {
+    return getEffectivePrice(b) - getEffectivePrice(a);
+  }
+  if (sortDir === 'name-asc') {
+    return a.cardName.localeCompare(b.cardName);
+  }
+  if (sortDir === 'name-desc') {
+    return b.cardName.localeCompare(a.cardName);
+  }
+
+  return 0; // default fallback
+});
 
   renderAllCards();
 }
@@ -998,6 +1076,14 @@ function applyFilters() {
       } else {
         renderAllCards();
       }
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const openBtn = document.getElementById('open-sidebar-btn');
+
+      sidebar.classList.toggle('open');
+      openBtn.style.display = sidebar.classList.contains('open') ? 'none' : 'inline-flex';
     }
   
     async function loadCreatureTypes() {

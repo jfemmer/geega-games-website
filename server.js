@@ -1027,7 +1027,7 @@ app.post('/api/shippo/label', async (req, res) => {
 
     res.json({ labelUrl: label.label_url });
   } catch (err) {
-    console.error('❌ Shippo label error:', err);
+    console.error('❌ Shippo label error:', err.response?.data || err.stack || err);
     res.status(500).json({ message: 'Failed to generate label', error: err.message });
   }
 });

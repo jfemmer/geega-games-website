@@ -1026,7 +1026,21 @@ app.post('/api/shippo/label', async (req, res) => {
       label_file_type: 'PDF'
     });
 
-    res.json({ labelUrl: label.label_url });
+    console.log('📨 Full label response:', label);
+
+    const labelUrl = label.label_url || label.label_pdf_url;
+
+    if (!labelUrl) {
+      return res.status(500).json({
+        message: 'Label creation failed — no label URL returned.',
+        error: label.messages || 'Missing label_url and label_pdf_url.'
+      });
+    }
+
+    res.json({
+      labelUrl,
+      trackingNumber: label.tracking_number
+    });
   } catch (err) {
     console.error('❌ Shippo label error:', err.response?.data || err.stack || err);
     res.status(500).json({
@@ -1035,6 +1049,7 @@ app.post('/api/shippo/label', async (req, res) => {
     });
   }
 });
+
 
 
 // Start Server

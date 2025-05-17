@@ -1,4 +1,7 @@
 module.exports = async () => {
-  const { default: shippoInit } = await import('shippo');
-  return shippoInit(process.env.SHIPPO_TEST_KEY);
+  const shippoModule = await import('shippo');
+  console.log('🚚 Shippo module keys:', Object.keys(shippoModule));
+
+  const shippo = shippoModule.default?.default || shippoModule.default || shippoModule;
+  return shippo(process.env.SHIPPO_TEST_KEY);
 };

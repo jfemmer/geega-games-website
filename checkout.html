@@ -1,850 +1,1089 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Checkout - Geega Games</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <style>
- body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #f0f2f5;
-  margin: 0;
-  padding: 0;
-}
+// server.js
+const express = require('express');
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const cors = require('cors');
+const axios = require('axios');
+require('dotenv').config();
+console.log("Stripe key exists?", !!process.env.STRIPE_SECRET_KEY);
 
-.container {
-  max-width: 800px;
-  margin: 40px auto;
-  background: #fff;
-  padding: 32px;
-  border-radius: 18px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
-}
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const app = express();
 
-h1 {
-  text-align: center;
-  color: rebeccapurple;
-  font-size: 32px;
-  font-weight: 600;
-  margin-bottom: 30px;
-}
+// 🆕 NEW: Multer + Tesseract
+const multer = require('multer');
+const Tesseract = require('tesseract.js');
+const path = require('path');
+const fs = require('fs');
+const sharp = require('sharp');
 
-.section {
-  margin-bottom: 40px;
-}
+const uspsUserID = process.env.USPS_USER_ID;
+const getShippo = require('./shippo-wrapper');
 
-.section h2 {
-  font-size: 22px;
-  color: rebeccapurple;
-  margin-bottom: 14px;
-  border-bottom: 2px solid #e0d3ee;
-  padding-bottom: 6px;
-  font-weight: 500;
-}
+// Setup for multer file uploads
+const upload = multer({ dest: 'uploads/' });
 
-.summary {
-  border: 1px solid #ddd;
-  padding: 22px;
-  border-radius: 14px;
-  background: #fafafa;
-}
+// Email + Twilio
+const nodemailer = require('nodemailer');
+const twilio = require('twilio');
 
-.summary p,
-.summary label,
-.summary small {
-  font-size: 15px;
-  line-height: 1.7;
-}
+const xml2js = require('xml2js');
+const parser = new xml2js.Parser();
 
-.payment-methods {
-  margin-bottom: 30px;
-}
-
-.payment-methods button {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  margin-bottom: 14px;
-  padding: 14px 18px;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.3s ease, transform 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-}
-
-.payment-methods button:hover {
-  transform: scale(1.03);
-}
-
-.venmo {
-  background: #3d95ce;
-  color: white;
-}
-
-.venmo:hover {
-  background: #2c7eb9;
-}
-
-.paypal {
-  background: #003087;
-  color: white;
-}
-
-.paypal:hover {
-  background: #002065;
-}
-
-.cashapp {
-  background: #00d632;
-  color: white;
-}
-
-.cashapp:hover {
-  background: #00b82a;
-}
-
-.submit-btn {
-  background: rebeccapurple;
-  color: white;
-  font-size: 18px;
-  padding: 16px 24px;
-  border: none;
-  border-radius: 12px;
-  width: 100%;
-  font-weight: bold;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(102, 51, 153, 0.15);
-  transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-}
-
-.submit-btn:hover {
-  background: #4b1c6e;
-  transform: scale(1.03);
-  box-shadow: 0 8px 24px rgba(102, 51, 153, 0.3);
-}
-
-.back-link {
-  display: block;
-  text-align: center;
-  margin-top: 35px;
-  color: rebeccapurple;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.back-link:hover {
-  text-decoration: underline;
-}
-
-gmpx-placeautocomplete {
-  display: block;
-  font-size: 16px;
-  margin-top: 8px;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-}
-
-#card-element {
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  background: #fdfdfd;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-#card-element:focus-within {
-  border-color: rebeccapurple;
-  outline: none;
-}
-
-.payment-button-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  margin-top: 16px;
-}
-
-#venmo-btn-container,
-#paypal-button-container {
-  width: 100%;
-  max-width: 2000px;
-  margin-left: 50px;
-}
-
-.foil-shimmer {
-  position: relative;
-  overflow: hidden;
-}
-
-.foil-shimmer::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    130deg,
-    rgba(255, 255, 255, 0) 40%,
-    rgba(255, 255, 255, 0.4) 50%,
-    rgba(255, 255, 255, 0) 60%
-  );
-  animation: shimmer 2.5s infinite linear;
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translate(-100%, -100%) rotate(25deg);
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.NOTIFY_EMAIL,
+    pass: process.env.NOTIFY_PASSWORD,
   }
-  100% {
-    transform: translate(100%, 100%) rotate(25deg);
-  }
-}
+});
 
-@media (max-width: 768px) {
-  .container {
-    margin: 20px;
-    padding: 20px;
-  }
+const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
 
-  .payment-methods button {
-    font-size: 15px;
-    padding: 12px;
-  }
+// Middleware
+app.use(express.json());
 
-  .submit-btn {
-    font-size: 16px;
-  }
-}
+app.use(cors({
+  origin: ['http://localhost:5500', 'https://jfemmer.github.io', 'https://www.geega-games.com'],
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type'],
+  credentials: true
+}));
 
-@media (max-width: 480px) {
-  #paypal-button-container {
-    justify-content: center;
-    margin-left: 0;
-  }
-}
 
-</style>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<script src="https://js.stripe.com/v3/"></script>
-<script src="https://www.paypal.com/sdk/js?client-id=AZEjeBXcTiffGaJM0dgIE9-RVe9VV7wBf9aH27Fe1Y5SUQRgYIG5YuM59O-Nb5k93EeK7umarb0_23qn&components=buttons,funding-eligibility&enable-funding=venmo,paypal&disable-funding=card,credit,paylater"></script>
-</head>
-<body>
-  <div class="container">
-    <h1>Checkout</h1>
+// ✅ Scryfall Image Fetch Helper
+const fetchScryfallImageUrl = async (name, set, options = {}) => {
+  const cleanedName = name.split('(')[0].trim();
+  const loweredName = name.toLowerCase();
+  let query = `${cleanedName} set:${set.toLowerCase()}`;
 
-    <div class="section">
-      <h2>Order Summary</h2>
-      <div class="summary" id="order-summary">
-        <p><strong>Name:</strong> <span id="summary-name">Loading...</span></p>
-        <p><strong>Email:</strong> <span id="summary-email">Loading...</span></p>
-        <div id="card-list" style="margin-top: 20px;">
-          <h3 style="color: rebeccapurple; font-size: 16px;">Cards in Your Order:</h3>
-          <div id="cart-cards" style="margin-top: 10px;"></div>
-        </div>
-        <p><strong>Total:</strong> <span id="summary-total">$0.00</span></p>
-      </div>
-    </div>
+  if (loweredName.includes('borderless')) query += ' is:borderless';
+  else if (loweredName.includes('showcase')) query += ' frame:showcase';
+  else if (loweredName.includes('extended')) query += ' frame:extendedart';
 
-    <div class="section">
-      <h2>Shipping Address</h2>
-      <div class="summary" id="shipping-info">
-        <p><strong>Address:</strong> <span id="shipping-address">Loading...</span></p>
-        <button onclick="editAddress()" style="margin-top: 10px; background: rebeccapurple; color: white; padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer;">Edit Address</button>
-      </div>
-    </div>
-
-<div class="section">
-  <h2>Shipping Method</h2>
-<div class="summary">
-  <label style="display: block; margin-bottom: 10px;">
-    <input type="radio" name="shippingMethod" value="pwe" onchange="updatePaymentOptions()" />
-    Plain White Envelope (PWE) – $1.25 (no tracking, buyer’s risk)<br>
-    <small style="color: crimson;"><em>* Only Credit/Debit is accepted for PWE</em></small>
-  </label>
-
-  <label style="display: block; margin-top: 10px;">
-    <input type="radio" name="shippingMethod" value="tracked" checked onchange="updatePaymentOptions()" />
-    Tracked Shipping – $5 (USPS First Class)<br>
-    <small><em>All payment methods accepted</em></small>
-  </label>
-  <p id="free-tracking-note" style="color: green; font-weight: bold; display: none; margin-top: 10px;">
-  🎉 Free tracking applied to orders over $75!
-</p>
-</div>
-</div>
-
-   <div class="payment-methods" id="payment-methods" style="margin-bottom: 25px;">
- <div class="payment-button-wrapper">
-  <div id="venmo-btn-container"></div>
-  <div id="paypal-button-container"></div>
-</div>
-</div>
-
-<div class="section">
-  <h2>Pay With Card</h2>
-  <div class="summary">
-    <form id="payment-form">
-      <div id="card-element"></div>
-      <div id="card-errors" role="alert" style="color: crimson; margin-top:10px;"></div>
-    </form>
-  </div>
-</div>
-
-<button class="submit-btn">Submit My Order</button>
-
-    <a href="cart.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Cart</a>
-  </div>
-
-<script>
-const API_BASE = 'https://geega-games-website-production.up.railway.app';
-let currentUser = null;
-
-function initAutocomplete() {
-  const input = document.getElementById('autocomplete');
-  const autocomplete = new google.maps.places.Autocomplete(input, {
-    types: ['address'],
-    componentRestrictions: { country: 'us' },
-    fields: ['formatted_address']
-  });
-
-  autocomplete.addListener('place_changed', () => {
-    const place = autocomplete.getPlace();
-    if (place.formatted_address) {
-      input.value = place.formatted_address;
-    }
-  });
-}
-
-function calculateAndDisplayTotal() {
-  let base = parseFloat(localStorage.getItem('cartTotal'));
-  if (isNaN(base)) base = 0;
-
-  const shipping = document.querySelector('input[name="shippingMethod"]:checked')?.value;
-  let total = base;
-
-  const qualifiesForFreeTracking = base >= 75 && shipping === 'tracked';
-  console.log(`📦 Base: ${base}, Shipping: ${shipping}, Free tracking? ${qualifiesForFreeTracking}`);
-
-if (shipping === 'tracked' && !qualifiesForFreeTracking) {
-  total += 5;
-} else if (shipping === 'pwe') {
-  total += 1.25;
-}
-
-  document.getElementById('summary-total').textContent = `$${total.toFixed(2)}`;
-  localStorage.setItem('cartTotalFinal', total.toFixed(2));
-
-  const freeTrackingNote = document.getElementById('free-tracking-note');
-  if (freeTrackingNote) {
-    freeTrackingNote.style.display = qualifiesForFreeTracking ? 'block' : 'none';
-  }
-}
-
-(async () => {
-  const userId = localStorage.getItem('userId');
-  if (!userId) {
-    document.getElementById('summary-name').textContent = 'Not logged in';
-    document.getElementById('summary-email').textContent = '—';
-    return;
+  if (loweredName.includes('rainbow foil') || set.toLowerCase().startsWith('sl')) {
+    query += ' finish:rainbow_foil';
   }
 
   try {
-    const userRes = await fetch(`${API_BASE}/api/users`);
-    const users = await userRes.json();
-    currentUser = users.find(u => u._id === userId);
-
-    if (currentUser) {
-      document.getElementById('summary-name').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
-      document.getElementById('summary-email').textContent = currentUser.email;
-
-      const parts = [currentUser.address, currentUser.state, currentUser.zip].filter(Boolean);
-      document.getElementById('shipping-address').textContent = parts.join(', ') || 'Not provided';
-    } else {
-      document.getElementById('summary-name').textContent = 'User not found';
-      document.getElementById('summary-email').textContent = '—';
-      document.getElementById('shipping-address').textContent = 'Not found';
-    }
+    const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`;
+    const result = await axios.get(searchUrl);
+    const cardData = result.data.data?.[0];
+    if (!cardData) return '';
+    return cardData.image_uris?.normal || cardData.card_faces?.[0]?.image_uris?.normal || '';
   } catch (err) {
-    console.error('❌ Error fetching user data:', err);
-    document.getElementById('summary-name').textContent = 'Error';
-    document.getElementById('summary-email').textContent = '—';
-    document.getElementById('shipping-address').textContent = 'Error loading address';
+    console.warn(`⚠️ Couldn’t fetch image for ${name} (${set}):`, err.message);
+    return '';
+  }
+};
+
+// ✅ Environment variables
+const MONGODB_URI = process.env.MONGODB_URI;
+const INVENTORY_DB_URI = process.env.INVENTORY_DB_URI;
+const EMPLOYEE_DB_URI = process.env.EMPLOYEE_DB_URI;
+const TRADEIN_DB_URI = process.env.TRADEIN_DB_URI;
+const port = process.env.PORT || 3000;
+
+if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI || !TRADEIN_DB_URI ) {
+  console.error('❌ One or more MongoDB URIs are missing in environment variables!');
+  process.exit(1);
+}
+
+// ✅ Connect to MongoDB
+const db1 = mongoose.createConnection(MONGODB_URI);
+const inventoryConnection = mongoose.createConnection(INVENTORY_DB_URI);
+const employeeConnection = mongoose.createConnection(EMPLOYEE_DB_URI);
+const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI);
+
+const createCartModel = require('./models/Cart');
+const Cart = createCartModel(db1);
+
+
+// ✅ Connection Logs
+[db1, inventoryConnection, employeeConnection, tradeInConnection].forEach((db, i) => {
+  db.on('connected', () => console.log(`✅ Connected to MongoDB database #${i+1}`));
+  db.on('error', (err) => console.error(`❌ MongoDB connection error #${i+1}:`, err.message));
+});
+
+const userSchema = new mongoose.Schema({
+  firstName: String,
+  lastName: String,
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  phone: String,
+  address: String,
+  state: String,
+  zip: String,
+  createdAt: { type: Date, default: Date.now },
+
+  // ✅ Notification Preferences
+  announcementNotifications: {
+  enabled: { type: Boolean, default: false },
+  byEmail: { type: Boolean, default: true },
+  byText: { type: Boolean, default: false }
+},
+
+  shippingNotifications: {
+    enabled: { type: Boolean, default: true },
+    byEmail: { type: Boolean, default: true },
+    byText: { type: Boolean, default: false }
+  }
+});
+
+const User = db1.model('User', userSchema);
+
+const inventorySchema = new mongoose.Schema({
+  cardName: { type: String, required: true },
+  quantity: { type: Number, required: true },
+  set: { type: String, required: true },
+  condition: { type: String, required: true },
+  foil: { type: Boolean, default: false },
+  imageUrl: String,
+  colors: [String],
+  cardType: String,
+  creatureTypes: [String],
+  priceUsd: Number,         // ✅ add this
+  priceUsdFoil: Number,     // ✅ and this
+  addedAt: { type: Date, default: Date.now }
+});
+const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
+
+const employeeSchema = new mongoose.Schema({
+  role: { type: String, required: true }, firstName: { type: String, required: true },
+  lastName: { type: String, required: true }, phone: { type: String, required: true },
+  email: { type: String, required: true }, emergencyContact: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+const Employee = employeeConnection.model('Employee', employeeSchema, 'Employees');
+
+const orderSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  firstName: String,
+  lastName: String,
+  email: String,
+  address: String,
+  cards: [
+    {
+      cardName: String,
+      set: String,
+      foil: Boolean,
+      specialArt: String,
+      quantity: Number,
+      imageUrl: String,
+      priceUsd: Number,
+      condition: String
+    }
+  ],
+  shippingMethod: String,
+  paymentMethod: String,
+  orderTotal: Number,
+  submittedAt: { type: Date, default: Date.now },
+
+  // 🆕 Status + Tracking Fields
+  status: { type: String, default: 'Pending' }, // e.g. 'Packing', 'Dropped Off', 'Shipped'
+  packedAt: Date,
+  droppedOffAt: Date, // ✅ Add this line
+  trackingNumber: String,
+  trackingCarrier: String, // e.g., 'USPS', 'UPS'
+  trackingHistory: [
+    {
+      timestamp: Date,
+      status: String,
+      details: String
+    }
+  ]
+});
+
+const Order = db1.model('Order', orderSchema, 'Orders');
+
+const tradeInSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  firstName: String,
+  lastName: String,
+  email: String,
+  phone: String,
+  cards: [
+    {
+      cardName: String,
+      set: String,
+      foil: Boolean,
+      condition: String,
+      imageUrl: String,
+    },
+  ],
+  submittedAt: { type: Date, default: Date.now }
+});
+
+const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
+
+// ✅ Routes
+
+// Root
+app.get('/', (req, res) => res.send('🧙‍♂️ Welcome to the Geega Games API!'));
+
+// Version Check
+app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js version'));
+
+
+// 🔁 Get cart
+// ✅ GET cart
+// ✅ GET cart
+// ✅ GET cart
+// 🛒 GET cart
+app.get('/api/cart', async (req, res) => {
+  const { userId } = req.query;
+  console.log('📥 [GET] /api/cart - Received userId:', userId);
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    console.warn('⚠️ Invalid userId format (GET):', userId);
+    return res.status(400).json({ message: 'Invalid userId format.' });
   }
 
   try {
-    const cartRes = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
-    const data = await cartRes.json();
-    const container = document.getElementById('cart-cards');
-    container.innerHTML = '';
+    const objectId = new mongoose.Types.ObjectId(userId);
+    console.log('🔍 Converted userId to ObjectId:', objectId);
 
-    if (!data.items || data.items.length === 0) {
-      container.innerHTML = '<p>No items in your cart.</p>';
-      return;
-    }
+    const cart = await Cart.findOne({ userId: objectId });
+    console.log('📦 Cart query result:', cart);
 
-    for (const item of data.items) {
-      let img = item.imageUrl;
-      if (!img || !img.startsWith('http')) {
-        try {
-          const scryRes = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(item.cardName)}`);
-          const scryData = await scryRes.json();
-          img = scryData.image_uris?.normal || scryData.card_faces?.[0]?.image_uris?.normal;
-        } catch (err) {
-          console.warn(`❌ Failed to fetch image for ${item.cardName}:`, err);
-        }
-      }
-
-      img = img || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
-      const price = parseFloat(item.priceUsd || 0).toFixed(2);
-      const quantity = item.quantity || 1;
-
-      const card = document.createElement('div');
-      card.style.display = 'flex';
-      card.style.alignItems = 'center';
-      card.style.marginBottom = '12px';
-      card.style.padding = '8px 0';
-      card.style.borderBottom = '1px solid #eee';
-
-      card.innerHTML = `
-        <div class="${item.foil ? 'foil-shimmer' : ''}" style="width: 80px; height: auto; border-radius: 8px; margin-right: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden;">
-          <img src="${img}" alt="${item.cardName}" style="width: 100%; height: auto; border-radius: 8px;">
-        </div>
-        <div style="font-size: 14px;">
-          <div><strong>${item.cardName}</strong></div>
-          <div>${item.set} | ${item.foil ? 'Foil' : 'Non-Foil'} | ${item.condition}</div>
-          <div>Qty: ${quantity} | $${price}</div>
-        </div>
-      `;
-      container.appendChild(card);
-    }
-
- // 👇 Sum up the cart
-let subtotal = 0;
-for (const item of data.items) {
-  const price = parseFloat(item.priceUsd || 0);
-  const quantity = item.quantity || 1;
-  subtotal += price * quantity;
-}
-localStorage.setItem('cartTotal', subtotal.toFixed(2));
-
-// 👇 Force update shipping cost & display
-updatePaymentOptions();  // ✅ This now works with the real subtotal
-
-calculateAndDisplayTotal(); // 🔁 Now this uses correct subtotal
+    res.json(cart ? { items: cart.items || [] } : { items: [] });
   } catch (err) {
-    console.error('❌ Error loading cart data:', err);
-    document.getElementById('cart-cards').innerHTML = '<p>Failed to load cart items.</p>';
+    console.error('❌ [GET] Fetch cart error:', err.stack || err);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
   }
-})();
+});
 
-function updatePaymentOptions() {
-  const shipping = document.querySelector('input[name="shippingMethod"]:checked')?.value;
-  const storedTotal = localStorage.getItem('cartTotal');
+// 🛒 POST add item to cart
+app.post('/api/cart', async (req, res) => {
+  const { userId, item } = req.body;
+  console.log('📥 [POST] /api/cart - Payload:', { userId, item });
 
-  if (!shipping || !storedTotal || isNaN(parseFloat(storedTotal))) {
-    console.warn('❌ Missing shipping method or cart total.');
-    return;
-  }
-
-  const venmoBtn = document.getElementById('venmo-btn');
-  const cashappBtn = document.getElementById('cashapp-btn');
-  const venmoNote = document.getElementById('venmo-note');
-  const paypalContainer = document.getElementById('paypal-button-container');
-  const paypalBtn = document.getElementById('paypal-btn');
-
-  if (shipping === 'pwe') {
-    if (venmoBtn) venmoBtn.style.display = 'flex';
-    if (venmoNote) venmoNote.style.display = 'inline';
-    if (cashappBtn) cashappBtn.style.display = 'none';
-    if (paypalContainer) paypalContainer.style.display = 'none';
-    if (paypalBtn) paypalBtn.style.display = 'none';
-  } else if (shipping === 'tracked') {
-    if (venmoBtn) venmoBtn.style.display = 'flex';
-    if (venmoNote) venmoNote.style.display = 'none';
-    if (cashappBtn) cashappBtn.style.display = 'flex';
-    if (paypalBtn) paypalBtn.style.display = 'flex';
-    if (paypalContainer) paypalContainer.style.display = 'block';
-
-    // Render PayPal button once
-    if (!window.paypalButtonRendered) {
-      window.paypalButtonRendered = true;
-      const total = localStorage.getItem('cartTotalFinal') || '0.00';
-
-      paypal.Buttons({
-        createOrder: function(data, actions) {
-          return actions.order.create({
-            purchase_units: [{ amount: { value: total } }]
-          });
-        },
-        onApprove: function(data, actions) {
-          return actions.order.capture().then(function(details) {
-            alert('✅ Payment completed by ' + details.payer.name.given_name);
-            window.location.href = 'checkout-success.html';
-          });
-        },
-        onError: function(err) {
-          console.error('❌ PayPal Error:', err);
-          alert('Something went wrong with PayPal.');
-        }
-      }).render('#paypal-button-container');
-    }
+  // 🔍 Validate userId
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    console.warn('⚠️ Invalid userId format (POST):', userId);
+    return res.status(400).json({ message: 'Invalid userId format.' });
   }
 
-  calculateAndDisplayTotal();
-}
-
-function editAddress() {
-  const modal = document.getElementById('address-modal');
-  modal.style.display = 'flex';
-
-  // Optional: Initialize autocomplete once
-  setTimeout(() => {
-    if (!window._addressAutocompleteInitialized) {
-      initAutocomplete();
-      window._addressAutocompleteInitialized = true;
-    }
-  }, 100);
-}
-
-function closeModal() {
-  document.getElementById('address-modal').style.display = 'none';
-}
-
-async function saveAddress() {
-  const el = document.getElementById('autocomplete');
-  const full = el?.value || el?.getAttribute('value');
-
-  if (!full || full.trim().length < 5) {
-    alert('Please select a valid address from the dropdown.');
-    return;
-  }
-
-  const userId = localStorage.getItem('userId');
-  const parts = full.split(',').map(p => p.trim());
-  const [address = '', city = '', stateZip = ''] = parts;
-  const [state = '', zip = ''] = stateZip.split(' ');
-
-  document.getElementById('shipping-address').textContent = full;
-  closeModal();
-
-  if (currentUser && currentUser._id) {
-    try {
-      await fetch(`${API_BASE}/api/users/${currentUser._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address, state, zip })
-      });
-      console.log('✅ Address updated');
-    } catch (err) {
-      console.error('❌ Failed to update address via API:', err);
-    }
-  }
-}
-
-
-function redirectTo(method) {
-  window.lastSelectedPaymentMethod = method;
-
-  const raw = localStorage.getItem('cartTotalFinal') || localStorage.getItem('cartTotal') || '0.00';
-  const amount = parseFloat(raw).toFixed(2);
-  const note = encodeURIComponent('MTG Order');
-
-  switch (method) {
-    case 'venmo':
-      window.location.href = `https://venmo.com/GeegaGames?txn=pay&amount=${amount}&note=${note}`;
-      break;
-    case 'paypal':
-      window.location.href = `https://www.paypal.com/paypalme/femmer4/${amount}`;
-      break;
-    case 'cashapp':
-      window.location.href = `https://cash.app/$GeegaGames?amount=${amount}`;
-      break;
-    default:
-      alert('Invalid payment method');
-  }
-}
-
-async function placeOrder() {
-  const userId = localStorage.getItem('userId');
-  if (!userId || !currentUser) {
-    alert('❌ Please log in before placing an order.');
-    return;
-  }
-
-  const shippingMethod = document.querySelector('input[name="shippingMethod"]:checked')?.value || 'pwe';
-  const selectedPayment = window.lastSelectedPaymentMethod || 'venmo';
-
-  if (shippingMethod === 'pwe' && selectedPayment !== 'venmo') {
-    alert('❌ Only Venmo (Friends & Family) is accepted for Plain White Envelope shipping.');
-    return;
+  // 🔍 Validate item fields
+  if (!item || !item.cardName || !item.set || !item.condition || item.quantity == null) {
+    console.warn('⚠️ Missing required item fields:', item);
+    return res.status(400).json({ message: 'Missing required item fields (cardName, set, condition, quantity).' });
   }
 
   try {
-    const cartRes = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
-    const cart = await cartRes.json();
-    const cartItems = cart.items || [];
+    const objectId = new mongoose.Types.ObjectId(userId);
 
-    for (const item of cartItems) {
-      if (!item.imageUrl) {
-        try {
-          const scryRes = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(item.cardName)}`);
-          const scryData = await scryRes.json();
-          item.imageUrl = scryData.image_uris?.normal || scryData.card_faces?.[0]?.image_uris?.normal;
-        } catch (e) {
-          item.imageUrl = 'https://dummyimage.com/75x105/cccccc/000000&text=No+Image';
-        }
-      }
-    }
-
-    const priceRes = await fetch(`${API_BASE}/api/inventory/prices`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cards: cartItems.map(item => ({
-          cardName: item.cardName,
-          set: item.set,
-          foil: item.foil
-        }))
-      })
+    // 🔍 Lookup matching inventory item
+    const inventoryItem = await CardInventory.findOne({
+      cardName: item.cardName,
+      set: item.set,
+      foil: !!item.foil,
+      condition: item.condition
     });
 
-    const priceMap = await priceRes.json();
-
-    const normalize = str => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
-
-    for (const item of cartItems) {
-      const key = `${normalize(item.cardName)}|${normalize(item.set)}|${item.foil ? '1' : '0'}`;
-      const priceFromMap = priceMap[key];
-      const fallbackPrice = parseFloat(item.priceUsd) || 0;
-      const price = priceFromMap != null ? priceFromMap : fallbackPrice;
-      item.priceUsd = parseFloat(price.toFixed(2)); // ✅ Ensure this is saved
+    if (!inventoryItem) {
+      console.warn('⚠️ Inventory item not found:', item);
+      return res.status(404).json({ message: 'Item not found in inventory.' });
     }
 
-    const storedTotal = localStorage.getItem('cartTotalFinal');
-    const orderTotal = parseFloat(storedTotal) || 0;
+    if (inventoryItem.quantity < item.quantity) {
+      console.warn(`⚠️ Not enough stock. Requested: ${item.quantity}, Available: ${inventoryItem.quantity}`);
+      return res.status(400).json({ message: 'Not enough inventory to add to cart.' });
+    }
 
-    const order = {
+    let cart = await Cart.findOne({ userId: objectId });
+    console.log('🛒 Existing cart:', cart || 'None found');
+
+    if (!cart) {
+      console.log('➕ Creating new cart');
+      cart = new Cart({ userId: objectId, items: [item] });
+    } else {
+      const key = `${item.cardName}|${item.set}|${item.foil}|${item.condition}|${item.variantType}`;
+      const existing = cart.items.find(i =>
+        `${i.cardName}|${i.set}|${i.foil}|${i.condition}|${i.variantType}` === key
+      );
+
+      const currentQty = existing ? existing.quantity : 0;
+      const newTotalQty = currentQty + item.quantity;
+
+      if (newTotalQty > inventoryItem.quantity) {
+        console.warn(`⚠️ Combined quantity (${newTotalQty}) exceeds stock (${inventoryItem.quantity})`);
+        return res.status(400).json({ message: 'You cannot add more than what is in stock.' });
+      }
+
+      if (existing) {
+        console.log('🧩 Updating quantity of existing item in cart');
+        existing.quantity = newTotalQty;
+      } else {
+        console.log('🆕 Pushing new item to cart');
+        cart.items.push(item);
+      }
+    }
+
+    cart.updatedAt = new Date();
+    await cart.save();
+    console.log('✅ Cart saved successfully');
+    res.status(200).json({ message: 'Item added to cart' });
+  } catch (err) {
+    console.error('❌ [POST] Add to cart error:', err.stack || err);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
+  }
+});
+
+app.post('/create-payment-intent', async (req, res) => {
+  const { amount } = req.body;
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // convert dollars to cents
+      currency: 'usd',
+      payment_method_types: ['card'],
+    });
+
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (error) {
+    console.error('❌ Stripe error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+// 🗑️ POST remove item by index
+app.post('/api/cart/remove', async (req, res) => {
+  const { userId, index, quantity = 1 } = req.body;
+  console.log('📥 [POST] /api/cart/remove - userId:', userId, 'index:', index, 'quantity:', quantity);
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    console.warn('⚠️ Invalid userId format (REMOVE):', userId);
+    return res.status(400).json({ message: 'Invalid userId format.' });
+  }
+
+  try {
+    const objectId = new mongoose.Types.ObjectId(userId);
+    const cart = await Cart.findOne({ userId: objectId });
+
+    if (!cart) {
+      console.warn('⚠️ No cart found for userId:', userId);
+      return res.status(404).json({ message: 'Cart not found.' });
+    }
+
+    if (index < 0 || index >= cart.items.length) {
+      console.warn('⚠️ Index out of bounds:', index);
+      return res.status(400).json({ message: 'Invalid index.' });
+    }
+
+    const item = cart.items[index];
+
+    if (!item.quantity || typeof item.quantity !== 'number') {
+      console.warn('⚠️ Invalid item quantity:', item.quantity);
+      return res.status(400).json({ message: 'Invalid item quantity.' });
+    }
+
+    if (item.quantity > quantity) {
+      console.log(`➖ Decreasing quantity of "${item.cardName}" from ${item.quantity} by ${quantity}`);
+      cart.items[index].quantity -= quantity;
+    } else {
+      console.log(`🗑️ Removing entire item "${item.cardName}" from cart (quantity ${item.quantity})`);
+      cart.items.splice(index, 1);
+    }
+
+    cart.updatedAt = new Date();
+    await cart.save();
+
+    res.status(200).json({ message: 'Item updated in cart' });
+  } catch (err) {
+    console.error('❌ [REMOVE] Error:', err.stack || err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+
+// 🧹 POST clear cart
+app.post('/api/cart/clear', async (req, res) => {
+  const { userId } = req.body;
+  console.log('📥 [POST] /api/cart/clear - userId:', userId);
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    console.warn('⚠️ Invalid userId format (CLEAR):', userId);
+    return res.status(400).json({ message: 'Invalid userId format.' });
+  }
+
+  try {
+    const objectId = new mongoose.Types.ObjectId(userId);
+    const result = await Cart.findOneAndUpdate(
+      { userId: objectId },
+      { items: [], updatedAt: new Date() }
+    );
+
+    console.log('🧹 Cart clear result:', result);
+    res.status(200).json({ message: 'Cart cleared' });
+  } catch (err) {
+    console.error('❌ [CLEAR] Cart error:', err.stack || err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Creature Types
+app.get('/api/inventory/creature-types', async (req, res) => {
+  try {
+    const types = await CardInventory.distinct('creatureTypes');
+    res.json([...new Set(types.flat().filter(Boolean))].sort());
+  } catch (err) {
+    console.error('❌ Creature types error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+app.post('/signup', async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      username,
+      email,
+      password,
+      phone,
+      address,
+      state,
+      zip,
+      announcementNotifications,
+      shippingNotifications
+    } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
+
+    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    if (existing) return res.status(409).json({ message: 'User already exists.' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await new User({
+      firstName,
+      lastName,
+      username,
+      email,
+      password: hashedPassword,
+      phone,
+      address,
+      state,
+      zip,
+      announcementNotifications: {
+        enabled: announcementNotifications?.enabled ?? false,
+        byEmail: announcementNotifications?.byEmail ?? true,
+        byText: announcementNotifications?.byText ?? false
+      },
+      shippingNotifications: {
+        enabled: shippingNotifications?.enabled ?? true,
+        byEmail: shippingNotifications?.byEmail ?? true,
+        byText: shippingNotifications?.byText ?? false
+      }
+    }).save();
+
+    res.status(201).json({ message: '🐶 Welcome to the Pack!' });
+  } catch (err) {
+    console.error('❌ Signup error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// Login
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    res.json({
+      message: 'Login successful',
+      userId: user._id,
+      username: user.username,
+      firstName: user.firstName  // ✅ make sure this is here
+    });
+  } catch (err) {
+    console.error('❌ Login error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// Get All Users
+app.get('/api/users', async (req, res) => {
+  try {
+    res.json(await User.find().sort({ createdAt: -1 }));
+  } catch (err) {
+    console.error('❌ Fetch users error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// PATCH /api/users/:id - Update address info
+app.patch('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { address, state, zip } = req.body;
+
+    const updated = await User.findByIdAndUpdate(
+      id,
+      { address, state, zip },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ message: 'User not found.' });
+
+    res.json({ message: 'User updated.', user: updated });
+  } catch (err) {
+    console.error('❌ Failed to update user:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// Add Inventory Card
+app.post('/api/inventory', async (req, res) => {
+  try {
+    const { cardName, quantity, set, condition, foil, price } = req.body;
+    if (!cardName || !quantity || !set || !condition) return res.status(400).json({ message: 'Missing fields.' });
+
+    const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
+    await new CardInventory({ cardName, quantity, set, condition, foil: !!foil, imageUrl, price }).save();
+
+    res.status(201).json({ message: 'Card added to inventory!' });
+  } catch (err) {
+    console.error('❌ Add inventory error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+app.post('/api/tradein', async (req, res) => {
+  const { userId, cards } = req.body;
+
+  if (!userId || !Array.isArray(cards) || cards.length === 0) {
+    return res.status(400).json({ message: 'Invalid trade-in data.' });
+  }
+
+  try {
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    const tradeInData = {
       userId,
-      firstName: currentUser.firstName,
-      lastName: currentUser.lastName,
-      email: currentUser.email,
-      address: [currentUser.address, currentUser.state, currentUser.zip].filter(Boolean).join(', '),
-      cards: cartItems,
-      shippingMethod,
-      paymentMethod: selectedPayment,
-      orderTotal
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      cards
     };
 
-    const res = await fetch(`${API_BASE}/api/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(order)
+    await new TradeIn(tradeInData).save();
+    res.status(201).json({ message: '🧾 Trade-in submitted successfully!' });
+  } catch (err) {
+    console.error('❌ Trade-in submission error:', err);
+    res.status(500).json({ message: 'Server error while submitting trade-in.' });
+  }
+});
+
+
+app.get('/api/inventory', async (req, res) => {
+  try {
+    const cards = await CardInventory.find({}, {
+      cardName: 1,
+      quantity: 1,
+      set: 1,
+      condition: 1,
+      foil: 1,
+      imageUrl: 1,
+      colors: 1,
+      cardType: 1,
+      creatureTypes: 1,
+      priceUsd: 1,
+      priceUsdFoil: 1,
+      addedAt: 1
+    }).sort({ cardName: 1 });
+
+    res.json(cards);
+  } catch (err) {
+    console.error('❌ Fetch inventory error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// Get Single Price
+app.post('/api/inventory/price', async (req, res) => {
+  const { cardName, set, foil } = req.body;
+  try {
+    const card = await CardInventory.findOne({ cardName, set, foil: !!foil });
+    if (!card || card.price == null) return res.status(404).json({ error: 'Price not found' });
+    res.json({ price: card.price });
+  } catch (err) {
+    console.error('❌ Single price error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.patch('/api/inventory/update-price', async (req, res) => {
+  const { cardName, set, foil, newPrice } = req.body;
+  if (!cardName || !set || typeof newPrice !== 'number') {
+    return res.status(400).json({ message: 'Missing required fields.' });
+  }
+
+  try {
+    const fieldToUpdate = foil ? 'priceUsdFoil' : 'priceUsd';
+
+    const updated = await CardInventory.findOneAndUpdate(
+      { cardName, set, foil },
+      { [fieldToUpdate]: newPrice },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ message: 'Card not found.' });
+
+    res.json({ message: 'Price updated.', updated });
+  } catch (err) {
+    console.error('❌ Update price error:', err);
+    res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+
+app.post('/api/inventory/prices', async (req, res) => {
+  try {
+    const { cards } = req.body;
+    if (!Array.isArray(cards)) return res.status(400).json({ error: 'Cards array required.' });
+
+    const prices = {};
+    const normalize = str => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
+
+    for (const { cardName, set, foil } of cards) {
+      if (!cardName || !set) continue;
+
+      // Try exact match
+      let match = await CardInventory.findOne({ cardName, set, foil: !!foil });
+
+      // Try case-insensitive fallback
+      if (!match) {
+        match = await CardInventory.findOne({
+          cardName: { $regex: `^${cardName}$`, $options: 'i' },
+          set: { $regex: `^${set}$`, $options: 'i' },
+          foil: !!foil
+        });
+      }
+
+      if (match) {
+        const key = `${normalize(cardName)}|${normalize(set)}|${foil ? '1' : '0'}`;
+        let rawPrice = foil ? match.priceUsdFoil : match.priceUsd;
+        if (rawPrice == null && match.price != null) {
+          rawPrice = match.price;  // ✅ fallback to general price
+        }
+        prices[key] = parseFloat(rawPrice) || 0;
+      }
+    }
+
+    res.json(prices);
+  } catch (err) {
+    console.error('❌ Batch prices error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/orders', async (req, res) => {
+  console.log('🧾 Incoming order data:', req.body);
+
+  const {
+    userId,
+    firstName,
+    lastName,
+    email,
+    address,
+    cards,
+    shippingMethod,
+    paymentMethod,
+    orderTotal
+  } = req.body;
+
+  try {
+    const parsedOrderTotal = parseFloat(orderTotal);
+    const newOrder = new Order({
+      userId,
+      firstName,
+      lastName,
+      email,
+      address,
+      cards,
+      shippingMethod,
+      paymentMethod,
+      orderTotal: isNaN(parsedOrderTotal) ? 0 : parsedOrderTotal,
+      status: req.body.status || 'Pending'
     });
 
-    if (res.ok) {
-      const orderData = await res.json();
-      const orderId = orderData._id;
+    const savedOrder = await newOrder.save();
 
-      await fetch(`${API_BASE}/api/cart/clear`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
+    // 🔻 Decrement inventory for each card in the order
+for (const item of cards) {
+  const match = await CardInventory.findOne({
+    cardName: item.cardName,
+    set: item.set,
+    foil: !!item.foil,
+    condition: item.condition
+  });
 
-      window.location.href = `checkout-success.html?orderId=${orderId}`;
+  if (!match) continue;
+
+  // 🛡️ Inventory safety check
+  if (match.quantity < item.quantity) {
+    return res.status(400).json({
+      message: `Not enough stock for ${item.cardName}. Available: ${match.quantity}, Requested: ${item.quantity}`
+    });
+  }
+
+  match.quantity -= item.quantity;
+
+  if (match.quantity <= 0) {
+    await CardInventory.deleteOne({ _id: match._id });
+  } else {
+    await match.save();
+  }
+}
+
+    // 🧹 Clear cart after successful order
+    await Cart.findOneAndUpdate(
+      { userId },
+      { items: [], updatedAt: new Date() }
+    );
+
+    res.status(201).json(savedOrder);
+  } catch (err) {
+    console.error('❌ Error saving order:', err);
+    res.status(500).json({ message: 'Server error while saving order.' });
+  }
+});
+
+// Delete Inventory Card
+app.delete('/api/inventory', async (req, res) => {
+  try {
+    const { cardName, set, foil } = req.body;
+    const deleted = await CardInventory.findOneAndDelete({ cardName, set, foil: !!foil });
+    if (!deleted) return res.status(404).json({ message: 'Card not found.' });
+    res.status(200).json({ message: 'Card deleted successfully.' });
+  } catch (err) {
+    console.error('❌ Delete card error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+app.patch('/api/inventory/decrement', async (req, res) => {
+  try {
+    const { cardName, set, foil } = req.body;
+
+    if (!cardName || !set) {
+      return res.status(400).json({ message: 'Missing cardName or set.' });
+    }
+
+    const query = {
+      cardName,
+      set,
+      foil: !!foil // Ensure boolean
+    };
+
+    const card = await CardInventory.findOne(query);
+
+    if (!card) {
+      return res.status(404).json({ message: 'Card not found.' });
+    }
+
+    if (card.quantity > 1) {
+      card.quantity -= 1;
+      await card.save();
+      return res.status(200).json({ message: 'Quantity decremented.', card });
     } else {
-      alert('❌ Failed to place order.');
+      await CardInventory.deleteOne({ _id: card._id });
+      return res.status(200).json({ message: 'Card removed from inventory (quantity reached 0).' });
     }
   } catch (err) {
-    console.error('❌ Order error:', err);
-    alert('Something went wrong while placing your order.');
+    console.error('❌ Decrement card error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// Add Employee
+app.post('/api/employees', async (req, res) => {
+  const { role, firstName, lastName, phone, email, emergencyContact } = req.body;
+  try {
+    await new Employee({ role, firstName, lastName, phone, email, emergencyContact }).save();
+    res.status(201).json({ message: 'Employee added!' });
+  } catch (err) {
+    console.error('❌ Employee error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+
+app.patch('/api/orders/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status, trackingNumber } = req.body;
+
+  try {
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ message: 'Order not found.' });
+
+    if (status) {
+  order.status = status;
+
+  if (status.toLowerCase() === 'packing') {
+    order.packedAt = new Date();
+  }
+
+  if (status.toLowerCase() === 'dropped off') {
+    order.droppedOffAt = new Date(); // ✅ Save current time
   }
 }
+    if (trackingNumber) order.trackingNumber = trackingNumber;
+    await order.save();
 
-document.addEventListener('DOMContentLoaded', () => {
-  // ✅ 1. Set default shipping option
-  const trackedRadio = document.querySelector('input[name="shippingMethod"][value="tracked"]');
-  if (trackedRadio) trackedRadio.checked = true;
-  updatePaymentOptions();
-
-  // ✅ 2. Initialize Stripe
-  const stripe = Stripe('pk_test_51RNUixQe9DCrM8Iiw6nGv65MIpZkQkSjXHLEYFTBEC9sDUOazGatkUYAhsZpRqOP8qadX5G8GyReU4a0uUOLUa4c00Zcx1NgAX');
-  const elements = stripe.elements();
-  const card = elements.create('card');
-  card.mount('#card-element');
-
-  card.on('change', ({ error }) => {
-    document.getElementById('card-errors').textContent = error ? error.message : '';
-  });
-
-  // ✅ 3. Handle payment and order on submit
- document.querySelector('.submit-btn').addEventListener('click', async (e) => {
-  e.preventDefault();
-
-  const button = e.target;
-  const overlay = document.getElementById('processing-overlay');
-  const message = document.getElementById('processing-message');
-  
-  button.disabled = true;
-  overlay.style.display = 'flex';
-  message.textContent = 'Processing payment...';
-
-  const totalAmount = localStorage.getItem('cartTotalFinal') || '0.00';
-
-  const response = await fetch(`${API_BASE}/create-payment-intent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount: totalAmount })
-  });
-
-  const { clientSecret, error: backendError } = await response.json();
-
-  if (backendError) {
-    overlay.style.display = 'none';
-    alert(`Backend Error: ${backendError}`);
-    button.disabled = false;
-    return;
-  }
-
-  const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
-    payment_method: {
-      card: card,
-      billing_details: {
-        name: `${currentUser.firstName} ${currentUser.lastName}`,
-        email: currentUser.email,
-        address: {
-          line1: currentUser.address,
-          postal_code: currentUser.zip,
-          state: currentUser.state,
-        },
-      },
+    const user = await User.findById(order.userId);
+    if (!user) {
+      console.warn('⚠️ User not found for order.userId:', order.userId);
+      return res.json({ message: 'Order updated, but user not found.' });
     }
-  });
 
-  if (error) {
-    overlay.style.display = 'none';
-    document.getElementById('card-errors').textContent = error.message;
-    button.disabled = false;
-  } else if (paymentIntent.status === 'succeeded') {
-    message.textContent = '✅ Payment successful! Placing your order...';
-    await placeOrder();
-  } else {
-    overlay.style.display = 'none';
-    alert('❌ Payment was not successful.');
-    button.disabled = false;
+    if (user?.shippingNotifications?.enabled) {
+      const message = `📦 Your Geega Games order is now: ${status}` +
+        (trackingNumber ? ` (Tracking #: ${trackingNumber})` : '');
+
+      try {
+        // ✅ Email
+        if (user.shippingNotifications.byEmail && user.email) {
+          console.log('📧 Sending email to', user.email);
+          await transporter.sendMail({
+            from: `"Geega Games" <${process.env.NOTIFY_EMAIL}>`,
+            to: user.email,
+            subject: '🧙 Order Status Update',
+            text: message
+          });
+        }
+
+        // ✅ SMS
+        if (user.shippingNotifications.byText && user.phone) {
+          const formattedPhone = user.phone.startsWith('+') ? user.phone : `+1${user.phone}`;
+          console.log('📱 Sending SMS to', formattedPhone);
+          await twilioClient.messages.create({
+            body: message,
+            from: process.env.TWILIO_PHONE,
+            to: formattedPhone
+          });
+        }
+      } catch (notifyErr) {
+        console.error('❌ Notification error:', notifyErr.message);
+        // Optionally log notifyErr.stack if needed
+      }
+    }
+
+    res.json({ message: 'Order updated and notification (if enabled) sent.', order });
+  } catch (err) {
+    console.error('❌ Order update error:', err.stack || err);
+    res.status(500).json({ message: 'Server error.' });
   }
 });
+
+app.get('/api/orders/:id', async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    res.json(order);
+  } catch (err) {
+    console.error('❌ Error fetching order by ID:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
+  const imagePath = path.resolve(req.file.path);
+
+  async function sliceIntoCards(filePath) {
+    const image = sharp(filePath);
+    const { width, height } = await image.metadata();
+    console.log(`📏 Image size: ${width} x ${height}`);
+
+    if (!width || !height || width < 900 || height < 900) {
+      throw new Error(`Image too small to slice: ${width}x${height} (min: 900x900 for 3x3 binder layout)`);
+    }
+
+    const cols = 3;
+    const rows = 3;
+    const cardWidth = Math.floor(width / cols);
+    const cardHeight = Math.floor(height / rows);
+
+    const cardPaths = [];
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const left = col * cardWidth;
+        const top = row * cardHeight;
+        const cropWidth = (col === cols - 1) ? width - left : cardWidth;
+        const cropHeight = (row === rows - 1) ? height - top : cardHeight;
+
+        const outputPath = `${filePath}-slice-${row}-${col}.png`;
+
+        try {
+          await image
+            .extract({ left, top, width: cropWidth, height: cropHeight })
+            .toFile(outputPath);
+
+          cardPaths.push(outputPath);
+        } catch (err) {
+          console.warn(`⚠️ Skipped invalid slice (${row},${col}): ${err.message}`);
+        }
+      }
+    }
+
+    return cardPaths;
+  }
+
+  try {
+    const slicedPaths = await sliceIntoCards(imagePath);
+    const results = [];
+
+    for (const slice of slicedPaths) {
+      try {
+        console.log(`🔍 OCR on: ${slice}`);
+        const { data: { text } } = await Tesseract.recognize(slice, 'eng');
+        console.log(`🧠 OCR text:\n${text}`);
+
+        const lines = text
+          .split('\n')
+          .map(l => l.trim())
+          .filter(l => l.length >= 2);
+
+        for (const line of lines) {
+          try {
+            console.log(`🔗 Trying Scryfall for: "${line}"`);
+            const response = await axios.get(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(line)}`);
+            const card = response.data;
+
+            results.push({
+              input: line,
+              matchedCard: card.name,
+              set: card.set_name,
+              image: card.image_uris?.normal || '',
+              price: card.prices.usd || 'N/A',
+            });
+            break; // stop after first valid match per slice
+          } catch (err) {
+            console.warn(`❌ No match on Scryfall for "${line}"`);
+          }
+        }
+      } catch (err) {
+        console.warn(`⚠️ OCR or parsing failed on ${slice}: ${err.message}`);
+      } finally {
+        if (fs.existsSync(slice)) fs.unlinkSync(slice);
+      }
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'No cards recognized. Try a clearer photo of your binder page.' });
+    }
+
+    res.json({ count: results.length, cards: results });
+  } catch (err) {
+    console.error('❌ Full processing error:', err.message || err);
+    res.status(500).json({ error: 'Could not process image or fetch card data.' });
+  } finally {
+    if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+  }
+});
+
+app.get('/api/track-usps/:trackingNumber', async (req, res) => {
+  const { trackingNumber } = req.params;
+  const uspsUserID = process.env.USPS_USER_ID;
+  const debug = req.query.debug === 'true';
+
+  const xml = `
+    <TrackFieldRequest USERID="${uspsUserID}">
+      <TrackID ID="${trackingNumber}"></TrackID>
+    </TrackFieldRequest>
+  `.trim();
+
+  try {
+    const uspsRes = await axios.get('https://secure.shippingapis.com/ShippingAPI.dll', {
+      params: { API: 'TrackV2', XML: xml },
+    });
+
+    const parsed = await parser.parseStringPromise(uspsRes.data);
+    const trackInfo = parsed?.TrackResponse?.TrackInfo?.[0];
+
+    if (debug) {
+      console.log('📦 FULL USPS RESPONSE:');
+      console.dir(trackInfo, { depth: null });
+      return res.json(trackInfo); // return entire object for inspection
+    }
+
+    const summary = trackInfo?.TrackSummary?.[0];
+    const details = Array.isArray(trackInfo?.TrackDetail) ? trackInfo.TrackDetail[0] : null;
+
+    const statusText = summary || details || 'Tracking info not yet available';
+    const dateMatch = statusText.match(/on (.*?)\./i);
+    const dateText = dateMatch ? dateMatch[1] : 'N/A';
+
+    res.json({
+      status: statusText.split(',')[0],
+      date: dateText,
+    });
+  } catch (err) {
+    console.error('❌ USPS tracking parse error:', err.message || err);
+    res.status(500).json({ status: 'Error', date: '' });
+  }
+});
+
+app.post('/api/shippo/label', async (req, res) => {
+  try {
+    const shippo = await getShippo();
+    console.log('✅ Shippo loaded:', typeof shippo, Object.keys(shippo));
+
+    const { addressFrom, addressTo, parcel } = req.body;
+
+    const shipment = await shippo.shipment.create({
+      address_from: addressFrom,
+      address_to: addressTo,
+      parcels: [parcel],
+      async: false
+    });
+
+    const rate = shipment.rates.find(r => r.provider === 'USPS');
+    if (!rate) return res.status(400).json({ message: 'No USPS rate found.' });
+
+    const label = await shippo.transaction.create({
+      rate: rate.object_id,
+      label_file_type: 'PDF'
+    });
+
+    console.log('📨 Full label response:', label);
+
+    const labelUrl = label.label_url || label.label_pdf_url;
+
+    if (!labelUrl) {
+      return res.status(500).json({
+        message: 'Label creation failed — no label URL returned.',
+        error: label.messages || 'Missing label_url and label_pdf_url.'
+      });
+    }
+
+    res.json({
+      labelUrl,
+      trackingNumber: label.tracking_number
+    });
+  } catch (err) {
+    console.error('❌ Shippo label error:', err.response?.data || err.stack || err);
+    res.status(500).json({
+      message: 'Failed to generate label',
+      error: err.response?.data?.error || err.message || 'Unknown error'
+    });
+  }
 });
 
 
-</script>
 
-<div id="address-modal" style="
-  display: none;
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(3px);
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-">
-  <div style="
-    background: white;
-    padding: 30px 24px;
-    border-radius: 16px;
-    width: 90%;
-    max-width: 420px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    animation: fadeIn 0.25s ease-out;
-  ">
-    <h3 style="color: rebeccapurple; font-size: 20px; margin-bottom: 20px; text-align: center;">
-      Edit Shipping Address
-    </h3>
-    <input
-      id="autocomplete"
-      type="text"
-      placeholder="Start typing your address..."
-      style="
-        width: 100%;
-        padding: 12px 14px;
-        font-size: 16px;
-        border-radius: 8px;
-        border: 1px solid #ccc;
-        margin-bottom: 20px;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-        box-sizing: border-box;
-      "
-      required
-    />
-    <div style="text-align: right;">
-      <button onclick="saveAddress()" style="
-        background: rebeccapurple;
-        color: white;
-        border: none;
-        padding: 10px 18px;
-        font-size: 15px;
-        border-radius: 8px;
-        cursor: pointer;
-        margin-right: 10px;
-      ">Save</button>
-      <button onclick="closeModal()" style="
-        background: #eee;
-        color: #333;
-        border: none;
-        padding: 10px 18px;
-        font-size: 15px;
-        border-radius: 8px;
-        cursor: pointer;
-      ">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<div id="processing-overlay" style="
-  display: none;
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(255,255,255,0.9);
-  z-index: 9999;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  font-family: 'Segoe UI', sans-serif;
-  color: rebeccapurple;
-  font-size: 20px;
-  font-weight: bold;
-">
-  <div class="spinner" style="
-    border: 4px solid #eee;
-    border-top: 4px solid rebeccapurple;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-    margin-bottom: 20px;
-  "></div>
-  <span id="processing-message">Processing payment...</span>
-</div>
-
-<style>
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-</style>
-
-<script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initAutocomplete">
-</script>
-</body>
-</html>
-
+// Start Server
+app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

@@ -1131,38 +1131,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function printLabel(orderId) {
   try {
-    // Fetch order data
+    // 🔍 Fetch the full order details from backend
     const res = await fetch(`https://geega-games-website-production.up.railway.app/api/orders/${orderId}`);
+    if (!res.ok) throw new Error(`Order not found (status ${res.status})`);
     const order = await res.json();
 
-    // 🛠️ TEMP fallback for address (replace with saved structured values if you store them!)
+    // 🧠 Try to parse address from stored string if you don't yet have separate fields
     const raw = order.address || '';
     const [street1, city, stateZip] = raw.split(',');
     const [state, zip] = stateZip?.trim().split(' ') || [];
 
+    // 📦 Build Shippo-compatible address
     const address_to = {
       name: `${order.firstName} ${order.lastName}`,
-      street1: street1?.trim() || '',
-      city: city?.trim() || '',
-      state: state?.trim() || '',
-      zip: zip?.trim() || '',
+      street1: (street1 || '').trim(),
+      city: (city || '').trim(),
+      state: (state || '').trim(),
+      zip: (zip || '').trim(),
       country: 'US'
     };
 
+    // 📨 Request label generation from backend
     const labelRes = await fetch('https://geega-games-website-production.up.railway.app/api/shippo/label', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, address_to })
+      body: JSON.stringify({ orderId, address_to })  // ✅ send structured address
     });
 
     const data = await labelRes.json();
     if (!labelRes.ok) throw new Error(data.message || 'Failed to create label');
 
     alert(`✅ Label created! Tracking #: ${data.trackingNumber}`);
-    window.open(data.labelUrl, '_blank');
+    window.open(data.labelUrl, '_blank'); // 📦 Open label in new tab
   } catch (err) {
     console.error('❌ Print label error:', err);
-    alert('❌ Failed to generate label.');
+    alert(`❌ Failed to generate label: ${err.message}`);
   }
 }
 </script>

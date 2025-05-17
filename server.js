@@ -18,8 +18,11 @@ const fs = require('fs');
 const sharp = require('sharp');
 
 const uspsUserID = process.env.USPS_USER_ID;
-const Shippo = require('shippo/lib/shippo'); 
-const shippo = new Shippo(process.env.SHIPPO_TEST_KEY); 
+let shippo;
+(async () => {
+  const m = await import('./shippo-wrapper.mjs');
+  shippo = m.default;
+})();
 
 // Setup for multer file uploads
 const upload = multer({ dest: 'uploads/' });
@@ -995,24 +998,27 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
 });
 
 app.post('/api/shippo/label', async (req, res) => {
+  if (!shippo) {
+    return res.status(503).json({ message: 'Shippo is still initializing, please try again shortly.' });
+  }
+
   const { orderId } = req.body;
 
   try {
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // 🧠 Attempt to parse full address string
+    // 🧠 Parse address like: "123 Main St, Springfield IL 62704"
     const addressParts = order.address?.split(',') || [];
     const street1 = addressParts[0]?.trim() || '';
     const cityStateZip = addressParts[1]?.trim() || '';
     const cityMatch = cityStateZip.match(/^(.*)\s+([A-Z]{2})\s+(\d{5})$/);
-
     const city = cityMatch?.[1]?.trim() || '';
     const state = cityMatch?.[2] || '';
     const zip = cityMatch?.[3] || '';
 
     if (!street1 || !city || !state || !zip) {
-      return res.status(400).json({ message: 'Could not parse address for USPS label.' });
+      return res.status(400).json({ message: 'Invalid address format. Please use: Street, City ST ZIP' });
     }
 
     const addressTo = {
@@ -1032,7 +1038,7 @@ app.post('/api/shippo/label', async (req, res) => {
       state: 'MO',
       zip: '63101',
       country: 'US',
-      email: process.env.NOTIFY_EMAIL
+      email: process.env.NOTIFY_EMAIL || 'you@example.com'
     };
 
     const parcel = {
@@ -1051,8 +1057,11 @@ app.post('/api/shippo/label', async (req, res) => {
       async: false
     });
 
+    const rate = shipment.rates?.[0];
+    if (!rate) return res.status(500).json({ message: 'No rates available from Shippo.' });
+
     const transaction = await shippo.transaction.create({
-      rate: shipment.rates[0].object_id,
+      rate: rate.object_id,
       label_file_type: 'PDF',
       async: false
     });
@@ -1065,11 +1074,13 @@ app.post('/api/shippo/label', async (req, res) => {
       labelUrl: transaction.label_url,
       trackingNumber: transaction.tracking_number
     });
+
   } catch (err) {
     console.error('❌ Shippo label creation error:', err);
     res.status(500).json({ message: 'Failed to create label' });
   }
 });
+
 
 
 

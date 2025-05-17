@@ -1131,38 +1131,61 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function printLabel(orderId) {
   try {
-    // 🔍 Fetch the full order details from backend
+    // 🔍 1. Fetch the order details
     const res = await fetch(`https://geega-games-website-production.up.railway.app/api/orders/${orderId}`);
     if (!res.ok) throw new Error(`Order not found (status ${res.status})`);
     const order = await res.json();
 
-    // 🧠 Try to parse address from stored string if you don't yet have separate fields
+    // 📬 2. Parse the shipping address
     const raw = order.address || '';
     const [street1, city, stateZip] = raw.split(',');
     const [state, zip] = stateZip?.trim().split(' ') || [];
 
-    // 📦 Build Shippo-compatible address
-    const address_to = {
+    const addressTo = {
       name: `${order.firstName} ${order.lastName}`,
       street1: (street1 || '').trim(),
       city: (city || '').trim(),
       state: (state || '').trim(),
       zip: (zip || '').trim(),
-      country: 'US'
+      country: 'US',
+      phone: order.phone || '555-000-0000',
+      email: order.email
     };
 
-    // 📨 Request label generation from backend
+    // 🏢 3. Define your store address
+    const addressFrom = {
+      name: 'Geega Games',
+      street1: '123 Market St',
+      city: 'St. Louis',
+      state: 'MO',
+      zip: '63101',
+      country: 'US',
+      phone: '555-123-4567',
+      email: 'hello@geega-games.com'
+    };
+
+    // 📦 4. Define a sample parcel (you can update dynamically later)
+    const parcel = {
+      length: '6',
+      width: '4',
+      height: '1',
+      distance_unit: 'in',
+      weight: '3',
+      mass_unit: 'oz'
+    };
+
+    // 🚀 5. Call backend to generate label
     const labelRes = await fetch('https://geega-games-website-production.up.railway.app/api/shippo/label', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, address_to })  // ✅ send structured address
+      body: JSON.stringify({ addressFrom, addressTo, parcel })
     });
 
     const data = await labelRes.json();
-    if (!labelRes.ok) throw new Error(data.message || 'Failed to create label');
+    if (!labelRes.ok) throw new Error(data.error || data.message || 'Failed to create label');
 
-    alert(`✅ Label created! Tracking #: ${data.trackingNumber}`);
-    window.open(data.labelUrl, '_blank'); // 📦 Open label in new tab
+    alert(`✅ Label created! Tracking #: ${data.trackingNumber || 'N/A'}`);
+    window.open(data.labelUrl, '_blank');
   } catch (err) {
     console.error('❌ Print label error:', err);
     alert(`❌ Failed to generate label: ${err.message}`);

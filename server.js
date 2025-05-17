@@ -1015,9 +1015,7 @@ app.post('/api/shippo/label', async (req, res) => {
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
     const toAddress = address_to || parseAddressString(order.address);
-    if (!toAddress || !toAddress.street1 || !toAddress.city || !toAddress.state || !toAddress.zip) {
-      return res.status(400).json({ message: 'Invalid address format. Please use: Street, City ST ZIP' });
-    }
+    console.log('📦 Shipping to:', toAddress);
 
     const fromAddress = {
       name: 'Geega Games',
@@ -1037,6 +1035,12 @@ app.post('/api/shippo/label', async (req, res) => {
       mass_unit: 'oz'
     };
 
+    console.log('📦 Creating shipment with:', {
+      address_from: fromAddress,
+      address_to: toAddress,
+      parcels: [parcel]
+    });
+
     const shipment = await shippo.shipment.create({
       address_from: fromAddress,
       address_to: toAddress,
@@ -1049,10 +1053,10 @@ app.post('/api/shippo/label', async (req, res) => {
 
     const transaction = await shippo.transaction.create({ rate: rate.object_id });
     if (transaction.status !== 'SUCCESS') {
+      console.log('❌ Transaction failed:', transaction);
       throw new Error(transaction.messages?.[0]?.text || 'Label creation failed.');
     }
 
-    // ✅ Update order with tracking info
     order.trackingNumber = transaction.tracking_number;
     order.trackingCarrier = transaction.tracking_provider;
     await order.save();
@@ -1062,29 +1066,10 @@ app.post('/api/shippo/label', async (req, res) => {
       labelUrl: transaction.label_url
     });
   } catch (err) {
-    console.error('❌ Shippo error:', err);
-    res.status(400).json({ message: err.message || 'Error creating shipping label' });
+    console.error('❌ Shippo label error:', err);
+    res.status(400).json({ message: err.message || 'Error creating label' });
   }
 });
-
-// Helper to parse old raw string address (fallback)
-function parseAddressString(raw) {
-  try {
-    const [street, city, stateZip] = raw.split(',');
-    const [state, zip] = (stateZip || '').trim().split(' ');
-    return {
-      name: '', // optionally use order name
-      street1: street?.trim(),
-      city: city?.trim(),
-      state: state?.trim(),
-      zip: zip?.trim(),
-      country: 'US'
-    };
-  } catch {
-    return null;
-  }
-}
-
 
 
 // Start Server

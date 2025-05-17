@@ -1,5 +1,4 @@
-const Shippo = require('shippo');
+const shippo = require('shippo')(process.env.SHIPPO_TEST_KEY);
 require('dotenv').config();
 
-const shippo = new Shippo(process.env.SHIPPO_TEST_KEY);
 module.exports = shippo;

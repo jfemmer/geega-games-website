@@ -1,5 +1,7 @@
 const shippo = require('shippo');
+console.log('🧪 typeof shippo:', typeof shippo);
+console.log('🧪 shippo keys:', Object.keys(shippo));
 
 module.exports = async () => {
-  return shippo(process.env.SHIPPO_TEST_KEY); // ✅ this will now work
+  return shippo; // Do NOT try to call it
 };

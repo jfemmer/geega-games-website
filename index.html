@@ -555,16 +555,18 @@ header.top-banner {
     box-shadow: 4px 0 12px rgba(0, 0, 0, 0.2);
   }
 
-  .sort-dropdown-wrapper {
-    max-width: 130px; /* ✅ smaller on mobile */
-  }
-
   .open-sidebar {
-    display: inline-block;
+    display: inline-flex; /* ✅ Force visible when sidebar starts closed */
+    align-items: center;
+    gap: 6px;
   }
 
   .filter-group {
     margin-bottom: 24px; /* ✅ More spacing between dropdowns */
+  }
+
+  .filter-sidebar:not(.open) {
+    display: none; /* Optional if you're not using translateX */
   }
 
   .styled-dropdown {
@@ -1109,7 +1111,11 @@ function applyFilters() {
       const openBtn = document.getElementById('open-sidebar-btn');
 
       sidebar.classList.toggle('open');
-      openBtn.style.display = sidebar.classList.contains('open') ? 'none' : 'inline-flex';
+      if (sidebar.classList.contains('open')) {
+        openBtn.style.display = 'none';
+      } else {
+        openBtn.style.display = 'inline-flex';
+      }
     }
   
     async function loadCreatureTypes() {

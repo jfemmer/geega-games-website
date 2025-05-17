@@ -18,7 +18,8 @@ const fs = require('fs');
 const sharp = require('sharp');
 
 const uspsUserID = process.env.USPS_USER_ID;
-const shippo = require('shippo')(process.env.SHIPPO_TEST_KEY);
+const Shippo = require('shippo/lib/shippo'); 
+const shippo = new Shippo(process.env.SHIPPO_TEST_KEY); 
 
 // Setup for multer file uploads
 const upload = multer({ dest: 'uploads/' });

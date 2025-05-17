@@ -555,6 +555,10 @@ header.top-banner {
     box-shadow: 4px 0 12px rgba(0, 0, 0, 0.2);
   }
 
+  .sort-dropdown-wrapper {
+    max-width: 130px; /* ✅ smaller on mobile */
+  }
+
   .filter-group {
     margin-bottom: 24px; /* ✅ More spacing between dropdowns */
   }
@@ -678,7 +682,7 @@ header.top-banner {
   
 <div class="page-layout">
   <!-- Sidebar -->
-  <aside id="sidebar" class="filter-sidebar open">
+  <aside id="sidebar" class="filter-sidebar">
     <div class="filter-header">
       <span>Filters</span>
       <button class="close-sidebar" onclick="toggleSidebar()">✖</button>

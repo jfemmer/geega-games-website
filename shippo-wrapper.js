@@ -1,4 +1,4 @@
-const shippo = require('shippo')(process.env.SHIPPO_TEST_KEY);
-require('dotenv').config();
-
-module.exports = shippo;
+module.exports = async () => {
+  const { default: Shippo } = await import('shippo');
+  return new Shippo(process.env.SHIPPO_TEST_KEY);
+};

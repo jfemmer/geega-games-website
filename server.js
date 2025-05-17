@@ -18,11 +18,7 @@ const fs = require('fs');
 const sharp = require('sharp');
 
 const uspsUserID = process.env.USPS_USER_ID;
-let shippo;
-(async () => {
-  const m = await import('./shippo-wrapper.mjs');
-  shippo = m.default;
-})();
+const shippo = require('./shippo-wrapper');
 
 // Setup for multer file uploads
 const upload = multer({ dest: 'uploads/' });

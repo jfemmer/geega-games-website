@@ -1008,66 +1008,29 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
 });
 
 app.post('/api/shippo/label', async (req, res) => {
-  const { orderId, address_to } = req.body;
-
   try {
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+    const shippo = await getShippo(); // ✅ Ensure it's available here
+    console.log('📦 Shippo keys:', Object.keys(shippo));
 
-    const toAddress = address_to || parseAddressString(order.address);
-    console.log('📦 Shipping to:', toAddress);
-
-    const fromAddress = {
-      name: 'Geega Games',
-      street1: '123 Warehouse Rd',
-      city: 'Hazelwood',
-      state: 'MO',
-      zip: '63042',
-      country: 'US'
-    };
-
-    const parcel = {
-      length: '6',
-      width: '4',
-      height: '2',
-      distance_unit: 'in',
-      weight: '8',
-      mass_unit: 'oz'
-    };
-
-    console.log('📦 Creating shipment with:', {
-      address_from: fromAddress,
-      address_to: toAddress,
-      parcels: [parcel]
-    });
+    // Your existing Shippo logic here...
+    const { addressFrom, addressTo, parcel } = req.body;
 
     const shipment = await shippo.shipment.create({
-      address_from: fromAddress,
-      address_to: toAddress,
+      address_from: addressFrom,
+      address_to: addressTo,
       parcels: [parcel],
       async: false
     });
 
-    const rate = shipment.rates?.[0];
-    if (!rate) throw new Error('No shipping rates found.');
+    const rate = shipment.rates.find(r => r.provider === 'USPS');
+    if (!rate) return res.status(400).json({ message: 'No USPS rate found' });
 
-    const transaction = await shippo.transaction.create({ rate: rate.object_id });
-    if (transaction.status !== 'SUCCESS') {
-      console.log('❌ Transaction failed:', transaction);
-      throw new Error(transaction.messages?.[0]?.text || 'Label creation failed.');
-    }
+    const label = await shippo.transaction.create({ rate: rate.object_id, label_file_type: 'PDF' });
 
-    order.trackingNumber = transaction.tracking_number;
-    order.trackingCarrier = transaction.tracking_provider;
-    await order.save();
-
-    res.json({
-      trackingNumber: transaction.tracking_number,
-      labelUrl: transaction.label_url
-    });
+    res.json({ labelUrl: label.label_url });
   } catch (err) {
     console.error('❌ Shippo label error:', err);
-    res.status(400).json({ message: err.message || 'Error creating label' });
+    res.status(500).json({ message: 'Failed to generate label', error: err.message });
   }
 });
 

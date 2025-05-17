@@ -542,7 +542,6 @@ header.top-banner {
   font-size: 14px;
 }
 
-/* === RESPONSIVE === */
 @media (max-width: 768px) {
   .filter-sidebar {
     position: absolute;
@@ -550,10 +549,29 @@ header.top-banner {
     left: 0;
     top: 0;
     height: 100vh;
+    width: 80%; /* ✅ not full screen */
+    padding: 24px 20px; /* ✅ More breathing room */
+    background-color: white;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.2);
   }
 
-  .open-sidebar {
-    display: inline-block;
+  .filter-group {
+    margin-bottom: 24px; /* ✅ More spacing between dropdowns */
+  }
+
+  .styled-dropdown {
+    font-size: 16px;
+    padding: 10px 14px;
+    border-radius: 10px;
+  }
+
+  .filter-header {
+    font-size: 20px;
+    margin-bottom: 30px;
+  }
+
+  .close-sidebar {
+    font-size: 24px;
   }
 }
 

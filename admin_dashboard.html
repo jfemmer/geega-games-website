@@ -1131,17 +1131,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function printLabel(orderId) {
   try {
-    const res = await fetch('https://geega-games-website-production.up.railway.app/api/shippo/label', {
+    // Fetch order data
+    const res = await fetch(`https://geega-games-website-production.up.railway.app/api/orders/${orderId}`);
+    const order = await res.json();
+
+    // 🛠️ TEMP fallback for address (replace with saved structured values if you store them!)
+    const raw = order.address || '';
+    const [street1, city, stateZip] = raw.split(',');
+    const [state, zip] = stateZip?.trim().split(' ') || [];
+
+    const address_to = {
+      name: `${order.firstName} ${order.lastName}`,
+      street1: street1?.trim() || '',
+      city: city?.trim() || '',
+      state: state?.trim() || '',
+      zip: zip?.trim() || '',
+      country: 'US'
+    };
+
+    const labelRes = await fetch('https://geega-games-website-production.up.railway.app/api/shippo/label', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId })
+      body: JSON.stringify({ orderId, address_to })
     });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to create label');
+    const data = await labelRes.json();
+    if (!labelRes.ok) throw new Error(data.message || 'Failed to create label');
 
     alert(`✅ Label created! Tracking #: ${data.trackingNumber}`);
-    window.open(data.labelUrl, '_blank'); // Open label in a new tab
+    window.open(data.labelUrl, '_blank');
   } catch (err) {
     console.error('❌ Print label error:', err);
     alert('❌ Failed to generate label.');
@@ -1332,6 +1350,46 @@ async function saveTracking(orderId) {
     console.error('❌ Failed to save tracking:', err);
     alert('❌ Could not save tracking number.');
   }
+}
+
+function extractAddressComponents(place) {
+  const components = {
+    street1: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'US'
+  };
+
+  for (const comp of place.address_components) {
+    const types = comp.types;
+
+    if (types.includes('street_number')) {
+      components.street1 = comp.long_name + ' ' + components.street1;
+    }
+
+    if (types.includes('route')) {
+      components.street1 += comp.long_name;
+    }
+
+    if (types.includes('locality')) {
+      components.city = comp.long_name;
+    }
+
+    if (types.includes('administrative_area_level_1')) {
+      components.state = comp.short_name;
+    }
+
+    if (types.includes('postal_code')) {
+      components.zip = comp.long_name;
+    }
+
+    if (types.includes('country')) {
+      components.country = comp.short_name;
+    }
+  }
+
+  return components;
 }
 </script>
   

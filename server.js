@@ -1007,13 +1007,9 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
 app.post('/api/shippo/label', async (req, res) => {
   try {
     const shippo = await getShippo();
+    console.log('✅ Shippo loaded:', typeof shippo, Object.keys(shippo));
 
     const { addressFrom, addressTo, parcel } = req.body;
-
-    // ✅ Validate required fields
-    if (!addressFrom || !addressTo || !parcel) {
-      return res.status(400).json({ message: 'Missing required address or parcel fields.' });
-    }
 
     const shipment = await shippo.shipment.create({
       address_from: addressFrom,

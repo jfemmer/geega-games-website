@@ -820,6 +820,16 @@ app.post('/api/employees', async (req, res) => {
   }
 });
 
+app.get('/api/orders', async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ submittedAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    console.error('❌ Error fetching orders:', err);
+    res.status(500).json({ message: 'Server error while fetching orders.' });
+  }
+});
+
 
 app.patch('/api/orders/:id/status', async (req, res) => {
   const { id } = req.params;

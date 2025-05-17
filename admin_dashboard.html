@@ -1179,10 +1179,11 @@ async function printLabel(orderId) {
     const data = await labelRes.json();
     console.log('📦 Shippo response:', data);
 
-    if (!labelRes.ok) throw new Error(data.error || data.message || 'Failed to create label');
-    if (!data.labelUrl) throw new Error('No label URL returned from backend');
+    if (!labelRes.ok || !data.labelUrl) {
+      throw new Error(data.error || data.message || 'Failed to create label');
+    }
 
-    alert(`✅ Label created!`);
+    alert('✅ Label created!');
     window.open(data.labelUrl, '_blank');
   } catch (err) {
     console.error('❌ Print label error:', err);

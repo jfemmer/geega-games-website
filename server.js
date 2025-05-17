@@ -259,13 +259,11 @@ app.post('/api/cart', async (req, res) => {
   const { userId, item } = req.body;
   console.log('📥 [POST] /api/cart - Payload:', { userId, item });
 
-  // 🔍 Validate userId
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     console.warn('⚠️ Invalid userId format (POST):', userId);
     return res.status(400).json({ message: 'Invalid userId format.' });
   }
 
-  // 🔍 Validate item fields
   if (!item || !item.cardName || !item.set || !item.condition || item.quantity == null) {
     console.warn('⚠️ Missing required item fields:', item);
     return res.status(400).json({ message: 'Missing required item fields (cardName, set, condition, quantity).' });
@@ -274,7 +272,6 @@ app.post('/api/cart', async (req, res) => {
   try {
     const objectId = new mongoose.Types.ObjectId(userId);
 
-    // 🔍 Lookup matching inventory item
     const inventoryItem = await CardInventory.findOne({
       cardName: item.cardName,
       set: item.set,
@@ -287,37 +284,38 @@ app.post('/api/cart', async (req, res) => {
       return res.status(404).json({ message: 'Item not found in inventory.' });
     }
 
-    if (inventoryItem.quantity < item.quantity) {
-      console.warn(`⚠️ Not enough stock. Requested: ${item.quantity}, Available: ${inventoryItem.quantity}`);
-      return res.status(400).json({ message: 'Not enough inventory to add to cart.' });
-    }
-
     let cart = await Cart.findOne({ userId: objectId });
     console.log('🛒 Existing cart:', cart || 'None found');
 
     if (!cart) {
       console.log('➕ Creating new cart');
-      cart = new Cart({ userId: objectId, items: [item] });
+      const qtyToAdd = Math.min(item.quantity, inventoryItem.quantity);
+      cart = new Cart({ userId: objectId, items: [{ ...item, quantity: qtyToAdd }] });
     } else {
-      const key = `${item.cardName}|${item.set}|${item.foil}|${item.condition}|${item.variantType}`;
-      const existing = cart.items.find(i =>
-        `${i.cardName}|${i.set}|${i.foil}|${i.condition}|${i.variantType}` === key
-      );
+      const itemVariantKey = item.variantType || '';
+      const key = `${item.cardName}|${item.set}|${item.foil}|${item.condition}|${itemVariantKey}`;
+
+      const existing = cart.items.find(i => {
+        const iVariantKey = i.variantType || '';
+        return `${i.cardName}|${i.set}|${i.foil}|${i.condition}|${iVariantKey}` === key;
+      });
 
       const currentQty = existing ? existing.quantity : 0;
-      const newTotalQty = currentQty + item.quantity;
+      const allowedToAdd = inventoryItem.quantity - currentQty;
 
-      if (newTotalQty > inventoryItem.quantity) {
-        console.warn(`⚠️ Combined quantity (${newTotalQty}) exceeds stock (${inventoryItem.quantity})`);
-        return res.status(400).json({ message: 'You cannot add more than what is in stock.' });
+      if (allowedToAdd <= 0) {
+        console.warn('⚠️ Max quantity already in cart.');
+        return res.status(400).json({ message: 'You already have the maximum allowed quantity in your cart.' });
       }
 
+      const qtyToAdd = Math.min(item.quantity, allowedToAdd);
+
       if (existing) {
-        console.log('🧩 Updating quantity of existing item in cart');
-        existing.quantity = newTotalQty;
+        console.log(`🧩 Updating existing item with +${qtyToAdd}`);
+        existing.quantity += qtyToAdd;
       } else {
-        console.log('🆕 Pushing new item to cart');
-        cart.items.push(item);
+        console.log(`🆕 Adding new item with quantity: ${qtyToAdd}`);
+        cart.items.push({ ...item, quantity: qtyToAdd });
       }
     }
 
@@ -547,10 +545,27 @@ app.patch('/api/users/:id', async (req, res) => {
 app.post('/api/inventory', async (req, res) => {
   try {
     const { cardName, quantity, set, condition, foil, price } = req.body;
-    if (!cardName || !quantity || !set || !condition) return res.status(400).json({ message: 'Missing fields.' });
+
+    if (!cardName || !quantity || !set || !condition) {
+      return res.status(400).json({ message: 'Missing fields.' });
+    }
 
     const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
-    await new CardInventory({ cardName, quantity, set, condition, foil: !!foil, imageUrl, price }).save();
+
+    const cardData = {
+      cardName,
+      quantity,
+      set,
+      condition,
+      foil: !!foil,
+      imageUrl
+    };
+
+    const parsedPrice = parseFloat(price) || 0;
+    cardData.priceUsd = foil ? 0 : parsedPrice;
+    cardData.priceUsdFoil = foil ? parsedPrice : 0;
+
+    await new CardInventory(cardData).save();
 
     res.status(201).json({ message: 'Card added to inventory!' });
   } catch (err) {
@@ -558,6 +573,7 @@ app.post('/api/inventory', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
+
 
 app.post('/api/tradein', async (req, res) => {
   const { userId, cards } = req.body;

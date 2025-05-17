@@ -1007,69 +1007,77 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
   }
 });
 
-app.post('/api/shippo/label', async (req, res) => {
-  const { orderId, address_to } = req.body;
+(async () => {
+  const getShippo = require('./shippo-wrapper');
+  const shippo = await getShippo();
+  console.log('🚚 Shippo object keys:', Object.keys(shippo));
 
-  try {
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+  // ✅ Define the Shippo label route inside this async block
+  app.post('/api/shippo/label', async (req, res) => {
+    const { orderId, address_to } = req.body;
 
-    const toAddress = address_to || parseAddressString(order.address);
-    console.log('📦 Shipping to:', toAddress);
+    try {
+      const order = await Order.findById(orderId);
+      if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    const fromAddress = {
-      name: 'Geega Games',
-      street1: '123 Warehouse Rd',
-      city: 'Hazelwood',
-      state: 'MO',
-      zip: '63042',
-      country: 'US'
-    };
+      const toAddress = address_to || parseAddressString(order.address);
+      if (!toAddress || !toAddress.street1 || !toAddress.city || !toAddress.state || !toAddress.zip) {
+        return res.status(400).json({ message: 'Invalid address format. Please use: Street, City ST ZIP' });
+      }
 
-    const parcel = {
-      length: '6',
-      width: '4',
-      height: '2',
-      distance_unit: 'in',
-      weight: '8',
-      mass_unit: 'oz'
-    };
+      const fromAddress = {
+        name: 'Geega Games',
+        street1: '123 Warehouse Rd',
+        city: 'Hazelwood',
+        state: 'MO',
+        zip: '63042',
+        country: 'US'
+      };
 
-    console.log('📦 Creating shipment with:', {
-      address_from: fromAddress,
-      address_to: toAddress,
-      parcels: [parcel]
-    });
+      const parcel = {
+        length: '6',
+        width: '4',
+        height: '2',
+        distance_unit: 'in',
+        weight: '8',
+        mass_unit: 'oz'
+      };
 
-    const shipment = await shippo.shipment.create({
-      address_from: fromAddress,
-      address_to: toAddress,
-      parcels: [parcel],
-      async: false
-    });
+      const shipment = await shippo.shipment.create({
+        address_from: fromAddress,
+        address_to: toAddress,
+        parcels: [parcel],
+        async: false
+      });
 
-    const rate = shipment.rates?.[0];
-    if (!rate) throw new Error('No shipping rates found.');
+      const rate = shipment.rates?.[0];
+      if (!rate) throw new Error('No shipping rates found.');
 
-    const transaction = await shippo.transaction.create({ rate: rate.object_id });
-    if (transaction.status !== 'SUCCESS') {
-      console.log('❌ Transaction failed:', transaction);
-      throw new Error(transaction.messages?.[0]?.text || 'Label creation failed.');
+      const transaction = await shippo.transaction.create({ rate: rate.object_id });
+      if (transaction.status !== 'SUCCESS') {
+        throw new Error(transaction.messages?.[0]?.text || 'Label creation failed.');
+      }
+
+      order.trackingNumber = transaction.tracking_number;
+      order.trackingCarrier = transaction.tracking_provider;
+      await order.save();
+
+      res.json({
+        trackingNumber: transaction.tracking_number,
+        labelUrl: transaction.label_url
+      });
+    } catch (err) {
+      console.error('❌ Shippo label error:', err);
+      res.status(400).json({ message: err.message || 'Error creating label' });
     }
+  });
 
-    order.trackingNumber = transaction.tracking_number;
-    order.trackingCarrier = transaction.tracking_provider;
-    await order.save();
-
-    res.json({
-      trackingNumber: transaction.tracking_number,
-      labelUrl: transaction.label_url
-    });
-  } catch (err) {
-    console.error('❌ Shippo label error:', err);
-    res.status(400).json({ message: err.message || 'Error creating label' });
-  }
-});
+  // ✅ Only start the server after Shippo is ready
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`🚀 Server running on port ${port}`);
+  });
+})();
 
 
 // Start Server

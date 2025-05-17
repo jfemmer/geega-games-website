@@ -1,7 +1,10 @@
 module.exports = async () => {
   const shippoModule = await import('shippo');
-  console.log('🚚 Shippo module keys:', Object.keys(shippoModule));
+  const createClient = shippoModule.createClient || shippoModule.default?.createClient;
 
-  const shippo = shippoModule.default?.default || shippoModule.default || shippoModule;
-  return shippo(process.env.SHIPPO_TEST_KEY);
+  if (!createClient) {
+    throw new Error('❌ Shippo SDK: createClient function not found.');
+  }
+
+  return createClient(process.env.SHIPPO_TEST_KEY);
 };

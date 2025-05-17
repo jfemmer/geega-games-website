@@ -750,12 +750,21 @@ app.delete('/api/inventory', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
-
 app.patch('/api/inventory/decrement', async (req, res) => {
   try {
     const { cardName, set, foil } = req.body;
 
-    const card = await CardInventory.findOne({ cardName, set, foil: !!foil });
+    if (!cardName || !set) {
+      return res.status(400).json({ message: 'Missing cardName or set.' });
+    }
+
+    const query = {
+      cardName,
+      set,
+      foil: !!foil // Ensure boolean
+    };
+
+    const card = await CardInventory.findOne(query);
 
     if (!card) {
       return res.status(404).json({ message: 'Card not found.' });
@@ -764,7 +773,7 @@ app.patch('/api/inventory/decrement', async (req, res) => {
     if (card.quantity > 1) {
       card.quantity -= 1;
       await card.save();
-      return res.status(200).json({ message: 'Quantity decremented.' });
+      return res.status(200).json({ message: 'Quantity decremented.', card });
     } else {
       await CardInventory.deleteOne({ _id: card._id });
       return res.status(200).json({ message: 'Card removed from inventory (quantity reached 0).' });

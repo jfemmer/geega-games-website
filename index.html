@@ -417,7 +417,82 @@
 .profile-dropdown a:hover {
   background-color: #f3eaff;
 }
+
+.filter-sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 20px 20px 0;
+  max-width: 280px;
+}
+
+.sort-wrapper {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.sort-wrapper label {
+  font-weight: bold;
+  color: rebeccapurple;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.filter-dropdown-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.filter-toggle {
+  width: 100%;
+  background-color: rebeccapurple;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-toggle:hover {
+  background-color: #5a00a0;
+}
+
+.filter-menu {
+  display: none;
+  background: white;
+  border: 2px solid #e0d2f7;
+  border-radius: 12px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-top: 10px;
+  width: 100%;
+  z-index: 10;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.filter-group label {
+  font-weight: bold;
+  color: rebeccapurple;
+  margin-bottom: 4px;
+}
 </style>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-6NPDFLEXW8"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-XXXXXXXXXX');
+</script>
 </head>
 
 <body>  
@@ -495,40 +570,64 @@
     </a>
   </div>
   
-  <div class="filter-sort-container">
-    <div class="dropdown-block sort-block">
-      <label for="sort-dropdown">Sort by:</label>
-      <select id="sort-dropdown" class="styled-dropdown">
-        <option value="name-asc">Name A → Z</option>
-        <option value="name-desc">Name Z → A</option>
-        <option value="price-asc">Price Low → High</option>
-        <option value="price-desc">Price High → Low</option>
-      </select>
-    </div>
-  
-    <div class="dropdown-block">
-      <label for="color-filter">Filter by Color:</label>
-      <select id="color-filter" class="styled-dropdown">
-        <option value="">All Colors</option>
-        <option value="W">White</option>
-        <option value="U">Blue</option>
-        <option value="B">Black</option>
-        <option value="R">Red</option>
-        <option value="G">Green</option>
-        <option value="C">Colorless</option>
-        <option value="M">Multicolor</option>
-        <option value="L">Land</option>
-      </select>
-    </div>
-  
-    <div class="dropdown-block">
-      <label for="creature-filter">Filter by Creature Type:</label>
-      <select id="creature-filter" class="styled-dropdown">
-        <option value="">All Types</option>
-        <!-- dynamically populated -->
-      </select>
+<div class="toolbar-row">
+  <!-- Filters (Left) -->
+  <div class="filter-sidebar">
+    <div class="filter-dropdown-wrapper">
+      <button class="filter-toggle" onclick="toggleFilterMenu()">
+        <i class="fa fa-filter"></i> Filters
+      </button>
+      <div id="filter-menu" class="filter-menu">
+        <div class="filter-group">
+          <label for="color-filter">Color:</label>
+          <select id="color-filter" class="styled-dropdown">
+            <option value="">All Colors</option>
+            <option value="W">White</option>
+            <option value="U">Blue</option>
+            <option value="B">Black</option>
+            <option value="R">Red</option>
+            <option value="G">Green</option>
+            <option value="C">Colorless</option>
+            <option value="M">Multicolor</option>
+            <option value="L">Land</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="type-filter">Card Type:</label>
+          <select id="type-filter" class="styled-dropdown">
+            <option value="">All Types</option>
+            <option value="Creature">Creature</option>
+            <option value="Instant">Instant</option>
+            <option value="Sorcery">Sorcery</option>
+            <option value="Artifact">Artifact</option>
+            <option value="Enchantment">Enchantment</option>
+            <option value="Planeswalker">Planeswalker</option>
+            <option value="Land">Land</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="creature-filter">Creature Type:</label>
+          <select id="creature-filter" class="styled-dropdown">
+            <option value="">All Types</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
+
+  <!-- Sort (Right) -->
+  <div class="sort-sidebar">
+    <label for="sort-dropdown">Sort by:</label>
+    <select id="sort-dropdown" class="styled-dropdown">
+      <option value="name-asc">Name A → Z</option>
+      <option value="name-desc">Name Z → A</option>
+      <option value="price-asc">Price Low → High</option>
+      <option value="price-desc">Price High → Low</option>
+    </select>
+  </div>
+</div>
   
   <!-- Card Grid -->
   <div id="card-container"></div>
@@ -662,7 +761,7 @@ async function addToCart(card, button) {
       condition: card.condition,
       quantity: 1,
       priceUsd: card.foil ? card.priceUsdFoil : card.priceUsd,
-      imageUrl: card.imageUrl  // ✅ Add this line
+      imageUrl: card.imageUrl
     };
 
     const res = await fetch(`${API_BASE}/api/cart`, {
@@ -677,6 +776,18 @@ async function addToCart(card, button) {
     }
 
     updateCartCount();
+
+    // ✅ Fire GA4 event
+    if (typeof gtag === 'function') {
+      gtag('event', 'add_to_cart', {
+        item_name: card.cardName,
+        item_set: card.set,
+        condition: card.condition,
+        foil: !!card.foil,
+        value: parseFloat(card.foil ? card.priceUsdFoil : card.priceUsd) || 0,
+        currency: 'USD'
+      });
+    }
 
     if (button) {
       button.textContent = 'Added ✅';
@@ -792,6 +903,7 @@ async function updateCartCount() {
 function applyFilters() {
   const color = document.getElementById('color-filter').value;
   const creature = document.getElementById('creature-filter').value.toLowerCase();
+  const cardType = document.getElementById('type-filter').value.toLowerCase(); // ✅ new line
   const sortDir = document.getElementById('sort-dropdown').value;
   renderSessionToken++;
 
@@ -805,9 +917,13 @@ function applyFilters() {
     const matchesType = !creature ||
       (Array.isArray(card.creatureTypes) && card.creatureTypes.some(type => type.toLowerCase() === creature));
 
-    return matchesColor && matchesType;
+    const matchesCardType = !cardType ||
+      (card.cardType?.toLowerCase().includes(cardType)); // ✅ card type match
+
+    return matchesColor && matchesType && matchesCardType;
   });
 
+  // ... sorting logic stays the same
   filteredCards.sort((a, b) => {
     const getEffectivePrice = (card, descending = false) => {
       const isFoil = card.foil || !!card.foilType;
@@ -815,8 +931,6 @@ function applyFilters() {
       if (isFoil && (isNaN(price) || price === 0)) {
         price = parseFloat(card.priceUsd);
       }
-
-      // Push N/A prices to the bottom
       return isNaN(price) ? (descending ? -Infinity : Infinity) : price;
     };
 
@@ -887,24 +1001,37 @@ function applyFilters() {
     }
   
     async function loadCreatureTypes() {
-      try {
-        const res = await fetch(`${apiEndpoint}/creature-types`);
-        const types = await res.json();
-        const dropdown = document.getElementById("creature-filter");
-        types.forEach(type => {
-          const option = document.createElement("option");
-          option.value = type;
-          option.textContent = type;
-          dropdown.appendChild(option);
-        });
-      } catch (err) {
-        console.error("❌ Creature type load error:", err);
-      }
-    }
+  try {
+    const res = await fetch(`${apiEndpoint}/creature-types`);
+    const types = await res.json();
+    const dropdown = document.getElementById("creature-filter");
+
+    // 🚫 Common card types to exclude
+    const excludedTypes = [
+      "Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Planeswalker", "Land"
+    ].map(t => t.toLowerCase());
+
+    types
+      .filter(type =>
+        !excludedTypes.includes(type.toLowerCase()) &&  // ✅ Exclude core types
+        !type.includes("/")                              // ✅ Exclude anything with a slash
+      )
+      .sort((a, b) => a.localeCompare(b))
+      .forEach(type => {
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = type;
+        dropdown.appendChild(option);
+      });
+  } catch (err) {
+    console.error("❌ Creature type load error:", err);
+  }
+}
   
     document.getElementById('sort-dropdown').addEventListener('change', applyFilters);
     document.getElementById('color-filter').addEventListener('change', applyFilters);
     document.getElementById('creature-filter').addEventListener('change', applyFilters);
+    document.getElementById('type-filter').addEventListener('change', applyFilters);
     document.getElementById('search-button').addEventListener('click', searchCards);
     document.getElementById('search-input').addEventListener('keypress', e => {
       if (e.key === 'Enter') searchCards();
@@ -990,7 +1117,23 @@ document.addEventListener('DOMContentLoaded', () => {
       menu.style.display = 'none';
     }
   });
+
+  function toggleFilterMenu() {
+  const menu = document.getElementById('filter-menu');
+  menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+}
+
+// Optional: close filter menu when clicking outside
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('filter-menu');
+  const toggle = document.querySelector('.filter-toggle');
+  if (menu && toggle && !menu.contains(e.target) && !toggle.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
   </script>
+
+  
   
 
 <!-- Legalities Modal -->

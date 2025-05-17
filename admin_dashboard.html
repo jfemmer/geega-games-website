@@ -1180,8 +1180,11 @@ async function printLabel(orderId) {
     console.log('📦 Shippo response:', data);
 
     if (!labelRes.ok || !data.labelUrl) {
-      throw new Error(data.error || data.message || 'Failed to create label');
-    }
+  const msg = typeof data.error === 'object'
+    ? JSON.stringify(data.error, null, 2)
+    : data.error || data.message || 'Failed to create label';
+  throw new Error(msg);
+}
 
     alert('✅ Label created!');
     window.open(data.labelUrl, '_blank');

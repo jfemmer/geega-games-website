@@ -242,6 +242,117 @@
     const signupForm = document.getElementById('signup-form');
     const errorMessage = document.getElementById('error-message');
     const signupButton = document.getElementById('signup-button');
+    const phoneInput = document.getElementById('phone');
+    
+  const emailInput = document.getElementById('new-email');
+  const suggestions = ['@gmail.com', '@yahoo.com', '@outlook.com', '@icloud.com'];
+  let suggestionBox;
+  let currentIndex = -1;
+
+  function removeSuggestionBox() {
+    if (suggestionBox) {
+      suggestionBox.remove();
+      suggestionBox = null;
+      currentIndex = -1;
+    }
+  }
+
+  function createSuggestionBox(base) {
+    removeSuggestionBox();
+
+    suggestionBox = document.createElement('div');
+    suggestionBox.style.position = 'absolute';
+    suggestionBox.style.backgroundColor = 'white';
+    suggestionBox.style.border = '1px solid #ccc';
+    suggestionBox.style.borderRadius = '6px';
+    suggestionBox.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
+    suggestionBox.style.zIndex = '1000';
+    suggestionBox.style.fontSize = '14px';
+    suggestionBox.style.padding = '5px 0';
+    suggestionBox.style.maxWidth = emailInput.offsetWidth + 'px';
+    suggestionBox.style.width = emailInput.offsetWidth + 'px';
+
+    const rect = emailInput.getBoundingClientRect();
+    suggestionBox.style.left = rect.left + window.scrollX + 'px';
+    suggestionBox.style.top = rect.bottom + window.scrollY + 'px';
+
+    suggestions.forEach((domain, i) => {
+      const suggestion = document.createElement('div');
+      suggestion.textContent = base + domain;
+      suggestion.dataset.index = i;
+      suggestion.style.padding = '8px 12px';
+      suggestion.style.cursor = 'pointer';
+
+      suggestion.addEventListener('click', () => {
+        emailInput.value = base + domain;
+        removeSuggestionBox();
+      });
+
+      suggestionBox.appendChild(suggestion);
+    });
+
+    document.body.appendChild(suggestionBox);
+  }
+
+  emailInput.addEventListener('input', () => {
+    const value = emailInput.value;
+    if (value.includes('@') || value.length < 2) {
+      removeSuggestionBox();
+      return;
+    }
+    createSuggestionBox(value);
+  });
+
+  emailInput.addEventListener('keydown', (e) => {
+    if (!suggestionBox) return;
+
+    const items = suggestionBox.querySelectorAll('div');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      currentIndex = (currentIndex + 1) % items.length;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      currentIndex = (currentIndex - 1 + items.length) % items.length;
+    } else if (e.key === 'Enter') {
+      if (currentIndex >= 0 && currentIndex < items.length) {
+        e.preventDefault();
+        emailInput.value = items[currentIndex].textContent;
+        removeSuggestionBox();
+      }
+    } else if (e.key === 'Escape') {
+      removeSuggestionBox();
+      return;
+    }
+
+    items.forEach((item, index) => {
+      item.style.backgroundColor = index === currentIndex ? '#eee' : 'transparent';
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target !== emailInput && suggestionBox && !suggestionBox.contains(e.target)) {
+      removeSuggestionBox();
+    }
+  });
+
+    phoneInput.addEventListener('input', (e) => {
+      let digits = e.target.value.replace(/\D/g, '');
+
+      // Remove leading "1" if user starts with it
+      if (digits.length > 10 && digits.startsWith('1')) {
+        digits = digits.slice(1);
+      }
+
+      if (digits.length > 10) digits = digits.slice(0, 10);
+
+      if (digits.length <= 3) {
+        e.target.value = `(${digits}`;
+      } else if (digits.length <= 6) {
+        e.target.value = `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+      } else {
+        e.target.value = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+      }
+    });
 
     signupForm.addEventListener('submit', async function (event) {
       event.preventDefault();

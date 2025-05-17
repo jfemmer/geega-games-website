@@ -1,4 +1,5 @@
 module.exports = async () => {
-  const { default: Shippo } = await import('shippo');
-  return new Shippo(process.env.SHIPPO_TEST_KEY);
+  const shippoModule = await import('shippo');
+  const shippo = shippoModule.default; // default export is the function
+  return shippo(process.env.SHIPPO_TEST_KEY); // ✅ CALL, don't use `new`
 };

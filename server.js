@@ -18,6 +18,7 @@ const fs = require('fs');
 const sharp = require('sharp');
 
 const uspsUserID = process.env.USPS_USER_ID;
+const shippo = require('shippo')(process.env.SHIPPO_TEST_KEY);
 
 // Setup for multer file uploads
 const upload = multer({ dest: 'uploads/' });
@@ -992,8 +993,82 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
   }
 });
 
+app.post('/api/shippo/label', async (req, res) => {
+  const { orderId } = req.body;
 
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
 
+    // 🧠 Attempt to parse full address string
+    const addressParts = order.address?.split(',') || [];
+    const street1 = addressParts[0]?.trim() || '';
+    const cityStateZip = addressParts[1]?.trim() || '';
+    const cityMatch = cityStateZip.match(/^(.*)\s+([A-Z]{2})\s+(\d{5})$/);
+
+    const city = cityMatch?.[1]?.trim() || '';
+    const state = cityMatch?.[2] || '';
+    const zip = cityMatch?.[3] || '';
+
+    if (!street1 || !city || !state || !zip) {
+      return res.status(400).json({ message: 'Could not parse address for USPS label.' });
+    }
+
+    const addressTo = {
+      name: `${order.firstName} ${order.lastName}`,
+      street1,
+      city,
+      state,
+      zip,
+      country: 'US',
+      email: order.email
+    };
+
+    const addressFrom = {
+      name: 'Geega Games',
+      street1: '123 Example St',
+      city: 'St. Louis',
+      state: 'MO',
+      zip: '63101',
+      country: 'US',
+      email: process.env.NOTIFY_EMAIL
+    };
+
+    const parcel = {
+      length: '6',
+      width: '4',
+      height: '1',
+      distance_unit: 'in',
+      weight: '4',
+      mass_unit: 'oz'
+    };
+
+    const shipment = await shippo.shipment.create({
+      address_from: addressFrom,
+      address_to: addressTo,
+      parcels: [parcel],
+      async: false
+    });
+
+    const transaction = await shippo.transaction.create({
+      rate: shipment.rates[0].object_id,
+      label_file_type: 'PDF',
+      async: false
+    });
+
+    if (transaction.status !== 'SUCCESS') {
+      return res.status(500).json({ message: 'Label creation failed', details: transaction.messages });
+    }
+
+    res.json({
+      labelUrl: transaction.label_url,
+      trackingNumber: transaction.tracking_number
+    });
+  } catch (err) {
+    console.error('❌ Shippo label creation error:', err);
+    res.status(500).json({ message: 'Failed to create label' });
+  }
+});
 
 
 

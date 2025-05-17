@@ -1,5 +1,3 @@
-const shippo = require('shippo');
+const shippo = require('shippo')(process.env.SHIPPO_TEST_KEY); // ✅ this returns the usable API instance
 
-module.exports = async () => {
-  return shippo(process.env.SHIPPO_TEST_KEY);
-};
+module.exports = async () => shippo;

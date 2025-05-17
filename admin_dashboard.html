@@ -1131,12 +1131,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function printLabel(orderId) {
   try {
-    // 🔍 1. Fetch the order details
     const res = await fetch(`https://geega-games-website-production.up.railway.app/api/orders/${orderId}`);
     if (!res.ok) throw new Error(`Order not found (status ${res.status})`);
     const order = await res.json();
 
-    // 📬 2. Parse the shipping address
     const raw = order.address || '';
     const [street1, city, stateZip] = raw.split(',');
     const [state, zip] = stateZip?.trim().split(' ') || [];
@@ -1152,7 +1150,6 @@ async function printLabel(orderId) {
       email: order.email
     };
 
-    // 🏢 3. Define your store address
     const addressFrom = {
       name: 'Geega Games',
       street1: '123 Market St',
@@ -1164,7 +1161,6 @@ async function printLabel(orderId) {
       email: 'hello@geega-games.com'
     };
 
-    // 📦 4. Define a sample parcel (you can update dynamically later)
     const parcel = {
       length: '6',
       width: '4',
@@ -1174,7 +1170,6 @@ async function printLabel(orderId) {
       mass_unit: 'oz'
     };
 
-    // 🚀 5. Call backend to generate label
     const labelRes = await fetch('https://geega-games-website-production.up.railway.app/api/shippo/label', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1182,9 +1177,12 @@ async function printLabel(orderId) {
     });
 
     const data = await labelRes.json();
-    if (!labelRes.ok) throw new Error(data.error || data.message || 'Failed to create label');
+    console.log('📦 Shippo response:', data);
 
-    alert(`✅ Label created! Tracking #: ${data.trackingNumber || 'N/A'}`);
+    if (!labelRes.ok) throw new Error(data.error || data.message || 'Failed to create label');
+    if (!data.labelUrl) throw new Error('No label URL returned from backend');
+
+    alert(`✅ Label created!`);
     window.open(data.labelUrl, '_blank');
   } catch (err) {
     console.error('❌ Print label error:', err);

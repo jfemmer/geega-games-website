@@ -1,7 +1,6 @@
-const shippo = require('shippo');
-console.log('🧪 typeof shippo:', typeof shippo);
-console.log('🧪 shippo keys:', Object.keys(shippo));
+const shippoFactory = require('shippo'); // ✅ This is a function
 
 module.exports = async () => {
-  return shippo; // Do NOT try to call it
+  const client = shippoFactory(process.env.SHIPPO_TEST_KEY); // ✅ Call it to get the real client
+  return client;
 };

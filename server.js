@@ -997,100 +997,82 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
 });
 
 app.post('/api/shippo/label', async (req, res) => {
-  if (!shippo) {
-    return res.status(503).json({ message: 'Shippo is still initializing, please try again shortly.' });
-  }
-
-  const { orderId } = req.body;
+  const { orderId, address_to } = req.body;
 
   try {
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // 🧠 Parse address like: "123 Main St, Springfield IL 62704"
-    const addressParts = order.address?.split(',') || [];
-    const street1 = addressParts[0]?.trim() || '';
-    const cityStateZip = addressParts[1]?.trim() || '';
-    const cityMatch = cityStateZip.match(/^(.*)\s+([A-Z]{2})\s+(\d{5})$/);
-    const city = cityMatch?.[1]?.trim() || '';
-    const state = cityMatch?.[2] || '';
-    const zip = cityMatch?.[3] || '';
-
-    if (!street1 || !city || !state || !zip) {
+    const toAddress = address_to || parseAddressString(order.address);
+    if (!toAddress || !toAddress.street1 || !toAddress.city || !toAddress.state || !toAddress.zip) {
       return res.status(400).json({ message: 'Invalid address format. Please use: Street, City ST ZIP' });
     }
 
-    const addressTo = {
-      name: `${order.firstName} ${order.lastName}`,
-      street1,
-      city,
-      state,
-      zip,
-      country: 'US',
-      email: order.email
-    };
-
-    const addressFrom = {
+    const fromAddress = {
       name: 'Geega Games',
-      street1: '123 Example St',
-      city: 'St. Louis',
+      street1: '123 Warehouse Rd',
+      city: 'Hazelwood',
       state: 'MO',
-      zip: '63101',
-      country: 'US',
-      email: process.env.NOTIFY_EMAIL || 'you@example.com'
+      zip: '63042',
+      country: 'US'
     };
 
     const parcel = {
       length: '6',
       width: '4',
-      height: '1',
+      height: '2',
       distance_unit: 'in',
-      weight: '4',
+      weight: '8',
       mass_unit: 'oz'
     };
 
     const shipment = await shippo.shipment.create({
-      address_from: addressFrom,
-      address_to: addressTo,
+      address_from: fromAddress,
+      address_to: toAddress,
       parcels: [parcel],
       async: false
     });
 
     const rate = shipment.rates?.[0];
-    if (!rate) return res.status(500).json({ message: 'No rates available from Shippo.' });
+    if (!rate) throw new Error('No shipping rates found.');
 
-    const transaction = await shippo.transaction.create({
-      rate: rate.object_id,
-      label_file_type: 'PDF',
-      async: false
-    });
-
+    const transaction = await shippo.transaction.create({ rate: rate.object_id });
     if (transaction.status !== 'SUCCESS') {
-      return res.status(500).json({ message: 'Label creation failed', details: transaction.messages });
+      throw new Error(transaction.messages?.[0]?.text || 'Label creation failed.');
     }
 
+    // ✅ Update order with tracking info
+    order.trackingNumber = transaction.tracking_number;
+    order.trackingCarrier = transaction.tracking_provider;
+    await order.save();
+
     res.json({
-      labelUrl: transaction.label_url,
-      trackingNumber: transaction.tracking_number
+      trackingNumber: transaction.tracking_number,
+      labelUrl: transaction.label_url
     });
-
   } catch (err) {
-    console.error('❌ Shippo label creation error:', err);
-    res.status(500).json({ message: 'Failed to create label' });
+    console.error('❌ Shippo error:', err);
+    res.status(400).json({ message: err.message || 'Error creating shipping label' });
   }
 });
 
-
-app.get('/api/orders/:id', async (req, res) => {
+// Helper to parse old raw string address (fallback)
+function parseAddressString(raw) {
   try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
-    res.json(order);
-  } catch (err) {
-    console.error('❌ Error fetching order:', err);
-    res.status(500).json({ message: 'Server error' });
+    const [street, city, stateZip] = raw.split(',');
+    const [state, zip] = (stateZip || '').trim().split(' ');
+    return {
+      name: '', // optionally use order name
+      street1: street?.trim(),
+      city: city?.trim(),
+      state: state?.trim(),
+      zip: zip?.trim(),
+      country: 'US'
+    };
+  } catch {
+    return null;
   }
-});
+}
 
 
 

@@ -1006,9 +1006,14 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
 
 app.post('/api/shippo/label', async (req, res) => {
   try {
-    const shippo = await getShippo(); // ✅ allowed here (inside async route)
+    const shippo = await getShippo();
 
     const { addressFrom, addressTo, parcel } = req.body;
+
+    // ✅ Validate required fields
+    if (!addressFrom || !addressTo || !parcel) {
+      return res.status(400).json({ message: 'Missing required address or parcel fields.' });
+    }
 
     const shipment = await shippo.shipment.create({
       address_from: addressFrom,
@@ -1018,7 +1023,7 @@ app.post('/api/shippo/label', async (req, res) => {
     });
 
     const rate = shipment.rates.find(r => r.provider === 'USPS');
-    if (!rate) return res.status(400).json({ message: 'No USPS rate found' });
+    if (!rate) return res.status(400).json({ message: 'No USPS rate found.' });
 
     const label = await shippo.transaction.create({
       rate: rate.object_id,
@@ -1028,7 +1033,10 @@ app.post('/api/shippo/label', async (req, res) => {
     res.json({ labelUrl: label.label_url });
   } catch (err) {
     console.error('❌ Shippo label error:', err.response?.data || err.stack || err);
-    res.status(500).json({ message: 'Failed to generate label', error: err.message });
+    res.status(500).json({
+      message: 'Failed to generate label',
+      error: err.response?.data?.error || err.message || 'Unknown error'
+    });
   }
 });
 

@@ -18,7 +18,7 @@ const fs = require('fs');
 const sharp = require('sharp');
 
 const uspsUserID = process.env.USPS_USER_ID;
-const shippo = await getShippo();
+const getShippo = require('./shippo-wrapper');
 
 // Setup for multer file uploads
 const upload = multer({ dest: 'uploads/' });
@@ -1006,10 +1006,8 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
 
 app.post('/api/shippo/label', async (req, res) => {
   try {
-    const shippo = await getShippo(); // ✅ Ensure it's available here
-    console.log('📦 Shippo keys:', Object.keys(shippo));
+    const shippo = await getShippo(); // ✅ allowed here (inside async route)
 
-    // Your existing Shippo logic here...
     const { addressFrom, addressTo, parcel } = req.body;
 
     const shipment = await shippo.shipment.create({
@@ -1022,7 +1020,10 @@ app.post('/api/shippo/label', async (req, res) => {
     const rate = shipment.rates.find(r => r.provider === 'USPS');
     if (!rate) return res.status(400).json({ message: 'No USPS rate found' });
 
-    const label = await shippo.transaction.create({ rate: rate.object_id, label_file_type: 'PDF' });
+    const label = await shippo.transaction.create({
+      rate: rate.object_id,
+      label_file_type: 'PDF'
+    });
 
     res.json({ labelUrl: label.label_url });
   } catch (err) {

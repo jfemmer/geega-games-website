@@ -587,6 +587,9 @@
     <label for="price">Price (USD)</label>
     <input type="number" id="price" name="price" min="0" step="0.01" required>
 
+    <label for="variantType">Variant Type</label>
+    <input type="text" id="variantType" name="variantType" placeholder="e.g. Borderless, Extended Art" />
+
     <input type="hidden" id="imageUrl" name="imageUrl">
 
     <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
@@ -799,6 +802,7 @@
   const cardName = document.getElementById('deleteCardName').value.trim();
   const cardSet = document.getElementById('deleteSet').value.trim();
   const isFoil = document.getElementById('deleteFoil').value === 'true';
+  const variantType = document.getElementById('deleteVariantType')?.value || ''; 
 
   console.log({ cardName, cardSet, isFoil });
 
@@ -808,7 +812,7 @@
     const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory/decrement", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardName, set: cardSet, foil: isFoil })
+      body: JSON.stringify({ cardName, set: cardSet, foil: isFoil, variantType })
     });
 
     if (!res.ok) throw new Error(`Decrement failed with status ${res.status}`);

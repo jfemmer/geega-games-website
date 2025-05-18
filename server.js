@@ -143,8 +143,9 @@ const inventorySchema = new mongoose.Schema({
   colors: [String],
   cardType: String,
   creatureTypes: [String],
-  priceUsd: Number,         // ✅ add this
-  priceUsdFoil: Number,     // ✅ and this
+  priceUsd: Number,
+  priceUsdFoil: Number,
+  variantType: String,  // ✅ Add this
   addedAt: { type: Date, default: Date.now }
 });
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');

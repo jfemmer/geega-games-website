@@ -357,10 +357,9 @@ async function saveAddress() {
   if (!userId) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/users`);
-    const users = await res.json();
-    const user = users.find(u => u._id === userId);
-
+    const res = await fetch(`${API_BASE}/api/users/${userId}`);
+    const user = await res.json();
+    
     // ✅ Set email and address
     document.getElementById('account-email').textContent = user?.email || '—';
     document.getElementById('account-address').textContent = user?.address || '—';
@@ -456,7 +455,9 @@ async function getTrackingUpdate(trackingNumber) {
       if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
 
-    document.addEventListener('DOMContentLoaded', loadAccountInfo);
+    window.addEventListener('load', () => {
+      setTimeout(loadAccountInfo, 100); // small delay ensures layout + localStorage is ready
+    });
 
 
   </script>

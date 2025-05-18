@@ -633,6 +633,7 @@
     <input type="hidden" id="deleteCardName" name="deleteCardName" required>
     <input type="hidden" id="deleteSet" name="deleteSet" required>
     <input type="hidden" id="deleteFoil" name="deleteFoil" required>
+    <input type="hidden" id="deleteVariantType" name="deleteVariantType">
     <button type="submit" style="background-color: crimson;">Delete Card</button>
   </form>
 
@@ -781,7 +782,7 @@
         document.getElementById('deleteCardName').value = card.cardName;
         document.getElementById('deleteSet').value = card.set;
         document.getElementById('deleteFoil').value = card.foil;
-        document.getElementById('deleteVariantType').value = card.variantType || '';
+        document.getElementById('deleteVariantType').value = (card.variantType || '').toLowerCase().trim();
 
         document.getElementById('delete-card-form').requestSubmit();
       });
@@ -1058,7 +1059,11 @@ document.querySelector('a[href="#"][onclick*="orders-section"]').addEventListene
         const condition = cardDiv.querySelector('.condition-select')?.value || 'NM';
 
         // 🧩 Populate form
-        document.getElementById('cardName').value = displayName;
+        document.getElementById('cardName').value = card.name;
+        const variantInput = document.getElementById('variantType');
+        if (variantInput) {
+          variantInput.value = treatments.join(', ');
+        }
     
         document.getElementById('set').value = set;
         document.getElementById('foil').checked = isFoil;
@@ -1134,7 +1139,8 @@ document.addEventListener('DOMContentLoaded', () => {
       condition: document.getElementById("condition").value,
       foil: document.getElementById("foil").checked,
       imageUrl: document.getElementById("imageUrl").value,
-      price: parseFloat(document.getElementById("price").value) || 0   // ✅ new line
+      price: parseFloat(document.getElementById("price").value) || 0,
+      variantType: document.getElementById("variantType").value.trim()  // ✅ ADD THIS LINE
     };
 
     try {
@@ -1371,12 +1377,11 @@ async function searchInventoryForPrice(query) {
 
     resultsDiv.innerHTML = '';
     filtered.slice(0, 20).forEach(card => {
-    const variant = card.variantType ? ` (${card.variantType})` : '';
-    const displayName = card.cardName + (card.foil ? " (Foil)" : "") + variant;
-    const displaySet = card.set.toUpperCase();
-    const imageUrl = card.imageUrl || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
+      const variant = card.variantType ? ` (${card.variantType})` : '';
+      const displayName = card.cardName + (card.foil ? " (Foil)" : "") + variant;
+      const displaySet = card.set.toUpperCase();
+      const imageUrl = card.imageUrl || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
 
-      // 🟣 Same price logic as customer site
       const rawPrice = parseFloat(card.foil ? card.priceUsdFoil : card.priceUsd);
       const adjustedPrice = isNaN(rawPrice) ? 'N/A' : (rawPrice < 0.5 ? '0.50' : rawPrice.toFixed(2));
 
@@ -1396,6 +1401,7 @@ async function searchInventoryForPrice(query) {
         document.getElementById('priceCardName').value = card.cardName;
         document.getElementById('priceSet').value = card.set;
         document.getElementById('priceFoil').value = card.foil;
+        document.getElementById('priceVariantType').value = card.variantType || '';  // ✅ FIXED
         document.getElementById('newPrice').value = isNaN(rawPrice) ? '' : rawPrice.toFixed(2);
         alert(`✅ Loaded "${displayName}" for price update.`);
         document.getElementById('newPrice').scrollIntoView({ behavior: 'smooth' });

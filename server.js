@@ -735,6 +735,22 @@ app.post('/api/orders', async (req, res) => {
     orderTotal
   } = req.body;
 
+  // ✅ Validate required fields
+  if (!userId || !firstName || !lastName || !email || !address || !Array.isArray(cards)) {
+    return res.status(400).json({ message: 'Missing required fields in order.' });
+  }
+
+  if (cards.length === 0) {
+    return res.status(400).json({ message: 'Order must contain at least one card.' });
+  }
+
+  for (const [i, item] of cards.entries()) {
+    if (!item.cardName || !item.set || !item.condition || typeof item.quantity !== 'number') {
+      console.warn(`⚠️ Invalid card at index ${i}:`, item);
+      return res.status(400).json({ message: `Invalid card data at index ${i}.` });
+    }
+  }
+
   try {
     const parsedOrderTotal = parseFloat(orderTotal);
     const newOrder = new Order({
@@ -752,34 +768,35 @@ app.post('/api/orders', async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // 🔻 Decrement inventory for each card in the order
-for (const item of cards) {
-  const match = await CardInventory.findOne({
-    cardName: item.cardName,
-    set: item.set,
-    foil: !!item.foil,
-    condition: item.condition
-  });
+    // 🔻 Decrement inventory
+    for (const item of cards) {
+      const match = await CardInventory.findOne({
+        cardName: item.cardName,
+        set: item.set,
+        foil: !!item.foil,
+        condition: item.condition
+      });
 
-  if (!match) continue;
+      if (!match) {
+        console.warn(`⚠️ No match found for item:`, item);
+        continue;
+      }
 
-  // 🛡️ Inventory safety check
-  if (match.quantity < item.quantity) {
-    return res.status(400).json({
-      message: `Not enough stock for ${item.cardName}. Available: ${match.quantity}, Requested: ${item.quantity}`
-    });
-  }
+      if (match.quantity < item.quantity) {
+        return res.status(400).json({
+          message: `Not enough stock for ${item.cardName}. Available: ${match.quantity}, Requested: ${item.quantity}`
+        });
+      }
 
-  match.quantity -= item.quantity;
+      match.quantity -= item.quantity;
 
-  if (match.quantity <= 0) {
-    await CardInventory.deleteOne({ _id: match._id });
-  } else {
-    await match.save();
-  }
-}
+      if (match.quantity <= 0) {
+        await CardInventory.deleteOne({ _id: match._id });
+      } else {
+        await match.save();
+      }
+    }
 
-    // 🧹 Clear cart after successful order
     await Cart.findOneAndUpdate(
       { userId },
       { items: [], updatedAt: new Date() }
@@ -787,7 +804,7 @@ for (const item of cards) {
 
     res.status(201).json(savedOrder);
   } catch (err) {
-    console.error('❌ Error saving order:', err);
+    console.error('❌ Error saving order:', err.stack || err);
     res.status(500).json({ message: 'Server error while saving order.' });
   }
 });

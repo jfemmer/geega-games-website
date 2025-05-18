@@ -770,32 +770,36 @@ app.post('/api/orders', async (req, res) => {
 
     // 🔻 Decrement inventory
     for (const item of cards) {
-      const match = await CardInventory.findOne({
-        cardName: item.cardName,
-        set: item.set,
-        foil: !!item.foil,
-        condition: item.condition
-      });
+    const match = await CardInventory.findOne({
+    cardName: item.cardName,
+    set: item.set,
+    foil: !!item.foil,
+    condition: item.condition
+  });
 
-      if (!match) {
-        console.warn(`⚠️ No match found for item:`, item);
-        continue;
-      }
+  // Sanitize item.priceUsd just in case it came from a bad string
+  const parsedPrice = parseFloat(item.priceUsd);
+  item.priceUsd = !isNaN(parsedPrice) ? parseFloat(parsedPrice.toFixed(2)) : 0;
 
-      if (match.quantity < item.quantity) {
-        return res.status(400).json({
-          message: `Not enough stock for ${item.cardName}. Available: ${match.quantity}, Requested: ${item.quantity}`
-        });
-      }
+  if (!match) {
+    console.warn(`⚠️ No match found in inventory for: ${item.cardName} (${item.set})`);
+    continue;
+  }
 
-      match.quantity -= item.quantity;
+  if (match.quantity < item.quantity) {
+    return res.status(400).json({
+      message: `Not enough stock for ${item.cardName}. Available: ${match.quantity}, Requested: ${item.quantity}`
+    });
+  }
 
-      if (match.quantity <= 0) {
-        await CardInventory.deleteOne({ _id: match._id });
-      } else {
-        await match.save();
-      }
-    }
+  match.quantity -= item.quantity;
+
+  if (match.quantity <= 0) {
+    await CardInventory.deleteOne({ _id: match._id });
+  } else {
+    await match.save();
+  }
+}
 
     await Cart.findOneAndUpdate(
       { userId },

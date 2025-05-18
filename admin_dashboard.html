@@ -551,77 +551,85 @@
   <div class="main">
 
     <!-- Inventory Section -->
-    <div class="section" id="inventory-section">
-      <div id="inventory-summary" style="padding: 20px; background-color: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center;">
-        <h3 style="color: rebeccapurple;">Inventory Summary</h3>
-        <p><strong>Total Cards:</strong> <span id="total-card-count">Loading...</span></p>
-        <p><strong>Total Inventory Value:</strong> $<span id="total-inventory-value">Loading...</span></p>
-      </div>  
+<div class="section" id="inventory-section">
+  <div id="inventory-summary" style="padding: 20px; background-color: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center;">
+    <h3 style="color: rebeccapurple;">Inventory Summary</h3>
+    <p><strong>Total Cards:</strong> <span id="total-card-count">Loading...</span></p>
+    <p><strong>Total Inventory Value:</strong> $<span id="total-inventory-value">Loading...</span></p>
+  </div>  
 
-      <h2>Add Inventory</h2>
-      <h3>Search Magic Card</h3>
-      <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
-      <div id="search-results" style="margin-top: 10px;"></div>
-      <hr style="margin: 20px 0;">
+  <h2>Add Inventory</h2>
+  <h3>Search Magic Card</h3>
+  <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
+  <div id="search-results" style="margin-top: 10px;"></div>
+  <hr style="margin: 20px 0;">
 
-  
-      <form id="update-card-form">
-        <label for="cardName">Card Name</label>
-        <input type="text" id="cardName" name="cardName" required>
-        <label for="quantity">Quantity</label>
-        <input type="number" id="quantity" name="quantity" min="0" required>
-        <label for="set">Set</label>
-        <input type="text" id="set" name="set" required>
-        <label for="condition">Condition</label>
-        <select id="condition" name="condition" required>
-          <option value="">Select Condition</option>
-          <option value="NM">Near Mint</option>
-          <option value="LP">Lightly Played</option>
-          <option value="MP">Moderately Played</option>
-          <option value="HP">Heavily Played</option>
-          <option value="DMG">Damaged</option>
-        </select>
-        <input type="hidden" id="imageUrl" name="imageUrl">
-        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
-          <input type="checkbox" id="foil" name="foil" style="width: 20px; height: 20px;">
-          <label for="foil" class="shimmer" style="margin: 0; font-size: 1.1rem;">Foil</label>
-        </div>
-        <button type="submit">Add / Update Card</button>
-      </form>
+  <form id="update-card-form">
+    <label for="cardName">Card Name</label>
+    <input type="text" id="cardName" name="cardName" required>
 
-      <h3>Update Card Price</h3>
+    <label for="quantity">Quantity</label>
+    <input type="number" id="quantity" name="quantity" min="0" required>
 
-      <h3>Search Inventory to Update Price</h3>
-<input type="text" id="price-search-input" placeholder="Search inventory by name or set..." autocomplete="off" />
-<div id="price-search-results" style="margin-top: 10px;"></div>
-<form id="price-update-form">
-  <label for="priceCardName">Card Name</label>
-  <input type="hidden" id="priceCardName" required>
-  
-  <label for="priceSet">Set</label>
-  <input type="hidden" id="priceSet" required>
+    <label for="set">Set</label>
+    <input type="text" id="set" name="set" required>
 
-  <label for="priceFoil">Foil?</label>
-  <input type="hidden" id="priceFoil" required>
+    <label for="condition">Condition</label>
+    <select id="condition" name="condition" required>
+      <option value="">Select Condition</option>
+      <option value="NM">Near Mint</option>
+      <option value="LP">Lightly Played</option>
+      <option value="MP">Moderately Played</option>
+      <option value="HP">Heavily Played</option>
+      <option value="DMG">Damaged</option>
+    </select>
 
-  <label for="newPrice">New Price (USD)</label>
-  <input type="number" id="newPrice" min="0" step="0.01" required>
+    <label for="price">Price (USD)</label>
+    <input type="number" id="price" name="price" min="0" step="0.01" required>
 
-  <button type="submit">Update Price</button>
-</form>
-  
-      <hr style="margin: 30px 0;">
-  
-      <h3>Delete Card from Inventory</h3>
-      <form id="delete-card-form">
-        <label for="delete-search-input">Card Name</label>
-        <input type="text" id="delete-search-input" placeholder="Search inventory..." autocomplete="off" />
-        <div id="delete-search-results" style="margin-top: 10px;"></div>
-        <input type="hidden" id="deleteCardName" name="deleteCardName" required>
-        <input type="hidden" id="deleteSet" name="deleteSet" required>
-        <input type="hidden" id="deleteFoil" name="deleteFoil" required>
-        <button type="submit" style="background-color: crimson;">Delete Card</button>
-      </form>
+    <input type="hidden" id="imageUrl" name="imageUrl">
+
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+      <input type="checkbox" id="foil" name="foil" style="width: 20px; height: 20px;">
+      <label for="foil" class="shimmer" style="margin: 0; font-size: 1.1rem;">Foil</label>
+    </div>
+
+    <button type="submit">Add / Update Card</button>
+  </form>
+
+  <h3>Update Card Price</h3>
+  <h3>Search Inventory to Update Price</h3>
+  <input type="text" id="price-search-input" placeholder="Search inventory by name or set..." autocomplete="off" />
+  <div id="price-search-results" style="margin-top: 10px;"></div>
+
+  <form id="price-update-form">
+    <label for="priceCardName">Card Name</label>
+    <input type="hidden" id="priceCardName" required>
+    
+    <label for="priceSet">Set</label>
+    <input type="hidden" id="priceSet" required>
+
+    <label for="priceFoil">Foil?</label>
+    <input type="hidden" id="priceFoil" required>
+
+    <label for="newPrice">New Price (USD)</label>
+    <input type="number" id="newPrice" min="0" step="0.01" required>
+
+    <button type="submit">Update Price</button>
+  </form>
+
+  <hr style="margin: 30px 0;">
+
+  <h3>Delete Card from Inventory</h3>
+  <form id="delete-card-form">
+    <label for="delete-search-input">Card Name</label>
+    <input type="text" id="delete-search-input" placeholder="Search inventory..." autocomplete="off" />
+    <div id="delete-search-results" style="margin-top: 10px;"></div>
+    <input type="hidden" id="deleteCardName" name="deleteCardName" required>
+    <input type="hidden" id="deleteSet" name="deleteSet" required>
+    <input type="hidden" id="deleteFoil" name="deleteFoil" required>
+    <button type="submit" style="background-color: crimson;">Delete Card</button>
+  </form>
 
     </div>
 
@@ -640,6 +648,7 @@
         <p>Loading users...</p>
       </div>
     </div>
+    
   
     <!-- Post Announcement Section -->
     <div class="section" id="announcement-section" style="display:none;">
@@ -946,8 +955,15 @@ document.querySelector('a[href="#"][onclick*="orders-section"]').addEventListene
     }, 300);
   });
 
-  async function searchScryfall(query) {
+ async function searchScryfall(query) {
   const resultsDiv = document.getElementById('search-results');
+  query = query.trim();
+
+  if (!query || query.length < 2) {
+    resultsDiv.innerHTML = `<p>❗ Please type at least 2 characters.</p>`;
+    return;
+  }
+
   resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
 
   try {
@@ -985,6 +1001,8 @@ document.querySelector('a[href="#"][onclick*="orders-section"]').addEventListene
       const set = card.set_name;
       const foilId = `foil-${Math.random().toString(36).substr(2, 9)}`;
       const conditionId = `condition-${Math.random().toString(36).substr(2, 9)}`;
+      const usd = parseFloat(card.prices?.usd || 0).toFixed(2);
+      const usdFoil = parseFloat(card.prices?.usd_foil || card.prices?.usd || 0).toFixed(2);
 
       const cardDiv = document.createElement('div');
       cardDiv.className = 'card-item';
@@ -1012,24 +1030,58 @@ document.querySelector('a[href="#"][onclick*="orders-section"]').addEventListene
         </div>
       `;
 
+      const foilCheckbox = cardDiv.querySelector('.foil-checkbox');
+
+      if (foilCheckbox) {
+        foilCheckbox.addEventListener('change', () => {
+          const selectedPrice = foilCheckbox.checked ? usdFoil : usd;
+          document.getElementById('price').value = selectedPrice;
+          document.getElementById('price').style.backgroundColor = '#e6ffe6';
+          setTimeout(() => {
+            document.getElementById('price').style.backgroundColor = '';
+          }, 800);
+        });
+      }
+
       cardDiv.querySelector('.add-button').addEventListener('click', () => {
         const isFoil = card.finishes?.length === 1 && card.finishes[0] === 'foil'
           ? true
-          : cardDiv.querySelector('.foil-checkbox')?.checked || false;
+          : foilCheckbox?.checked || false;
+
         const condition = cardDiv.querySelector('.condition-select')?.value || 'NM';
 
-        // Populate form fields
+        // 🧩 Populate form
         document.getElementById('cardName').value = displayName;
         document.getElementById('set').value = set;
         document.getElementById('foil').checked = isFoil;
         document.getElementById('condition').value = condition;
         document.getElementById('imageUrl').value = imageUrl;
         document.getElementById('quantity').value = 1;
+        document.getElementById('price').value = isFoil ? usdFoil : usd;
 
-        // Clear UI
+        document.getElementById('price').style.backgroundColor = '#e6ffe6';
+        setTimeout(() => {
+          document.getElementById('price').style.backgroundColor = '';
+        }, 800);
+
+        // 🔁 Replace #foil to clear past listeners
+        const oldFoil = document.getElementById('foil');
+        const newFoil = oldFoil.cloneNode(true);
+        oldFoil.parentNode.replaceChild(newFoil, oldFoil);
+
+        newFoil.checked = isFoil;
+
+        newFoil.addEventListener('change', () => {
+          const updatedPrice = newFoil.checked ? usdFoil : usd;
+          document.getElementById('price').value = updatedPrice;
+          document.getElementById('price').style.backgroundColor = '#e6ffe6';
+          setTimeout(() => {
+            document.getElementById('price').style.backgroundColor = '';
+          }, 800);
+        });
+
         document.getElementById('search-input').value = '';
         resultsDiv.innerHTML = '';
-
         document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
       });
 
@@ -1040,6 +1092,7 @@ document.querySelector('a[href="#"][onclick*="orders-section"]').addEventListene
     resultsDiv.innerHTML = `<p>❌ Could not find a card for "<strong>${query}</strong>".</p>`;
   }
 }
+
 
 async function updateOrderCount() {
   try {
@@ -1072,7 +1125,8 @@ document.addEventListener('DOMContentLoaded', () => {
       set: document.getElementById("set").value.trim(),
       condition: document.getElementById("condition").value,
       foil: document.getElementById("foil").checked,
-      imageUrl: document.getElementById("imageUrl").value  // ✅ Include image URL
+      imageUrl: document.getElementById("imageUrl").value,
+      price: parseFloat(document.getElementById("price").value) || 0   // ✅ new line
     };
 
     try {

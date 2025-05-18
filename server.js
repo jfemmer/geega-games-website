@@ -556,10 +556,9 @@ app.patch('/api/users/:id', async (req, res) => {
   }
 });
 
-// Add Inventory Card
 app.post('/api/inventory', async (req, res) => {
   try {
-    const { cardName, quantity, set, condition, foil, price } = req.body;
+    const { cardName, quantity, set, condition, foil, price, variantType } = req.body;
 
     if (!cardName || !quantity || !set || !condition) {
       return res.status(400).json({ message: 'Missing fields.' });
@@ -567,27 +566,47 @@ app.post('/api/inventory', async (req, res) => {
 
     const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
 
-    const cardData = {
+    const parsedPrice = parseFloat(price) || 0;
+    const priceUsd = foil ? 0 : parsedPrice;
+    const priceUsdFoil = foil ? parsedPrice : 0;
+
+    const query = {
       cardName,
-      quantity,
       set,
       condition,
       foil: !!foil,
-      imageUrl
+      variantType: variantType || ''
     };
 
-    const parsedPrice = parseFloat(price) || 0;
-    cardData.priceUsd = foil ? 0 : parsedPrice;
-    cardData.priceUsdFoil = foil ? parsedPrice : 0;
+    const existingCard = await CardInventory.findOne(query);
 
-    await new CardInventory(cardData).save();
+    if (existingCard) {
+      // ✅ Update quantity + price
+      existingCard.quantity += parseInt(quantity);
+      existingCard.priceUsd = priceUsd;
+      existingCard.priceUsdFoil = priceUsdFoil;
+      existingCard.imageUrl = imageUrl;
+      await existingCard.save();
+      return res.status(200).json({ message: 'Card updated in inventory!' });
+    } else {
+      // ✅ Create new entry
+      const newCard = new CardInventory({
+        ...query,
+        quantity,
+        priceUsd,
+        priceUsdFoil,
+        imageUrl
+      });
+      await newCard.save();
+      return res.status(201).json({ message: 'Card added to inventory!' });
+    }
 
-    res.status(201).json({ message: 'Card added to inventory!' });
   } catch (err) {
     console.error('❌ Add inventory error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
+
 
 
 app.post('/api/tradein', async (req, res) => {
@@ -633,6 +652,7 @@ app.get('/api/inventory', async (req, res) => {
       creatureTypes: 1,
       priceUsd: 1,
       priceUsdFoil: 1,
+      variantType: 1,
       addedAt: 1
     }).sort({ cardName: 1 });
 
@@ -665,8 +685,17 @@ app.patch('/api/inventory/update-price', async (req, res) => {
   try {
     const fieldToUpdate = foil ? 'priceUsdFoil' : 'priceUsd';
 
+    const { cardName, set, foil, newPrice, variantType } = req.body;
+
+    const query = {
+      cardName,
+      set,
+      foil: !!foil,
+      variantType: variantType || ''
+    };
+
     const updated = await CardInventory.findOneAndUpdate(
-      { cardName, set, foil },
+      query,
       { [fieldToUpdate]: newPrice },
       { new: true }
     );
@@ -835,17 +864,18 @@ app.delete('/api/inventory', async (req, res) => {
 });
 app.patch('/api/inventory/decrement', async (req, res) => {
   try {
-    const { cardName, set, foil } = req.body;
+    const { cardName, set, foil, variantType } = req.body;
 
     if (!cardName || !set) {
       return res.status(400).json({ message: 'Missing cardName or set.' });
     }
 
     const query = {
-      cardName,
-      set,
-      foil: !!foil // Ensure boolean
-    };
+  cardName,
+  set,
+  foil: !!foil,
+  variantType: variantType || ''
+};
 
     const card = await CardInventory.findOne(query);
 

@@ -184,6 +184,13 @@
   .info-row div {
     width: 100%;
     word-break: break-word;
+    min-width: 0;
+  }
+
+  #account-email,
+  #account-address {
+    display: block;
+    word-wrap: break-word;
   }
 }
   </style>
@@ -422,6 +429,9 @@ async function saveAddress() {
   } catch (err) {
     console.error('❌ Error loading orders:', err);
   }
+
+  document.getElementById('account-email').style.display = 'block';
+  document.getElementById('account-address').style.display = 'block';
 }
 
 async function getTrackingUpdate(trackingNumber) {

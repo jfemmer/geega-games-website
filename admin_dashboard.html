@@ -603,20 +603,22 @@
   <div id="price-search-results" style="margin-top: 10px;"></div>
 
   <form id="price-update-form">
-    <label for="priceCardName">Card Name</label>
-    <input type="hidden" id="priceCardName" required>
-    
-    <label for="priceSet">Set</label>
-    <input type="hidden" id="priceSet" required>
+  <label for="priceCardName">Card Name</label>
+  <input type="hidden" id="priceCardName" required>
 
-    <label for="priceFoil">Foil?</label>
-    <input type="hidden" id="priceFoil" required>
+  <label for="priceSet">Set</label>
+  <input type="hidden" id="priceSet" required>
 
-    <label for="newPrice">New Price (USD)</label>
-    <input type="number" id="newPrice" min="0" step="0.01" required>
+  <label for="priceFoil">Foil?</label>
+  <input type="hidden" id="priceFoil" required>
 
-    <button type="submit">Update Price</button>
-  </form>
+  <input type="hidden" id="priceVariantType" required>
+
+  <label for="newPrice">New Price (USD)</label>
+  <input type="number" id="newPrice" min="0" step="0.01" required>
+
+  <button type="submit">Update Price</button>
+</form>
 
   <hr style="margin: 30px 0;">
 
@@ -776,6 +778,7 @@
         document.getElementById('deleteCardName').value = card.cardName;
         document.getElementById('deleteSet').value = card.set;
         document.getElementById('deleteFoil').value = card.foil;
+        document.getElementById('deleteVariantType').value = card.variantType || '';
 
         document.getElementById('delete-card-form').requestSubmit();
       });
@@ -1052,6 +1055,7 @@ document.querySelector('a[href="#"][onclick*="orders-section"]').addEventListene
 
         // 🧩 Populate form
         document.getElementById('cardName').value = displayName;
+    
         document.getElementById('set').value = set;
         document.getElementById('foil').checked = isFoil;
         document.getElementById('condition').value = condition;
@@ -1363,9 +1367,10 @@ async function searchInventoryForPrice(query) {
 
     resultsDiv.innerHTML = '';
     filtered.slice(0, 20).forEach(card => {
-      const displayName = card.cardName + (card.foil ? " (Foil)" : "");
-      const displaySet = card.set.toUpperCase();
-      const imageUrl = card.imageUrl || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
+    const variant = card.variantType ? ` (${card.variantType})` : '';
+    const displayName = card.cardName + (card.foil ? " (Foil)" : "") + variant;
+    const displaySet = card.set.toUpperCase();
+    const imageUrl = card.imageUrl || 'https://dummyimage.com/100x140/cccccc/000000&text=No+Image';
 
       // 🟣 Same price logic as customer site
       const rawPrice = parseFloat(card.foil ? card.priceUsdFoil : card.priceUsd);

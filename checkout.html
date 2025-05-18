@@ -623,9 +623,11 @@ async function placeOrder() {
     for (const item of cartItems) {
       const key = `${normalize(item.cardName)}|${normalize(item.set)}|${item.foil ? '1' : '0'}`;
       const priceFromMap = priceMap[key];
-      const fallbackPrice = parseFloat(item.priceUsd) || 0;
-      const price = priceFromMap != null ? priceFromMap : fallbackPrice;
-      item.priceUsd = parseFloat(price.toFixed(2)); // ✅ Ensure this is saved
+      const fallbackPrice = parseFloat(item.priceUsd);
+      const price = priceFromMap != null
+        ? priceFromMap
+        : (isNaN(fallbackPrice) ? 0 : fallbackPrice);
+      item.priceUsd = parseFloat(price.toFixed(2));
     }
 
     const storedTotal = localStorage.getItem('cartTotalFinal');

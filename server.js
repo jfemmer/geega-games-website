@@ -768,39 +768,46 @@ app.post('/api/orders', async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // 🔻 Decrement inventory
+    // 🔻 Decrement inventory and sanitize prices
     for (const item of cards) {
-    const match = await CardInventory.findOne({
-    cardName: item.cardName,
-    set: item.set,
-    foil: !!item.foil,
-    condition: item.condition
-  });
+      // Sanitize item.priceUsd just in case it came from a bad string
+      const parsedPrice = parseFloat(item.priceUsd);
+      item.priceUsd = !isNaN(parsedPrice) ? parseFloat(parsedPrice.toFixed(2)) : 0;
 
-  // Sanitize item.priceUsd just in case it came from a bad string
-  const parsedPrice = parseFloat(item.priceUsd);
-  item.priceUsd = !isNaN(parsedPrice) ? parseFloat(parsedPrice.toFixed(2)) : 0;
+      const match = await CardInventory.findOne({
+        cardName: item.cardName,
+        set: item.set,
+        foil: !!item.foil,
+        condition: item.condition
+      });
 
-  if (!match) {
-    console.warn(`⚠️ No match found in inventory for: ${item.cardName} (${item.set})`);
-    continue;
-  }
+      if (!match) {
+        console.warn(`⚠️ No match found in inventory for: ${item.cardName} (${item.set})`);
+        continue;
+      }
 
-  if (match.quantity < item.quantity) {
-    return res.status(400).json({
-      message: `Not enough stock for ${item.cardName}. Available: ${match.quantity}, Requested: ${item.quantity}`
-    });
-  }
+      if (match.quantity < item.quantity) {
+        return res.status(400).json({
+          message: `Not enough stock for ${item.cardName}. Available: ${match.quantity}, Requested: ${item.quantity}`
+        });
+      }
 
-  match.quantity -= item.quantity;
+      // 🛡️ Sanitize match.priceUsd/priceUsdFoil to avoid crashing on save
+      const parsedMatchPrice = parseFloat(match.priceUsd);
+      const parsedMatchFoilPrice = parseFloat(match.priceUsdFoil);
+      match.priceUsd = !isNaN(parsedMatchPrice) ? parsedMatchPrice : 0;
+      match.priceUsdFoil = !isNaN(parsedMatchFoilPrice) ? parsedMatchFoilPrice : 0;
 
-  if (match.quantity <= 0) {
-    await CardInventory.deleteOne({ _id: match._id });
-  } else {
-    await match.save();
-  }
-}
+      match.quantity -= item.quantity;
 
+      if (match.quantity <= 0) {
+        await CardInventory.deleteOne({ _id: match._id });
+      } else {
+        await match.save();
+      }
+    }
+
+    // 🧹 Clear cart
     await Cart.findOneAndUpdate(
       { userId },
       { items: [], updatedAt: new Date() }

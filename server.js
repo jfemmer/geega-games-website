@@ -558,11 +558,15 @@ app.patch('/api/users/:id', async (req, res) => {
 
 app.post('/api/inventory', async (req, res) => {
   try {
-    const { cardName, quantity, set, condition, foil, price, variantType } = req.body;
+    const { cardName, quantity, set, condition, foil, price } = req.body;
+    let variantType = req.body.variantType || '';
 
     if (!cardName || !quantity || !set || !condition) {
       return res.status(400).json({ message: 'Missing fields.' });
     }
+
+    // 🧼 Normalize variantType
+    variantType = variantType.trim().toLowerCase();
 
     const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
 
@@ -575,9 +579,10 @@ app.post('/api/inventory', async (req, res) => {
       set,
       condition,
       foil: !!foil,
-      variantType: variantType || ''
+      variantType
     };
 
+    console.log('🧩 Inventory check query:', query);
     const existingCard = await CardInventory.findOne(query);
 
     if (existingCard) {
@@ -862,6 +867,7 @@ app.delete('/api/inventory', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
+
 app.patch('/api/inventory/decrement', async (req, res) => {
   try {
     const { cardName, set, foil, variantType } = req.body;
@@ -871,11 +877,11 @@ app.patch('/api/inventory/decrement', async (req, res) => {
     }
 
     const query = {
-  cardName,
-  set,
-  foil: !!foil,
-  variantType: variantType || ''
-};
+      cardName,
+      set,
+      foil: !!foil,
+      variantType: (variantType || '').trim().toLowerCase()
+    };
 
     const card = await CardInventory.findOne(query);
 
@@ -896,6 +902,7 @@ app.patch('/api/inventory/decrement', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
+
 
 // Add Employee
 app.post('/api/employees', async (req, res) => {

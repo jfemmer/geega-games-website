@@ -169,6 +169,23 @@
   display: inline-block;
   font-weight: bold;
 }
+
+@media (max-width: 600px) {
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .info-row span {
+    width: auto;
+    margin-bottom: 4px;
+  }
+
+  .info-row div {
+    width: 100%;
+    word-break: break-word;
+  }
+}
   </style>
 </head>
 <body>

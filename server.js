@@ -875,6 +875,7 @@ app.delete('/api/inventory', async (req, res) => {
 });
 
 app.patch('/api/inventory/decrement', async (req, res) => {
+  console.log('🛠️ PATCH /api/inventory/decrement called with:', req.body);
   try {
     const { cardName, set, foil, variantType } = req.body;
 

@@ -805,7 +805,7 @@
   const isFoil = document.getElementById('deleteFoil').value === 'true';
   const variantType = document.getElementById('deleteVariantType')?.value || ''; 
 
-  console.log({ cardName, cardSet, isFoil });
+  console.log('🛠️ Deleting card with:', { cardName, set: cardSet, foil: isFoil, variantType });
 
   if (!cardName || !cardSet) return alert("Missing card name or set.");
 

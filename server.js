@@ -682,30 +682,36 @@ app.post('/api/inventory/price', async (req, res) => {
 });
 
 app.patch('/api/inventory/update-price', async (req, res) => {
-  const { cardName, set, foil, newPrice } = req.body;
-  if (!cardName || !set || typeof newPrice !== 'number') {
-    return res.status(400).json({ message: 'Missing required fields.' });
+  const { cardName, set, foil, newPrice, variantType } = req.body;
+
+  const parsedPrice = parseFloat(newPrice);
+  if (!cardName || !set || isNaN(parsedPrice)) {
+    return res.status(400).json({ message: 'Missing or invalid required fields.' });
   }
 
   try {
     const fieldToUpdate = foil ? 'priceUsdFoil' : 'priceUsd';
 
-    const { cardName, set, foil, newPrice, variantType } = req.body;
-
     const query = {
       cardName,
       set,
       foil: !!foil,
-      variantType: variantType || ''
+      variantType: (variantType || '').trim().toLowerCase()
     };
+
+    console.log('🔍 Update price request:', { cardName, set, foil, newPrice, variantType });
+    console.log('🧩 MongoDB query:', query);
 
     const updated = await CardInventory.findOneAndUpdate(
       query,
-      { [fieldToUpdate]: newPrice },
+      { [fieldToUpdate]: parsedPrice },
       { new: true }
     );
 
-    if (!updated) return res.status(404).json({ message: 'Card not found.' });
+    if (!updated) {
+      console.warn('⚠️ No matching card found for update:', query);
+      return res.status(404).json({ message: 'Card not found.' });
+    }
 
     res.json({ message: 'Price updated.', updated });
   } catch (err) {
@@ -876,16 +882,31 @@ app.patch('/api/inventory/decrement', async (req, res) => {
       return res.status(400).json({ message: 'Missing cardName or set.' });
     }
 
-    const query = {
+    const baseQuery = {
       cardName,
       set,
-      foil: !!foil,
-      variantType: (variantType || '').trim().toLowerCase()
+      foil: !!foil
     };
 
-    const card = await CardInventory.findOne(query);
+    const variantKey = (variantType || '').trim().toLowerCase();
+
+    let card = await CardInventory.findOne({ ...baseQuery, variantType: variantKey });
+
+    // Fallback if exact match failed
+    if (!card) {
+      card = await CardInventory.findOne({
+        ...baseQuery,
+        $or: [
+          { variantType: { $exists: false } },
+          { variantType: '' },
+          { variantType: null },
+          { variantType: { $regex: `^${variantKey}$`, $options: 'i' } } // Case-insensitive match
+        ]
+      });
+    }
 
     if (!card) {
+      console.warn('⚠️ Card not found for:', { cardName, set, foil, variantKey });
       return res.status(404).json({ message: 'Card not found.' });
     }
 
@@ -902,7 +923,6 @@ app.patch('/api/inventory/decrement', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
-
 
 // Add Employee
 app.post('/api/employees', async (req, res) => {

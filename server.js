@@ -876,38 +876,62 @@ app.delete('/api/inventory', async (req, res) => {
 
 app.patch('/api/inventory/decrement', async (req, res) => {
   console.log('🛠️ PATCH /api/inventory/decrement called with:', req.body);
+
   try {
-    const { cardName, set, foil, variantType } = req.body;
+    const {
+      cardName,
+      set,
+      foil,
+      variantType,
+      colors = [],
+      cardType = '',
+      creatureTypes = []
+    } = req.body;
 
     if (!cardName || !set) {
       return res.status(400).json({ message: 'Missing cardName or set.' });
     }
 
-    const baseQuery = {
-      cardName,
-      set,
-      foil: !!foil
-    };
-
     const variantKey = (variantType || '').trim().toLowerCase();
 
-    let card = await CardInventory.findOne({ ...baseQuery, variantType: variantKey });
+    // 🔍 Build exact match query
+    const exactQuery = {
+      cardName,
+      set,
+      foil: !!foil,
+      variantType: variantKey,
+      colors: { $all: colors }, // Order-agnostic match
+      cardType,
+      creatureTypes: { $all: creatureTypes }
+    };
 
-    // Fallback if exact match failed
+    let card = await CardInventory.findOne(exactQuery);
+
+    // 🔁 Fallback: match by cardName, set, foil, and loosely by variant
     if (!card) {
       card = await CardInventory.findOne({
-        ...baseQuery,
+        cardName,
+        set,
+        foil: !!foil,
         $or: [
           { variantType: { $exists: false } },
           { variantType: '' },
           { variantType: null },
-          { variantType: { $regex: `^${variantKey}$`, $options: 'i' } } // Case-insensitive match
+          { variantType: { $regex: `^${variantKey}$`, $options: 'i' } }
         ]
       });
     }
 
     if (!card) {
-      console.warn('⚠️ Card not found for:', { cardName, set, foil, variantKey });
+      console.warn('⚠️ Card not found for:', {
+        cardName,
+        set,
+        foil,
+        variantKey,
+        colors,
+        cardType,
+        creatureTypes
+      });
       return res.status(404).json({ message: 'Card not found.' });
     }
 
@@ -1207,6 +1231,68 @@ app.post('/api/shippo/label', async (req, res) => {
       message: 'Failed to generate label',
       error: err.response?.data?.error || err.message || 'Unknown error'
     });
+  }
+});
+
+// ✅ Add this to server.js near other routes
+
+// Route: Send opt-in email to all users
+app.get('/api/send-email-optin', async (req, res) => {
+  try {
+    const users = await User.find({
+      'announcementNotifications.enabled': { $ne: true }
+    });
+
+    for (const user of users) {
+      const baseUrl = 'https://www.geega-games.com/api/email-opt-in';
+      const yesUrl = `${baseUrl}?email=${encodeURIComponent(user.email)}&response=yes`;
+      const noUrl = `${baseUrl}?email=${encodeURIComponent(user.email)}&response=no`;
+
+      const html = `
+        <p>Hi ${user.firstName || 'there'},</p>
+        <p>Would you like to receive occasional updates about new inventory, deals, and Geega Games news?</p>
+        <p><a href="${yesUrl}">✅ Yes, sign me up!</a></p>
+        <p><a href="${noUrl}">❌ No thanks</a></p>
+      `;
+
+      await transporter.sendMail({
+        from: `Geega Games <${process.env.NOTIFY_EMAIL}>`,
+        to: user.email,
+        subject: 'Want Geega Games Updates?',
+        html
+      });
+    }
+
+    res.json({ message: `Opt-in emails sent to ${users.length} users.` });
+  } catch (err) {
+    console.error('❌ Email opt-in error:', err);
+    res.status(500).json({ message: 'Failed to send opt-in emails' });
+  }
+});
+
+// Route: Handle email opt-in link clicks
+app.get('/api/email-opt-in', async (req, res) => {
+  const { email, response } = req.query;
+
+  if (!email || !['yes', 'no'].includes(response)) {
+    return res.status(400).send('Invalid request');
+  }
+
+  try {
+    const updated = await User.findOneAndUpdate(
+      { email },
+      { 'announcementNotifications.enabled': response === 'yes' },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).send('User not found.');
+
+    return res.send(response === 'yes'
+      ? '🎉 Thanks! You’ll now receive Geega Games updates.'
+      : '✅ Got it — you won’t receive email updates.');
+  } catch (err) {
+    console.error('❌ Opt-in update error:', err);
+    res.status(500).send('Error updating preference.');
   }
 });
 

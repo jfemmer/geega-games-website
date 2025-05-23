@@ -1237,40 +1237,6 @@ app.post('/api/shippo/label', async (req, res) => {
 // ✅ Add this to server.js near other routes
 
 // Route: Send opt-in email to all users
-app.get('/api/send-email-optin', async (req, res) => {
-  try {
-    const users = await User.find({
-      'announcementNotifications.enabled': { $ne: true }
-    });
-
-    for (const user of users) {
-      const baseUrl = 'https://www.geega-games.com/api/email-opt-in';
-      const yesUrl = `${baseUrl}?email=${encodeURIComponent(user.email)}&response=yes`;
-      const noUrl = `${baseUrl}?email=${encodeURIComponent(user.email)}&response=no`;
-
-      const html = `
-        <p>Hi ${user.firstName || 'there'},</p>
-        <p>Would you like to receive occasional updates about new inventory, deals, and Geega Games news?</p>
-        <p><a href="${yesUrl}">✅ Yes, sign me up!</a></p>
-        <p><a href="${noUrl}">❌ No thanks</a></p>
-      `;
-
-      await transporter.sendMail({
-        from: `Geega Games <${process.env.NOTIFY_EMAIL}>`,
-        to: user.email,
-        subject: 'Want Geega Games Updates?',
-        html
-      });
-    }
-
-    res.json({ message: `Opt-in emails sent to ${users.length} users.` });
-  } catch (err) {
-    console.error('❌ Email opt-in error:', err);
-    res.status(500).json({ message: 'Failed to send opt-in emails' });
-  }
-});
-
-// Route: Handle email opt-in link clicks
 app.get('/api/email-opt-in', async (req, res) => {
   const { email, response } = req.query;
 
@@ -1281,18 +1247,65 @@ app.get('/api/email-opt-in', async (req, res) => {
   try {
     const updated = await User.findOneAndUpdate(
       { email },
-      { 'announcementNotifications.enabled': response === 'yes' },
+      {
+        'announcementNotifications.enabled': response === 'yes',
+        'announcementNotifications.byEmail': response === 'yes',
+        'announcementNotifications.byText': response === 'yes'
+      },
       { new: true }
     );
 
     if (!updated) return res.status(404).send('User not found.');
 
-    return res.send(response === 'yes'
-      ? '🎉 Thanks! You’ll now receive Geega Games updates.'
-      : '✅ Got it — you won’t receive email updates.');
+    return res.send(
+      response === 'yes'
+        ? '🎉 Thanks! You’ll now receive Geega Games updates.'
+        : '✅ Got it — you won’t receive email updates.'
+    );
   } catch (err) {
     console.error('❌ Opt-in update error:', err);
     res.status(500).send('Error updating preference.');
+  }
+});
+
+
+app.get('/api/manual-update-optin', async (req, res) => {
+  const updates = [
+    'godlyalert@gmail.com',
+    'joseguerrero411@yahoo.com',
+    'femdymere@gmail.com',
+    'scott.dyvig@gmail.com',
+    'mak091901@gmail.com',
+    'Espurg03@yahoo.com',
+    'jwgarfield82@gmail.com',
+    'nienlam547@gmail.com',
+    'scottyhayward12221@gmail.com',
+    'haywardscotty9@gmail.com',
+    'brumfield61@yahoo.com'
+  ];
+
+  try {
+    const result = await Promise.all(
+      updates.map(email =>
+        User.findOneAndUpdate(
+          { email },
+          {
+            announcementNotifications: {
+              enabled: true,
+              byEmail: true,
+              byText: true
+            }
+          },
+          { new: true }
+        )
+      )
+    );
+
+    const updated = result.filter(r => r);
+    res.send(`✅ Updated ${updated.length} user(s).`);
+  } catch (err) {
+    console.error('❌ Manual update error:', err);
+    res.status(500).send('Failed to update users.');
   }
 });
 

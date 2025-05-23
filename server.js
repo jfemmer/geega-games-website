@@ -1236,35 +1236,36 @@ app.post('/api/shippo/label', async (req, res) => {
 
 // ✅ Add this to server.js near other routes
 
-// Route: Send opt-in email to all users
-app.get('/api/email-opt-in', async (req, res) => {
-  const { email, response } = req.query;
-
-  if (!email || !['yes', 'no'].includes(response)) {
-    return res.status(400).send('Invalid request');
-  }
-
+app.get('/api/send-email-optin', async (req, res) => {
   try {
-    const updated = await User.findOneAndUpdate(
-      { email },
-      {
-        'announcementNotifications.enabled': response === 'yes',
-        'announcementNotifications.byEmail': response === 'yes',
-        'announcementNotifications.byText': response === 'yes'
-      },
-      { new: true }
-    );
+    const users = await User.find({
+      'announcementNotifications.enabled': { $ne: true }
+    });
 
-    if (!updated) return res.status(404).send('User not found.');
+    for (const user of users) {
+      const baseUrl = 'https://www.geega-games.com/api/email-opt-in';
+      const yesUrl = `${baseUrl}?email=${encodeURIComponent(user.email)}&response=yes`;
+      const noUrl = `${baseUrl}?email=${encodeURIComponent(user.email)}&response=no`;
 
-    return res.send(
-      response === 'yes'
-        ? '🎉 Thanks! You’ll now receive Geega Games updates.'
-        : '✅ Got it — you won’t receive email updates.'
-    );
+      const html = `
+        <p>Hi ${user.firstName || 'there'},</p>
+        <p>Would you like to receive occasional updates about new inventory, deals, and Geega Games news?</p>
+        <p><a href="${yesUrl}">✅ Yes, sign me up!</a></p>
+        <p><a href="${noUrl}">❌ No thanks</a></p>
+      `;
+
+      await transporter.sendMail({
+        from: `Geega Games <${process.env.NOTIFY_EMAIL}>`,
+        to: user.email,
+        subject: 'Want Geega Games Updates?',
+        html
+      });
+    }
+
+    res.json({ message: `Opt-in emails sent to ${users.length} users.` });
   } catch (err) {
-    console.error('❌ Opt-in update error:', err);
-    res.status(500).send('Error updating preference.');
+    console.error('❌ Email opt-in error:', err);
+    res.status(500).json({ message: 'Failed to send opt-in emails' });
   }
 });
 

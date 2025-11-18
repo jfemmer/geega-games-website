@@ -546,6 +546,9 @@ input.highlighted {
     <a href="#" onclick="showSection('orders-section'); loadOrders();">
       Orders <span id="order-count" style="background: white; color: rebeccapurple; font-weight: bold; padding: 2px 6px; border-radius: 8px; font-size: 0.85em;">0</span>
     </a>
+    <a href="#" onclick="showSection('collections-section'); loadCollections();">
+      Incoming Collections
+    </a>
     <a href="#" onclick="showSection('user-management-section')">User Management</a>
     <a href="#" onclick="showSection('announcement-section')">Post Announcement</a>
     <a href="#" onclick="showSection('employee-section')">Add Employee</a>
@@ -654,6 +657,33 @@ input.highlighted {
         <p>Loading orders...</p>
         </div>
       </div>
+
+      <!-- ✅ Incoming Collections Section -->
+<div class="section" id="collections-section" style="display:none;">
+  <h2>Incoming Collections</h2>
+
+  <div id="collections-filters" style="margin-bottom: 16px; display:flex; gap:10px; flex-wrap:wrap;">
+    <select id="collections-status-filter" style="max-width:200px;">
+      <option value="">All Statuses</option>
+      <option value="New">New</option>
+      <option value="Reviewing">Reviewing</option>
+      <option value="Offer Sent">Offer Sent</option>
+      <option value="Accepted">Accepted</option>
+      <option value="Declined">Declined</option>
+      <option value="Completed">Completed</option>
+    </select>
+    <input
+      type="text"
+      id="collections-search"
+      placeholder="Search by name, email, or notes..."
+      style="max-width:260px;"
+    />
+  </div>
+
+  <div id="collections-list">
+    <p>Loading incoming collections...</p>
+  </div>
+</div>
   
     <!-- User Management Section -->
     <div class="section" id="user-management-section" style="display:none;">
@@ -1530,6 +1560,189 @@ document.getElementById('send-optin-button').addEventListener('click', async () 
     alert('❌ Error sending opt-in emails.');
   }
 });
+
+let allCollections = []; // cache for filtering
+
+  async function loadCollections() {
+    const list = document.getElementById('collections-list');
+    list.innerHTML = '<p>Loading incoming collections...</p>';
+
+    try {
+      const res = await fetch('https://geega-games-website-production.up.railway.app/api/collections');
+      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      const collections = await res.json();
+
+      if (!Array.isArray(collections) || collections.length === 0) {
+        list.innerHTML = '<p>No incoming collections yet.</p>';
+        allCollections = [];
+        return;
+      }
+
+      allCollections = collections;
+      renderCollections();
+    } catch (err) {
+      console.error('❌ Error loading collections:', err);
+      list.innerHTML = '<p>❌ Failed to load collections.</p>';
+    }
+  }
+
+  function renderCollections() {
+    const list = document.getElementById('collections-list');
+    const statusFilter = document.getElementById('collections-status-filter').value;
+    const searchTerm = document.getElementById('collections-search').value.trim().toLowerCase();
+
+    const filtered = allCollections.filter(col => {
+      const matchesStatus = !statusFilter || col.status === statusFilter;
+      const blob = [
+        col.name,
+        col.firstName,
+        col.lastName,
+        col.email,
+        col.phone,
+        col.source,
+        col.notes,
+        col.internalNotes
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      const matchesSearch = !searchTerm || blob.includes(searchTerm);
+      return matchesStatus && matchesSearch;
+    });
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<p>No collections match your filters.</p>';
+      return;
+    }
+
+    list.innerHTML = filtered
+      .map(col => {
+        const name =
+          col.name ||
+          [col.firstName, col.lastName].filter(Boolean).join(' ') ||
+          'Unknown Seller';
+        const created = col.createdAt
+          ? new Date(col.createdAt).toLocaleString()
+          : '—';
+        const status = col.status || 'New';
+        const estValue =
+          typeof col.estimatedValue === 'number'
+            ? col.estimatedValue.toFixed(2)
+            : col.estimatedValue || '—';
+        const totalCount = col.totalCards || col.cardCount || '—';
+        const source = col.source || col.channel || 'Unknown';
+        const id = col._id || col.id;
+
+        return `
+          <div class="order-card">
+            <div class="order-header">
+              <h3>${name}</h3>
+              <div><strong>Est. Value:</strong> $${estValue}</div>
+            </div>
+
+            <div class="order-details">
+              <p><strong>Email:</strong> ${col.email || '—'}</p>
+              <p><strong>Phone:</strong> ${col.phone || '—'}</p>
+              <p><strong>Source:</strong> ${source}</p>
+              <p><strong>Total Cards:</strong> ${totalCount}</p>
+              <p><strong>Submitted:</strong> ${created}</p>
+            </div>
+
+            ${
+              col.notes
+                ? `<div style="margin-top:10px;">
+                     <strong>Seller Notes:</strong>
+                     <p style="margin:4px 0;">${col.notes}</p>
+                   </div>`
+                : ''
+            }
+
+            <div style="margin-top: 14px;">
+              <label for="internal-${id}" style="font-weight:600;">Internal Notes:</label>
+              <textarea
+                id="internal-${id}"
+                rows="3"
+                style="width:100%; resize:vertical;"
+              >${col.internalNotes || ''}</textarea>
+            </div>
+
+            <div class="order-status" style="margin-top: 14px;">
+              <strong>Status:</strong>
+              <select id="status-${id}">
+                ${['New','Reviewing','Offer Sent','Accepted','Declined','Completed']
+                  .map(
+                    s =>
+                      `<option value="${s}" ${
+                        s === status ? 'selected' : ''
+                      }>${s}</option>`
+                  )
+                  .join('')}
+              </select>
+              <button
+                style="margin-left:10px; width:auto; padding-inline:14px;"
+                onclick="saveCollection('${id}')"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  async function saveCollection(id) {
+    const statusSelect = document.getElementById(`status-${id}`);
+    const notesArea = document.getElementById(`internal-${id}`);
+
+    const status = statusSelect ? statusSelect.value : undefined;
+    const internalNotes = notesArea ? notesArea.value.trim() : '';
+
+    try {
+      const res = await fetch(
+        `https://geega-games-website-production.up.railway.app/api/collections/${id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status, internalNotes })
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error updating collection');
+
+      alert('✅ Collection updated.');
+
+      // Update local cache so UI is in sync without full reload
+      const idx = allCollections.findIndex(c => (c._id || c.id) === id);
+      if (idx !== -1) {
+        allCollections[idx].status = status;
+        allCollections[idx].internalNotes = internalNotes;
+      }
+    } catch (err) {
+      console.error('❌ Failed to update collection:', err);
+      alert('❌ Could not update collection.');
+    }
+  }
+
+  // Filters: re-render when changed
+  document.addEventListener('DOMContentLoaded', () => {
+    const statusFilter = document.getElementById('collections-status-filter');
+    const searchInput = document.getElementById('collections-search');
+
+    if (statusFilter) {
+      statusFilter.addEventListener('change', renderCollections);
+    }
+
+    if (searchInput) {
+      let searchTimeout;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(renderCollections, 250);
+      });
+    }
+  });
+
 </script>
   
 </body>

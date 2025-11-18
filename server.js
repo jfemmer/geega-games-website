@@ -211,9 +211,23 @@ const tradeInSchema = new mongoose.Schema({
       foil: Boolean,
       condition: String,
       imageUrl: String,
+      quantity: { type: Number, default: 1 } // just in case you pass qty
     },
   ],
-  submittedAt: { type: Date, default: Date.now }
+
+  // 🕒 When the trade-in / collection was submitted
+  submittedAt: { type: Date, default: Date.now },
+
+  // 🆕 Incoming Collections fields
+  status: {
+    type: String,
+    default: 'New' // New, Reviewing, Offer Sent, Accepted, Declined, Completed
+  },
+  estimatedValue: Number,   // Your estimated payout / value
+  totalCards: Number,       // Total number of cards in the collection
+  source: String,           // e.g. 'Website form', 'Facebook', 'In-store'
+  notes: String,            // Seller-facing notes / description
+  internalNotes: String     // Only for you / staff
 });
 
 const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
@@ -615,7 +629,7 @@ app.post('/api/inventory', async (req, res) => {
 
 
 app.post('/api/tradein', async (req, res) => {
-  const { userId, cards } = req.body;
+  const { userId, cards, estimatedValue, source, notes } = req.body;
 
   if (!userId || !Array.isArray(cards) || cards.length === 0) {
     return res.status(400).json({ message: 'Invalid trade-in data.' });
@@ -625,13 +639,26 @@ app.post('/api/tradein', async (req, res) => {
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ message: 'User not found.' });
 
+    // 🧮 Compute total cards (if quantity exists, use it; otherwise default 1)
+    const totalCards = cards.reduce(
+      (sum, c) => sum + (typeof c.quantity === 'number' ? c.quantity : 1),
+      0
+    );
+
     const tradeInData = {
       userId,
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
       phone: user.phone,
-      cards
+      cards,
+
+      // Incoming Collections meta
+      estimatedValue: typeof estimatedValue === 'number' ? estimatedValue : undefined,
+      totalCards,
+      source: source || 'Website Trade-In',
+      notes: notes || '',
+      status: 'New' // default state when submitted
     };
 
     await new TradeIn(tradeInData).save();
@@ -639,6 +666,56 @@ app.post('/api/tradein', async (req, res) => {
   } catch (err) {
     console.error('❌ Trade-in submission error:', err);
     res.status(500).json({ message: 'Server error while submitting trade-in.' });
+  }
+});
+
+// List all incoming collections (for admin dashboard)
+app.get('/api/collections', async (req, res) => {
+  try {
+    const collections = await TradeIn.find().sort({ submittedAt: -1 });
+    res.json(collections);
+  } catch (err) {
+    console.error('❌ Error fetching collections:', err);
+    res.status(500).json({ message: 'Server error while fetching collections.' });
+  }
+});
+
+// Update a single collection (status, internal notes, etc.)
+app.patch('/api/collections/:id', async (req, res) => {
+  const { id } = req.params;
+  const {
+    status,
+    internalNotes,
+    estimatedValue,
+    totalCards,
+    source,
+    notes
+  } = req.body;
+
+  try {
+    const update = {};
+
+    if (typeof status === 'string') update.status = status;
+    if (typeof internalNotes === 'string') update.internalNotes = internalNotes;
+    if (typeof notes === 'string') update.notes = notes;
+    if (typeof source === 'string') update.source = source;
+    if (typeof estimatedValue === 'number') update.estimatedValue = estimatedValue;
+    if (typeof totalCards === 'number') update.totalCards = totalCards;
+
+    const updated = await TradeIn.findByIdAndUpdate(
+      id,
+      update,
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Collection not found.' });
+    }
+
+    res.json({ message: 'Collection updated.', collection: updated });
+  } catch (err) {
+    console.error('❌ Error updating collection:', err);
+    res.status(500).json({ message: 'Server error while updating collection.' });
   }
 });
 

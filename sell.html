@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sell Your Collection | Geega Games</title>
+  <meta name="description" content="Fast, fair, and easy way to sell your Magic: The Gathering collection to Geega Games. Choose quick entry or bulk photo upload.">
+  <style>
+  :root{
+    --brand:#663399; /* rebeccapurple */
+    --brand-dark:#4a0c83;
+    --bg:#f5f5f7;
+    --text:#222;
+    --muted:#6b7280;
+    --ok:#16a34a;
+    --warn:#dc2626;
+    --card:#fff;
+    --ring: 0 0 0 3px rgba(102,51,153,.25);
+    --shadow: 0 8px 24px rgba(0,0,0,.08);
+    --radius: 14px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    color:var(--text); background:var(--bg);
+  }
+  .container{max-width:1000px; margin-inline:auto; padding:24px;}
+  header{ text-align:center; margin-top:6px; }
+  h1{ color:var(--brand); margin:0 0 8px; font-size:clamp(26px,3.2vw,40px); }
+  .sub{ color:var(--muted); margin:0 auto; max-width:60ch; }
+
+  /* ===== CHOICES (Updated) ===== */
+  .choices{
+    display:flex; gap:12px; justify-content:center; margin:22px 0 8px; flex-wrap:wrap;
+  }
+  .choice{
+    appearance:none;
+    background:#fff;
+    color:var(--text);
+    border:1px solid #e5e7eb;
+    border-radius:14px;
+    padding:12px 16px;
+    cursor:pointer;
+    min-width:260px;
+    text-align:left;
+    box-shadow:0 4px 14px rgba(0,0,0,.06);
+    transition:box-shadow .15s, border-color .15s, transform .04s;
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .choice .choice-title{
+    font-weight:800; color:var(--brand); font-size:1rem; line-height:1.1;
+  }
+  .choice .choice-sub{
+    color:var(--muted); font-size:.92rem; line-height:1.25;
+  }
+  .choice:hover{ box-shadow:0 8px 20px rgba(0,0,0,.08); }
+  .choice:active{ transform:translateY(1px); }
+  .choice:focus,
+  .choice:focus-visible{
+    outline:none; box-shadow:var(--ring), 0 8px 20px rgba(0,0,0,.08);
+    border-color:var(--brand);
+  }
+  .choice[aria-pressed="true"],
+  .choice[aria-selected="true"]{
+    border-color:var(--brand);
+    box-shadow:var(--ring), 0 8px 20px rgba(102,51,153,.10);
+  }
+  @media (max-width:480px){
+    .choice{ min-width:unset; width:100%; }
+  }
+  /* ===== End choices ===== */
+
+  .trust{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin:14px 0 24px; }
+  .pill{ background:#fff; border:1px solid #eee; border-radius:999px; padding:8px 12px; display:flex; align-items:center; gap:8px; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.04)}
+
+  .card{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; }
+
+  form{ display:none }
+  form.active{ display:block }
+  .row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:720px){ .row{ grid-template-columns:1fr; } }
+  label{ font-weight:700; color:var(--brand); display:block; margin-top:12px; }
+  .hint{ color:var(--muted); font-size:.9rem; margin-top:2px }
+  input, select, textarea, button{ font-size:16px }
+  input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="tel"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px 12px;
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      transition: border .15s, box-shadow .15s;
+    }
+  input:focus, textarea:focus, select:focus{ outline:none; border-color:var(--brand); box-shadow:var(--ring); }
+  textarea{ min-height:110px; resize:vertical }
+  .btn{ appearance:none; border:0; background:var(--brand); color:#fff; padding:12px 16px; font-weight:800; border-radius:12px; cursor:pointer; }
+  .btn.secondary{ background:#111; }
+  .btn.icon{ display:inline-flex; align-items:center; gap:8px }
+  .btn[disabled]{ opacity:.6; cursor:not-allowed }
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .success{ color:var(--ok); font-weight:800; display:none; margin-top:10px }
+  .error{ color:var(--warn); font-weight:700; display:none; margin-top:10px }
+
+  .results{ margin-top:6px }
+  .result{ padding:8px 10px; border:1px solid #e5e7eb; border-radius:10px; margin-top:6px; cursor:pointer; background:#fff }
+  .result:hover, .result:focus{ outline:none; box-shadow:var(--ring); border-color:var(--brand) }
+
+  .selected{ display:grid; grid-template-columns:140px 1fr; gap:16px; margin-top:12px; align-items:start }
+  @media (max-width:640px){ .selected{ grid-template-columns:1fr } }
+  .thumb{ width:140px; border-radius:12px; background:#eee; aspect-ratio: 5/7; object-fit:cover }
+  .set-symbol{ width:28px; height:28px; vertical-align:middle; margin-left:8px; }
+
+  table{ width:100%; border-collapse:collapse; margin-top:10px; }
+  thead th{ background:#f3f4f6; text-align:left; padding:10px; font-size:.95rem }
+  td{ padding:10px; border-top:1px solid #eee }
+  .del{ background:#fff; border:1px solid #eee; border-radius:8px; padding:6px 10px; cursor:pointer }
+
+  .drop{ border:2px dashed #c4b5fd; border-radius:var(--radius); padding:16px; display:grid; gap:8px; place-items:center; text-align:center; background:#fafafa }
+  .drop.drag{ background:#f5f3ff; border-color:var(--brand) }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:8px; margin-top:10px }
+  .grid img{ width:100%; height:100px; object-fit:cover; border-radius:10px; }
+
+  .helpbox{ position:sticky; top:12px; align-self:start; background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px }
+  .helpbox h3{ margin:0 0 6px; color:#111 }
+  .helpbox ul{ margin:0; padding-left:18px }
+
+ .row-set {
+  position: relative;
+  width: 100%;
+}
+
+/* Full-width select with extra right padding for the symbol */
+.row-set select {
+  width: 100%;
+  padding: 12px 48px 12px 12px; /* top right bottom left */
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  transition: border .15s, box-shadow .15s;
+  box-sizing: border-box;
+}
+
+.row-set select:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: var(--ring);
+}
+
+/* Symbol sits inside on the right */
+#set-symbol {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  pointer-events: none; /* don't block clicks on the select */
+}
+
+/* Container */
+.set-select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* Button styling (fake select) */
+.set-select-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: border .15s, box-shadow .15s;
+}
+
+/* Focus effect */
+.set-select-btn:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: var(--ring);
+}
+
+/* Menu of options */
+.set-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 20;
+}
+
+/* One option row */
+.set-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.set-option:hover {
+  background: #f4f3ff;
+}
+
+/* Set symbol thumb */
+.set-option img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+/* Selected icon inside button */
+.set-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+  footer{ color:var(--muted); text-align:center; font-size:.9rem; margin:26px 0 8px }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Sell Your Magic: The Gathering Cards</h1>
+      <p class="sub">Pick the path that fits your collection. We make fair, fast offers—usually within 24–48 hours of receiving your list or photos.</p>
+    </header>
+
+    <div class="trust" aria-hidden="true">
+      <div class="pill">⚡ Fast offers (24–48h)</div>
+      <div class="pill">💵 Cash, PayPal, or Zelle</div>
+      <div class="pill">🤝 No-pressure quotes</div>
+      <div class="pill">📦 Local pickup or shipping</div>
+    </div>
+
+    <div class="choices" role="tablist" aria-label="Submission modes">
+      <button id="btn-quick" class="choice" role="tab" aria-selected="true" aria-controls="panel-quick" aria-pressed="true">
+        <span class="choice-title">Quick List</span>
+        <span class="choice-sub">Up to ~200 cards • Type names & pick versions</span>
+      </button>
+
+      <button id="btn-bulk" class="choice" role="tab" aria-selected="false" aria-controls="panel-bulk" aria-pressed="false">
+        <span class="choice-title">Bulk Photos</span>
+        <span class="choice-sub">Big boxes/binders • Upload clear pics</span>
+      </button>
+    </div>
+
+    <div class="row" style="align-items:start">
+      <section class="card" id="panel-quick" role="tabpanel" aria-labelledby="btn-quick">
+        <form id="entry-form" class="active" novalidate>
+          <div class="row">
+            <div>
+              <label for="entry-name">Your Name *</label>
+              <input id="entry-name" type="text" autocomplete="name" required>
+            </div>
+            <div>
+              <label for="entry-email">Email *</label>
+              <input id="entry-email" type="email" autocomplete="email" required>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label for="entry-phone">Phone (optional)</label>
+              <input id="entry-phone" type="tel" inputmode="tel" placeholder="(###) ###-####">
+            </div>
+            <div>
+              <label for="entry-zip">ZIP (optional)</label>
+              <input id="entry-zip" type="text" inputmode="numeric" pattern="[0-9]{5}" placeholder="63011">
+            </div>
+          </div>
+
+          <label for="card-search" style="margin-top:16px">Search cards by name</label>
+          <input id="card-search" type="text" placeholder="e.g., Sol Ring" aria-autocomplete="list" aria-expanded="false" aria-controls="search-results" autocomplete="off" />
+          <div id="search-results" class="results" role="listbox" aria-label="Card suggestions"></div>
+
+        <div id="card-form-fields" style="display:none; margin-top:12px">
+  <div class="selected">
+    <img id="card-preview" class="thumb" alt="Selected card image"/>
+    <div>
+      <!-- Set dropdown (full width, on its own row) -->
+      <div>
+        <label for="set-select">Set</label>
+        <div class="set-select-wrapper">
+          <button type="button" id="set-select" class="set-select-btn">
+            <span id="set-select-label">Loading sets…</span>
+            <img id="set-select-icon" class="set-icon" alt="">
+          </button>
+          <div id="set-options" class="set-options" hidden></div>
+        </div>
+      </div>
+
+      <!-- Row 2: Version + Foil (below the set dropdown) -->
+      <div class="row" style="margin-top:8px">
+        <div>
+          <label for="card-variant">Card Version</label>
+          <select id="card-variant">
+            <option value="">Standard</option>
+          </select>
+          <div class="hint">Borderless, Extended art, etc.</div>
+        </div>
+        <div>
+          <label for="card-foil">Foil</label>
+          <select id="card-foil">
+            <option value="nonfoil">Nonfoil</option>
+            <option value="foil">Foil</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 3: Condition + Quantity -->
+      <div class="row">
+        <div>
+          <label for="card-condition">Condition</label>
+          <select id="card-condition">
+            <option value="NM">Near Mint</option>
+            <option value="LP">Lightly Played</option>
+            <option value="MP">Moderately Played</option>
+            <option value="HP">Heavily Played</option>
+            <option value="DMG">Damaged</option>
+          </select>
+        </div>
+        <div>
+          <label for="card-quantity">Quantity</label>
+          <input id="card-quantity" type="number" min="1" value="1" />
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top:10px">
+        <button class="btn icon" type="button" id="btn-add">➕ Add to List</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+          <h3 style="margin:18px 0 6px">🧾 Your List</h3>
+          <div class="card" style="padding:0">
+            <table id="card-list">
+              <thead>
+                <tr>
+                  <th>Card</th><th>Set</th><th>Version</th><th>Foil</th><th>Condition</th><th>Qty</th><th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="actions" style="margin-top:14px">
+            <button class="btn" type="submit" id="entry-submit">Submit for Quote</button>
+            <button class="btn secondary" type="button" id="entry-clear" title="Clear list">Clear</button>
+            <span class="success" id="entry-success">✅ Thanks! We got your list. We'll email you shortly.</span>
+            <span class="error" id="entry-error">❌ Something went wrong. Please try again.</span>
+          </div>
+
+          <input type="text" id="company" name="company" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px" aria-hidden="true">
+        </form>
+      </section>
+
+      <aside class="helpbox" aria-label="Helpful tips">
+        <h3>What happens next?</h3>
+        <ul>
+          <li>We review your list/photos and send a fair offer.</li>
+          <li>Choose cash, PayPal, or Zelle.</li>
+          <li>Local? We can meet or pick up. Shipping? We provide a label.</li>
+        </ul>
+        <p class="hint" style="margin-top:8px">Questions? Email <a href="mailto:sales@geegagames.com">sales@geegagames.com</a>.</p>
+      </aside>
+    </div>
+
+    <section class="card" id="panel-bulk" role="tabpanel" aria-labelledby="btn-bulk" hidden>
+      <form id="bulk-form" novalidate>
+        <div class="row">
+          <div>
+            <label for="bulk-name">Your Name *</label>
+            <input id="bulk-name" type="text" required>
+          </div>
+          <div>
+            <label for="bulk-email">Email *</label>
+            <input id="bulk-email" type="email" required>
+          </div>
+        </div>
+        <label for="bulk-notes">Tell us what you have</label>
+        <textarea id="bulk-notes" placeholder="e.g., 2 tote bins of commons/uncommons, Commander decks, some foils, sealed product..."></textarea>
+
+        <label>Photos (up to 20)</label>
+        <div id="drop" class="drop" tabindex="0" aria-label="Drag and drop photos or click to choose">
+          <div>📸 Drag & drop photos here or click to choose</div>
+          <input id="bulk-photos" type="file" accept="image/*" multiple style="display:none">
+          <button class="btn" type="button" id="choose-files">Choose Photos</button>
+          <div class="hint">Wide shots of boxes + close-ups of any high-value cards help us price faster.</div>
+        </div>
+        <div id="thumbs" class="grid" aria-live="polite"></div>
+
+        <div class="actions" style="margin-top:14px">
+          <button class="btn" type="submit" id="bulk-submit">Send Photos</button>
+          <span class="success" id="bulk-success">✅ Upload received! We'll reply soon.</span>
+          <span class="error" id="bulk-error">❌ Upload failed. Please try again.</span>
+        </div>
+
+        <input type="text" id="website" name="website" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px" aria-hidden="true">
+      </form>
+    </section>
+
+    <footer>
+      By submitting, you agree we may contact you about your quote. We never sell your data.
+    </footer>
+  </div>
+
+  <script>
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const API_BASE = 'https://geega-games-website-production.up.railway.app';
+
+  // Tabs
+  const btnQuick = $('#btn-quick');
+  const btnBulk  = $('#btn-bulk');
+  const panelQuick = $('#panel-quick');
+  const panelBulk  = $('#panel-bulk');
+  function switchMode(mode){
+    const quick = mode === 'quick';
+    btnQuick.setAttribute('aria-pressed', quick);
+    btnQuick.setAttribute('aria-selected', quick);
+    btnBulk.setAttribute('aria-pressed', !quick);
+    btnBulk.setAttribute('aria-selected', !quick);
+    panelQuick.hidden = !quick; panelBulk.hidden = quick;
+  }
+  btnQuick.addEventListener('click', ()=> switchMode('quick'));
+  btnBulk.addEventListener('click',  ()=> switchMode('bulk'));
+
+  // Quick Entry
+  const entryForm   = $('#entry-form');
+  const entrySuccess= $('#entry-success');
+  const entryError  = $('#entry-error');
+  const entrySubmit = $('#entry-submit');
+
+  const resultBox   = $('#search-results');
+  const cardSearch  = $('#card-search');
+  const cardFields  = $('#card-form-fields');
+  const cardPreview = $('#card-preview');
+
+  // NEW: custom set dropdown pieces
+  const setSelectBtn   = $('#set-select');
+  const setOptionsPanel= $('#set-options');
+  const setSelectLabel = $('#set-select-label');
+  const setSelectIcon  = $('#set-select-icon');
+
+  const btnAdd        = $('#btn-add');
+  const variantSelect = $('#card-variant');
+  const foilSelect    = $('#card-foil');
+
+  let selectedCard = {};
+  let cardsToSubmit = [];
+  let allPrints = [];        // cache of prints for the selected card
+  let currentSetName = '';   // currently selected set name (for submit)
+
+  function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); } }
+  async function fetchJson(url){ const res = await fetch(url); if(!res.ok) throw new Error('Network'); return res.json(); }
+
+  // Autocomplete
+  cardSearch.addEventListener('input', debounce(async (e)=>{
+    const q = e.target.value.trim();
+    resultBox.innerHTML = '';
+    cardSearch.setAttribute('aria-expanded','false');
+    if(q.length < 3) return;
+    try{
+      const data = await fetchJson(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(q)}`);
+      resultBox.innerHTML = data.data.slice(0,10).map(name=>
+        `<div class="result" role="option" tabindex="0" data-name="${name.replaceAll('"','&quot;')}">${name}</div>`
+      ).join('');
+      cardSearch.setAttribute('aria-expanded','true');
+    }catch{}
+  }, 250));
+
+  // choose result
+  resultBox.addEventListener('click', (e)=>{
+    const item = e.target.closest('.result');
+    if(item) selectCard(item.dataset.name);
+  });
+  resultBox.addEventListener('keydown', (e)=>{
+    const item = e.target.closest('.result');
+    if(item && (e.key==='Enter' || e.key===' ')) { e.preventDefault(); selectCard(item.dataset.name); }
+  });
+
+  function pickImage(p){
+    return (
+      p.image_uris?.png ||
+      p.card_faces?.[0]?.image_uris?.png ||
+      p.image_uris?.large ||
+      p.card_faces?.[0]?.image_uris?.large ||
+      ''
+    );
+  }
+
+  function labelFromPrinting(p){
+    // Build a readable label describing art/treatments (not finish).
+    const tags = [];
+    const fe = p.frame_effects || [];
+    const promo = p.promo_types || [];
+
+    if (fe.includes('borderless'))   tags.push('Borderless');
+    if (fe.includes('extendedart'))  tags.push('Extended Art');
+    if (fe.includes('showcase'))     tags.push('Showcase');
+    if (p.full_art)                  tags.push('Full Art');
+    if (p.textless)                  tags.push('Textless');
+    if ((p.frame || '').includes('199')) tags.push('Retro Frame');
+    if (p.border_color && p.border_color !== 'black') tags.push(`${p.border_color[0].toUpperCase()+p.border_color.slice(1)} Border`);
+    if (promo.length)                tags.push(promo.map(x=>x.replace(/_/g,' ')).join('+'));
+
+    const base = tags.length ? tags.join(' + ') : 'Standard';
+    const cn = p.collector_number ? ` #${p.collector_number}` : '';
+    const artist = p.artist ? ` • ${p.artist}` : '';
+    return `${base}${cn}${artist}`;
+  }
+
+  function finishesPretty(arr){
+    const map = {nonfoil:'Nonfoil', foil:'Foil', etched:'Etched Foil', gilded:'Gilded Foil', glossy:'Glossy Foil'};
+    return (arr||[]).map(f=> map[f] || f).join(', ');
+  }
+
+  function labelFromPrintingShort(p){
+    // Ultra-compact treatment labels (no finish info here)
+    const fe = p.frame_effects || [];
+    if (fe.includes('showcase'))          return 'Showcase';
+    if (fe.includes('borderless'))        return 'Borderless';
+    if (fe.includes('extendedart'))       return 'EA';
+    if ((p.frame || '').includes('199'))  return 'Retro';
+    if (p.textless)                       return 'Textless';
+    if (p.full_art)                       return 'Full Art';
+    return 'Standard';
+  }
+
+  function fullLabelForTitle(p){
+    // Descriptive label for tooltip/records
+    return labelFromPrinting(p);
+  }
+
+  // Toggle open/close for custom set dropdown
+  if (setSelectBtn && setOptionsPanel) {
+    setSelectBtn.addEventListener('click', () => {
+      setOptionsPanel.hidden = !setOptionsPanel.hidden;
+    });
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!setOptionsPanel.contains(e.target) && !setSelectBtn.contains(e.target)) {
+        setOptionsPanel.hidden = true;
+      }
+    });
+  }
+
+  async function selectCard(name){
+    resultBox.innerHTML=''; cardSearch.value = name;
+    try{
+      const data = await fetchJson(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`);
+      selectedCard = {
+        name: data.name,
+        image: data.image_uris?.png || data.card_faces?.[0]?.image_uris?.png || data.image_uris?.large || data.card_faces?.[0]?.image_uris?.large || '',
+        printsUri: data.prints_search_uri
+      };
+      cardPreview.src = selectedCard.image;
+      cardPreview.alt = `${selectedCard.name} preview`;
+      cardFields.style.display = 'block';
+
+      if (!setSelectBtn || !setOptionsPanel || !setSelectLabel || !setSelectIcon) {
+        console.warn('Custom set dropdown elements missing from DOM.');
+        return;
+      }
+
+      // Load all printings for this card
+      const prints = await fetchJson(selectedCard.printsUri);
+      allPrints = (prints.data || []).filter(p => pickImage(p)); // keep only those with an image
+
+      // Build set list (unique sets)
+      const seenSet = new Set();
+      const setOptions = [];
+      allPrints.forEach(p=>{
+        if (seenSet.has(p.set_name)) return;
+        seenSet.add(p.set_name);
+        setOptions.push({
+          set_name: p.set_name,
+          img: pickImage(p),
+          symbol: p.set ? `https://c2.scryfall.com/file/scryfall-symbols/sets/${p.set}.svg` : ''
+        });
+      });
+      setOptions.sort((a,b)=> a.set_name.localeCompare(b.set_name));
+
+      // Helper: update foil dropdown for chosen printing finishes
+      function setFoilOptions(finishes){
+        const pretty = {
+          nonfoil:'Nonfoil',
+          foil:'Foil',
+          etched:'Etched Foil',
+          gilded:'Gilded Foil',
+          glossy:'Glossy Foil'
+        };
+        const uniq = Array.from(new Set(finishes||[]));
+        const order = ['nonfoil','foil','etched','gilded','glossy',
+          ...uniq.filter(f=>!['nonfoil','foil','etched','gilded','glossy'].includes(f))
+        ];
+        foilSelect.innerHTML = order
+          .filter(f=> uniq.includes(f))
+          .map(f=> `<option value="${f}">${pretty[f] || f}</option>`)
+          .join('');
+        if (foilSelect.options.length) foilSelect.value = foilSelect.options[0].value;
+      }
+
+      // Helper: populate variants for selected set
+      function populateVariantsForSet(setName){
+        const inSet = allPrints.filter(p => p.set_name === setName);
+
+        const rows = inSet.map(p => ({
+          id: p.id,
+          short: labelFromPrintingShort(p),
+          long:  fullLabelForTitle(p),
+          image: pickImage(p),
+          finishes: p.finishes || [],
+          illustration_id: p.illustration_id || '',
+          collector_number: p.collector_number || ''
+        }));
+
+        // Disambiguate identical shorts with "• Art N"
+        const counts = {};
+        rows.forEach(r => { counts[r.short] = (counts[r.short] || 0) + 1; });
+
+        const seenPerShort = {};
+        rows.forEach(r => {
+          if (counts[r.short] > 1) {
+            seenPerShort[r.short] = (seenPerShort[r.short] || 0) + 1;
+            const idx = seenPerShort[r.short];
+            const cn = r.collector_number ? ` #${r.collector_number}` : '';
+            r.short = `${r.short} • Art ${idx}${cn}`;
+          }
+        });
+
+        rows.sort((a,b)=> a.short.localeCompare(b.short, undefined, {numeric:true}));
+
+        variantSelect.innerHTML = rows.map(r =>
+          `<option value="${r.id}"
+                   title="${r.long}"
+                   data-full="${r.long}"
+                   data-image="${r.image}"
+                   data-finishes="${(r.finishes||[]).join(',')}">${r.short}</option>`
+        ).join('');
+
+        if (rows[0]) {
+          variantSelect.value = rows[0].id;
+          cardPreview.src = rows[0].image;
+          setFoilOptions(rows[0].finishes);
+        } else {
+          variantSelect.innerHTML = `<option value="" disabled>No versions found</option>`;
+          foilSelect.innerHTML = `<option value="nonfoil">Nonfoil</option>`;
+        }
+      }
+
+      // Build the custom dropdown list UI
+      setOptionsPanel.innerHTML = '';
+      if (!setOptions.length) {
+        setSelectLabel.textContent = 'No sets found';
+        setSelectIcon.style.display = 'none';
+        currentSetName = '';
+        return;
+      }
+
+      setOptions.forEach((it, index) => {
+        const div = document.createElement('div');
+        div.className = 'set-option';
+        div.dataset.setName = it.set_name;
+        div.dataset.symbol = it.symbol;
+        div.dataset.image = it.img;
+
+        const symbolHtml = it.symbol
+          ? `<img src="${it.symbol}" alt="">`
+          : `<div style="width:26px;height:26px;border-radius:50%;background:#f3f4f6;"></div>`;
+
+        div.innerHTML = `
+          ${symbolHtml}
+          <span>${it.set_name}</span>
+        `;
+
+        div.addEventListener('click', () => {
+          currentSetName = it.set_name;
+          setSelectLabel.textContent = it.set_name;
+          if (it.symbol) {
+            setSelectIcon.src = it.symbol;
+            setSelectIcon.style.display = 'inline';
+          } else {
+            setSelectIcon.style.display = 'none';
+          }
+          populateVariantsForSet(it.set_name);
+          setOptionsPanel.hidden = true;
+        });
+
+        setOptionsPanel.appendChild(div);
+
+        // Initialize first option as selected
+        if (index === 0) {
+          currentSetName = it.set_name;
+          setSelectLabel.textContent = it.set_name;
+          if (it.symbol) {
+            setSelectIcon.src = it.symbol;
+            setSelectIcon.style.display = 'inline';
+          } else {
+            setSelectIcon.style.display = 'none';
+          }
+        }
+      });
+
+      // Populate variants for initial set
+      populateVariantsForSet(currentSetName);
+
+      // Variant change handler
+      variantSelect.onchange = (e) => {
+        const opt = e.target.selectedOptions?.[0];
+        const img = opt?.dataset?.image;
+        const finishes = (opt?.dataset?.finishes || '').split(',').filter(Boolean);
+        if (img) cardPreview.src = img;
+        setFoilOptions(finishes);
+      };
+
+      // Foil change does not alter art, just the finish.
+
+    }catch(err){
+      console.error(err);
+      cardFields.style.display = 'none';
+    }
+  }
+
+  // Add to list with human-readable foil type (while keeping boolean for backend)
+  btnAdd.addEventListener('click', ()=>{
+    const name = selectedCard.name;
+    const set  = currentSetName || '';
+    const versionOpt  = $('#card-variant').selectedOptions?.[0];
+    const variantLabel = versionOpt ? (versionOpt.getAttribute('data-full') || versionOpt.textContent) : 'Standard';
+    const foilType = $('#card-foil').value || 'nonfoil';
+    const foilBool = foilType !== 'nonfoil';
+    const condition = $('#card-condition').value;
+    const quantity = parseInt($('#card-quantity').value,10);
+    if(!name || !set || !condition || !quantity || quantity<1) return;
+
+    cardsToSubmit.push({
+      cardName: name,
+      set,
+      variant: variantLabel,
+      foil: foilBool,   // boolean for API
+      foilType,         // for UI (Nonfoil / Foil / Etched / etc.)
+      condition,
+      quantity
+    });
+    renderTable();
+  });
+
+  function renderTable(){
+    const tbody = $('#card-list tbody');
+    if(cardsToSubmit.length===0){
+      tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted); padding:14px">No cards yet. Search above and add.</td></tr>`;
+      return;
+    }
+    const prettyFoil = {nonfoil:'No', foil:'Foil', etched:'Etched', gilded:'Gilded', glossy:'Glossy'};
+    tbody.innerHTML = cardsToSubmit.map((c,i)=>
+      `<tr>
+        <td>${c.cardName}</td>
+        <td>${c.set}</td>
+        <td>${c.variant}</td>
+        <td>${prettyFoil[c.foilType] || (c.foil ? 'Foil' : 'No')}</td>
+        <td>${c.condition}</td>
+        <td>${c.quantity}</td>
+        <td><button class="del" type="button" aria-label="Remove" onclick="removeCard(${i})">🗑️</button></td>
+      </tr>`
+    ).join('');
+  }
+  window.removeCard = (i)=>{ cardsToSubmit.splice(i,1); renderTable(); };
+  renderTable();
+
+  $('#entry-clear').addEventListener('click', ()=>{ cardsToSubmit = []; renderTable(); });
+
+  entryForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const entrySuccess = $('#entry-success');
+  const entryError   = $('#entry-error');
+  const entrySubmit  = $('#entry-submit');
+
+  entrySuccess.style.display = 'none';
+  entryError.style.display   = 'none';
+
+  // honeypot
+  if ($('#company').value) return;
+
+  if (cardsToSubmit.length === 0) {
+    alert('Please add at least one card to your list.');
+    return;
+  }
+
+  const name  = $('#entry-name').value.trim();
+  const email = $('#entry-email').value.trim();
+  const phone = $('#entry-phone').value.trim();
+  const zip   = $('#entry-zip').value.trim();
+
+  if (!name || !email) {
+    alert('Name and email are required.');
+    return;
+  }
+
+  // ✅ Require login so we can attach the collection to the user account
+  const userId = localStorage.getItem('userId');
+  if (!userId) {
+    alert('Please sign in to submit your collection so we can attach it to your account.');
+    return;
+  }
+
+  // 📝 Extra context that will show up in the TradeIn document as notes
+  const notes = [
+    'Sell Page - Quick List submission',
+    `Name: ${name}`,
+    `Email: ${email}`,
+    phone ? `Phone: ${phone}` : '',
+    zip   ? `ZIP: ${zip}`     : ''
+  ].filter(Boolean).join('\n');
+
+  // 🔁 Cards go in the TradeIn.cards array
+  const payload = {
+    userId,
+    cards: cardsToSubmit.map(c => ({
+      cardName:  c.cardName,
+      set:       c.set,
+      foil:      c.foil,
+      condition: c.condition,
+      imageUrl:  '',             // optional for now
+      quantity:  c.quantity
+    })),
+    // Optional meta your /api/tradein route understands
+    estimatedValue: undefined,
+    source: 'Sell Page - Quick List',
+    notes
+  };
+
+  try {
+    entrySubmit.disabled  = true;
+    entrySubmit.textContent = 'Submitting…';
+
+    const res = await fetch(`${API_BASE}/api/tradein`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      cardsToSubmit = [];
+      renderTable();
+      entryForm.reset();
+      $('#card-form-fields').style.display = 'none';
+      entrySuccess.style.display = 'inline';
+    } else {
+      console.error('Trade-in submit failed', await res.text());
+      throw new Error('Bad response');
+    }
+  } catch (err) {
+    console.error('Trade-in error', err);
+    entryError.style.display = 'inline';
+  } finally {
+    entrySubmit.disabled = false;
+    entrySubmit.textContent = 'Submit for Quote';
+  }
+});
+
+  // Bulk Photos flow
+  const bulkForm = $('#bulk-form');
+  const drop = $('#drop');
+  const fileInput = $('#bulk-photos');
+  const thumbs = $('#thumbs');
+  const bulkSuccess = $('#bulk-success');
+  const bulkError = $('#bulk-error');
+  const bulkSubmit = $('#bulk-submit');
+
+  $('#choose-files').addEventListener('click', ()=> fileInput.click());
+
+  ;['dragenter','dragover'].forEach(evt=> drop.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.add('drag'); }));
+  ;['dragleave','drop'].forEach(evt=> drop.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag'); }));
+  drop.addEventListener('drop', e=>{ handleFiles(e.dataTransfer.files); });
+  drop.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', ()=> handleFiles(fileInput.files));
+
+  function handleFiles(fileList){
+    const files = Array.from(fileList).filter(f=> f.type.startsWith('image/'));
+    const max = 20;
+    const chosen = (fileInput._files||[]).concat(files).slice(0,max);
+    fileInput._files = chosen;
+    renderThumbs();
+  }
+
+  function renderThumbs(){
+    thumbs.innerHTML = '';
+    const files = fileInput._files || [];
+    files.forEach(f=>{
+      const url = URL.createObjectURL(f);
+      const img = document.createElement('img'); img.src=url; img.alt=f.name; thumbs.appendChild(img);
+    });
+  }
+
+  bulkForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    bulkSuccess.style.display='none'; bulkError.style.display='none';
+    if($('#website').value) return;
+    if(!$('#bulk-name').value.trim() || !$('#bulk-email').value.trim()){ alert('Name and email are required.'); return; }
+    const files = fileInput._files || [];
+    if(files.length===0){ alert('Please add at least one photo.'); return; }
+    const formData = new FormData();
+    formData.append('name',$('#bulk-name').value.trim());
+    formData.append('email',$('#bulk-email').value.trim());
+    formData.append('notes',$('#bulk-notes').value.trim());
+    files.slice(0,20).forEach(f=> formData.append('photos', f, f.name));
+    try{
+      bulkSubmit.disabled=true; bulkSubmit.textContent='Uploading…';
+      const res = await fetch(`${API_BASE}/api/sell/photos`, { method:'POST', body: formData });
+      if(res.ok){ bulkForm.reset(); fileInput._files=[]; renderThumbs(); bulkSuccess.style.display='inline'; }
+      else { throw new Error('Bad response'); }
+    }catch(err){ bulkError.style.display='inline'; }
+    finally{ bulkSubmit.disabled=false; bulkSubmit.textContent='Send Photos'; }
+  });
+</script>
+
+</body>
+</html>

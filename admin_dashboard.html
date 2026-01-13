@@ -692,6 +692,7 @@
     <input type="text" id="variantType" name="variantType" placeholder="e.g. Borderless, Extended Art" />
 
     <input type="hidden" id="imageUrl" name="imageUrl">
+    <input type="hidden" id="rarity" name="rarity">
 
     <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
       <input type="checkbox" id="foil" name="foil" style="width: 20px; height: 20px;">
@@ -709,6 +710,7 @@
   <form id="price-update-form">
     <label for="priceCardName">Card Name</label>
     <input type="hidden" id="priceCardName" required>
+
 
     <label for="priceSet">Set</label>
     <input type="hidden" id="priceSet" required>
@@ -1287,114 +1289,146 @@
       return [...new Set(variants)];
     }
 
-    async function searchScryfall(query) {
-      const resultsDiv = document.getElementById('search-results');
-      query = query.trim();
+   async function searchScryfall(query) {
+  const resultsDiv = document.getElementById('search-results');
+  query = query.trim();
 
-      if (query.length < 2) {
-        resultsDiv.innerHTML = `<p>❗ Please type at least 2 characters.</p>`;
-        return;
+  if (query.length < 2) {
+    resultsDiv.innerHTML = `<p>❗ Please type at least 2 characters.</p>`;
+    return;
+  }
+
+  resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+
+  try {
+    const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
+    if (!searchRes.ok) throw new Error('Card not found');
+
+    const baseCard = await searchRes.json();
+    const printsRes = await fetch(baseCard.prints_search_uri);
+    const cards = [baseCard, ...(await printsRes.json()).data];
+
+    resultsDiv.innerHTML = '';
+
+    cards.slice(0, 20).forEach(card => {
+      const imageUrl =
+        card.image_uris?.normal ||
+        card.card_faces?.[0]?.image_uris?.normal ||
+        'https://dummyimage.com/223x310/eeeeee/000000&text=No+Image';
+
+      const set = card.set_name || 'Unknown Set';
+      const usd = parseFloat(card.prices?.usd || 0);
+      const usdFoil = parseFloat(card.prices?.usd_foil || card.prices?.usd || 0);
+
+      const treatments = getVariantTypes(card);
+      const displayName = `${card.name}${treatments.length ? ` (${treatments.join(', ')})` : ''}`;
+      const colors = card.colors || [];
+      const cardType = card.type_line || '';
+      const rarity = (card.rarity || '').toLowerCase(); // common/uncommon/rare/mythic
+
+      // ✅ rare floor (choose one)
+      const isRare = rarity === 'rare'; // rare only
+      // const isRare = (rarity === 'rare' || rarity === 'mythic'); // rare + mythic
+
+      const creatureTypes = (/creature/i.test(cardType) && cardType.includes('—'))
+        ? cardType.split('—')[1].trim().split(' ').filter(Boolean)
+        : [];
+
+      const foilId = `foil-${Math.random().toString(36).slice(2)}`;
+      const conditionId = `cond-${Math.random().toString(36).slice(2)}`;
+
+      const foilOptions = card.finishes?.includes('foil') && card.finishes?.includes('nonfoil')
+        ? `<label><input type="checkbox" id="${foilId}" class="foil-checkbox"> Foil</label>`
+        : card.finishes?.length === 1 && card.finishes[0] === 'foil'
+          ? `<span style="font-size: 0.9em; color: #6a2f9c;">✨ Foil Only</span>`
+          : '';
+
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'card-item';
+      cardDiv.innerHTML = `
+        <img src="${imageUrl}" alt="${displayName}">
+        <div class="card-details">
+          <strong>${displayName}</strong>
+          <span>Set: ${set}</span>
+          ${foilOptions}
+          <label for="${conditionId}">Condition:</label>
+          <select id="${conditionId}" class="condition-select">
+            <option value="NM">Near Mint</option>
+            <option value="LP">Lightly Played</option>
+            <option value="MP">Moderately Played</option>
+            <option value="HP">Heavily Played</option>
+            <option value="DMG">Damaged</option>
+          </select>
+          <button class="add-button">Add / Update</button>
+        </div>
+      `;
+
+      const foilCheckbox = cardDiv.querySelector('.foil-checkbox');
+
+      // ✅ Helper to apply the rare minimum
+      function clampRareMin(v) {
+        const num = parseFloat(v) || 0;
+        if (isRare && num < 0.75) return 0.75;
+        return num;
       }
 
-      resultsDiv.innerHTML = `<p>Searching for "<strong>${query}</strong>"...</p>`;
+      // ✅ When toggling foil, clamp price too
+      if (foilCheckbox) {
+        foilCheckbox.addEventListener('change', () => {
+          const next = foilCheckbox.checked ? usdFoil : usd;
+          const clamped = clampRareMin(next);
+          document.getElementById('price').value = clamped.toFixed(2);
+        });
+      }
 
-      try {
-        const searchRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
-        if (!searchRes.ok) throw new Error('Card not found');
+      cardDiv.querySelector('.add-button').addEventListener('click', () => {
+        const isFoilSelected =
+          (card.finishes?.length === 1 && card.finishes[0] === 'foil')
+            ? true
+            : (foilCheckbox?.checked || false);
 
-        const baseCard = await searchRes.json();
-        const printsRes = await fetch(baseCard.prints_search_uri);
-        const cards = [baseCard, ...(await printsRes.json()).data];
+        const condition = cardDiv.querySelector('.condition-select')?.value || 'NM';
+
+        document.getElementById('cardName').value = card.name;
+        document.getElementById('set').value = set;
+        document.getElementById('foil').checked = isFoilSelected;
+        document.getElementById('condition').value = condition;
+        document.getElementById('imageUrl').value = imageUrl;
+        document.getElementById('quantity').value = 1;
+        document.getElementById('rarity').value = rarity;
+
+        // ✅ set price with rare min enforced
+        const base = isFoilSelected ? usdFoil : usd;
+        const clamped = clampRareMin(base);
+        const priceInput = document.getElementById('price');
+        priceInput.value = clamped.toFixed(2);
+
+        // Optional: lock min attribute in the UI
+        priceInput.min = isRare ? "0.75" : "0";
+
+        document.getElementById('variantType').value = treatments.join(', ');
+
+        const variantInput = document.getElementById('variantType');
+        variantInput.classList.add('highlighted');
+        setTimeout(() => variantInput.classList.remove('highlighted'), 1500);
+
+        const form = document.getElementById('update-card-form');
+        form.dataset.colors = JSON.stringify(colors);
+        form.dataset.cardType = cardType;
+        form.dataset.creatureTypes = JSON.stringify(creatureTypes);
 
         resultsDiv.innerHTML = '';
+        document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
+      });
 
-        cards.slice(0, 20).forEach(card => {
-          const imageUrl = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || 'https://dummyimage.com/223x310/eeeeee/000000&text=No+Image';
-          const set = card.set_name || 'Unknown Set';
-          const usd = parseFloat(card.prices?.usd || 0).toFixed(2);
-          const usdFoil = parseFloat(card.prices?.usd_foil || card.prices?.usd || 0).toFixed(2);
+      resultsDiv.appendChild(cardDiv);
+    });
 
-          const treatments = getVariantTypes(card);
-          const displayName = `${card.name}${treatments.length ? ` (${treatments.join(', ')})` : ''}`;
-          const colors = card.colors || [];
-          const cardType = card.type_line || '';
-          const creatureTypes = (/creature/i.test(cardType) && cardType.includes('—'))
-            ? cardType.split('—')[1].trim().split(' ').filter(Boolean)
-            : [];
-
-          const foilId = `foil-${Math.random().toString(36).slice(2)}`;
-          const conditionId = `cond-${Math.random().toString(36).slice(2)}`;
-
-          const foilOptions = card.finishes?.includes('foil') && card.finishes?.includes('nonfoil')
-            ? `<label><input type="checkbox" id="${foilId}" class="foil-checkbox"> Foil</label>`
-            : card.finishes?.length === 1 && card.finishes[0] === 'foil'
-              ? `<span style="font-size: 0.9em; color: #6a2f9c;">✨ Foil Only</span>`
-              : '';
-
-          const cardDiv = document.createElement('div');
-          cardDiv.className = 'card-item';
-          cardDiv.innerHTML = `
-            <img src="${imageUrl}" alt="${displayName}">
-            <div class="card-details">
-              <strong>${displayName}</strong>
-              <span>Set: ${set}</span>
-              ${foilOptions}
-              <label for="${conditionId}">Condition:</label>
-              <select id="${conditionId}" class="condition-select">
-                <option value="NM">Near Mint</option>
-                <option value="LP">Lightly Played</option>
-                <option value="MP">Moderately Played</option>
-                <option value="HP">Heavily Played</option>
-                <option value="DMG">Damaged</option>
-              </select>
-              <button class="add-button">Add / Update</button>
-            </div>
-          `;
-
-          const foilCheckbox = cardDiv.querySelector('.foil-checkbox');
-
-          if (foilCheckbox) {
-            foilCheckbox.addEventListener('change', () => {
-              document.getElementById('price').value = foilCheckbox.checked ? usdFoil : usd;
-            });
-          }
-
-          cardDiv.querySelector('.add-button').addEventListener('click', () => {
-            const isFoil = card.finishes?.length === 1 && card.finishes[0] === 'foil'
-              ? true
-              : foilCheckbox?.checked || false;
-            const condition = cardDiv.querySelector('.condition-select')?.value || 'NM';
-
-            document.getElementById('cardName').value = card.name;
-            document.getElementById('set').value = set;
-            document.getElementById('foil').checked = isFoil;
-            document.getElementById('condition').value = condition;
-            document.getElementById('imageUrl').value = imageUrl;
-            document.getElementById('quantity').value = 1;
-            document.getElementById('price').value = isFoil ? usdFoil : usd;
-            document.getElementById('variantType').value = treatments.join(', ');
-
-            const variantInput = document.getElementById('variantType');
-            variantInput.classList.add('highlighted');
-            setTimeout(() => variantInput.classList.remove('highlighted'), 1500);
-
-            const form = document.getElementById('update-card-form');
-            form.dataset.colors = JSON.stringify(colors);
-            form.dataset.cardType = cardType;
-            form.dataset.creatureTypes = JSON.stringify(creatureTypes);
-
-            resultsDiv.innerHTML = '';
-            document.getElementById('cardName').scrollIntoView({ behavior: 'smooth' });
-          });
-
-          resultsDiv.appendChild(cardDiv);
-        });
-
-      } catch (err) {
-        console.error('❌ Scryfall error:', err);
-        resultsDiv.innerHTML = `<p>❌ Could not find a card for "<strong>${query}</strong>".</p>`;
-      }
-    }
+  } catch (err) {
+    console.error('❌ Scryfall error:', err);
+    resultsDiv.innerHTML = `<p>❌ Could not find a card for "<strong>${query}</strong>".</p>`;
+  }
+}
 
     async function updateOrderCount() {
       try {
@@ -1413,51 +1447,75 @@
 
   <script>
   document.addEventListener("DOMContentLoaded", () => {
-    const form = document.getElementById("update-card-form");
-    if (!form) {
-      console.warn("Form not found");
-      return;
+  const form = document.getElementById("update-card-form");
+  if (!form) {
+    console.warn("Form not found");
+    return;
+  }
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    // ✅ Read rarity from hidden input
+    const rarity = (document.getElementById("rarity")?.value || "").toLowerCase();
+
+    // ✅ Parse and clamp price
+    let price = parseFloat(document.getElementById("price").value) || 0;
+
+    // Enforce minimum price for rares
+    // rare ONLY:
+    if (rarity === "rare" && price < 0.75) {
+      price = 0.75;
     }
 
-    form.addEventListener("submit", async function (e) {
-      e.preventDefault();
+    // OR rare + mythic (uncomment if desired)
+    // if ((rarity === "rare" || rarity === "mythic") && price < 0.75) {
+    //   price = 0.75;
+    // }
 
-      const cardData = {
-        cardName: document.getElementById("cardName").value.trim(),
-        quantity: parseInt(document.getElementById("quantity").value),
-        set: document.getElementById("set").value.trim(),
-        condition: document.getElementById("condition").value,
-        foil: document.getElementById("foil").checked,
-        imageUrl: document.getElementById("imageUrl").value,
-        price: parseFloat(document.getElementById("price").value) || 0,
-        variantType: document.getElementById("variantType").value.trim(),
-        colors: JSON.parse(form.dataset.colors || '[]'),
-        cardType: form.dataset.cardType || '',
-        creatureTypes: JSON.parse(form.dataset.creatureTypes || '[]')
-      };
+    const cardData = {
+      cardName: document.getElementById("cardName").value.trim(),
+      quantity: parseInt(document.getElementById("quantity").value, 10),
+      set: document.getElementById("set").value.trim(),
+      condition: document.getElementById("condition").value,
+      foil: document.getElementById("foil").checked,
+      imageUrl: document.getElementById("imageUrl").value,
+      price,               // ✅ clamped price
+      rarity,              // optional but useful
+      variantType: document.getElementById("variantType").value.trim(),
+      colors: JSON.parse(form.dataset.colors || "[]"),
+      cardType: form.dataset.cardType || "",
+      creatureTypes: JSON.parse(form.dataset.creatureTypes || "[]")
+    };
 
-      try {
-        const response = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+    try {
+      const response = await fetch(
+        "https://geega-games-website-production.up.railway.app/api/inventory",
+        {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(cardData)
-        });
+        }
+      );
 
-        if (!response.ok) throw new Error(`Failed to add card: ${response.status}`);
-        const result = await response.json();
-        alert("✅ Card added/updated successfully!");
-        console.log("✅ Server Response:", result);
-        form.reset();
-
-        form.dataset.colors = '[]';
-        form.dataset.cardType = '';
-        form.dataset.creatureTypes = '[]';
-      } catch (error) {
-        alert("❌ Error adding card.");
-        console.error("❌ Add Card Error:", error);
+      if (!response.ok) {
+        throw new Error(`Failed to add card: ${response.status}`);
       }
-    });
+
+      alert("✅ Card added / updated successfully!");
+      form.reset();
+
+      // Reset metadata
+      form.dataset.colors = "[]";
+      form.dataset.cardType = "";
+      form.dataset.creatureTypes = "[]";
+    } catch (error) {
+      console.error("❌ Add Card Error:", error);
+      alert("❌ Error adding card.");
+    }
   });
+});
+
 
   document.addEventListener("DOMContentLoaded", () => {
     const employeeForm = document.getElementById("add-employee-form");

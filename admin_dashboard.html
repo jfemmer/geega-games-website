@@ -1456,62 +1456,65 @@
   form.addEventListener("submit", async function (e) {
     e.preventDefault();
 
-    // ✅ Read rarity from hidden input
-    const rarity = (document.getElementById("rarity")?.value || "").toLowerCase();
+    const rarity = (document.getElementById("rarity")?.value || "").toLowerCase().trim();
 
-    // ✅ Parse and clamp price
-    let price = parseFloat(document.getElementById("price").value) || 0;
+    let price = parseFloat(document.getElementById("price").value);
+    if (isNaN(price)) price = 0;
 
-    // Enforce minimum price for rares
-    // rare ONLY:
-    if (rarity === "rare" && price < 0.75) {
-      price = 0.75;
-    }
+    // ✅ Enforce minimum for Rare + Mythic
+    const isRareOrMythic = (rarity === "rare" || rarity === "mythic");
+    if (isRareOrMythic && price < 0.75) price = 0.75;
 
-    // OR rare + mythic (uncomment if desired)
-    // if ((rarity === "rare" || rarity === "mythic") && price < 0.75) {
-    //   price = 0.75;
-    // }
+    // ✅ Force the UI to reflect the clamp
+    document.getElementById("price").value = price.toFixed(2);
+
+    const isFoil = document.getElementById("foil").checked;
 
     const cardData = {
       cardName: document.getElementById("cardName").value.trim(),
-      quantity: parseInt(document.getElementById("quantity").value, 10),
+      quantity: parseInt(document.getElementById("quantity").value, 10) || 0,
       set: document.getElementById("set").value.trim(),
       condition: document.getElementById("condition").value,
-      foil: document.getElementById("foil").checked,
+      foil: isFoil,
       imageUrl: document.getElementById("imageUrl").value,
-      price,               // ✅ clamped price
-      rarity,              // optional but useful
       variantType: document.getElementById("variantType").value.trim(),
+
+      // ✅ Send all common price keys so backend can't "miss" it
+      price: price,
+      priceUsd: price,
+      priceUsdFoil: isFoil ? price : undefined,
+
+      rarity: rarity,
+
       colors: JSON.parse(form.dataset.colors || "[]"),
       cardType: form.dataset.cardType || "",
       creatureTypes: JSON.parse(form.dataset.creatureTypes || "[]")
     };
 
-    try {
-      const response = await fetch(
-        "https://geega-games-website-production.up.railway.app/api/inventory",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(cardData)
-        }
-      );
+    // Optional: remove undefined fields (keeps payload clean)
+    Object.keys(cardData).forEach(k => cardData[k] === undefined && delete cardData[k]);
 
-      if (!response.ok) {
-        throw new Error(`Failed to add card: ${response.status}`);
-      }
+    console.log("📦 Submitting cardData:", cardData);
+
+    try {
+      const response = await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cardData)
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || `Failed: ${response.status}`);
 
       alert("✅ Card added / updated successfully!");
       form.reset();
 
-      // Reset metadata
       form.dataset.colors = "[]";
       form.dataset.cardType = "";
       form.dataset.creatureTypes = "[]";
     } catch (error) {
       console.error("❌ Add Card Error:", error);
-      alert("❌ Error adding card.");
+      alert(`❌ Error adding card: ${error.message}`);
     }
   });
 });

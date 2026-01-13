@@ -745,6 +745,19 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
+app.delete('/api/inventory/clear', async (req, res) => {
+  try {
+    const result = await CardInventory.deleteMany({});
+    res.json({
+      message: 'Inventory cleared',
+      deletedCount: result.deletedCount || 0
+    });
+  } catch (err) {
+    console.error('❌ Clear inventory error:', err);
+    res.status(500).json({ message: 'Failed to clear inventory' });
+  }
+});
+
 // Get Single Price
 app.post('/api/inventory/price', async (req, res) => {
   const { cardName, set, foil } = req.body;

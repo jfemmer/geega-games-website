@@ -1289,6 +1289,23 @@
       return [...new Set(variants)];
     }
 
+    async function fetchAllPrints(printsSearchUri, maxCards = 500) {
+      let url = printsSearchUri;
+      let all = [];
+
+      while (url && all.length < maxCards) {
+        const res = await fetch(url);
+        if (!res.ok) break;
+
+        const json = await res.json();
+        if (Array.isArray(json.data)) all.push(...json.data);
+
+        url = json.has_more ? json.next_page : null;
+      }
+
+      return all;
+    }
+
    async function searchScryfall(query) {
   const resultsDiv = document.getElementById('search-results');
   query = query.trim();
@@ -1305,12 +1322,23 @@
     if (!searchRes.ok) throw new Error('Card not found');
 
     const baseCard = await searchRes.json();
-    const printsRes = await fetch(baseCard.prints_search_uri);
-    const cards = [baseCard, ...(await printsRes.json()).data];
+    const prints = await fetchAllPrints(baseCard.prints_search_uri, 600);
+
+    // Deduplicate (baseCard is usually included in prints already)
+    const byId = new Map();
+    [baseCard, ...prints].forEach(c => byId.set(c.id, c));
+    let cards = Array.from(byId.values());
+
+    // Optional: sort newest -> oldest (default-ish), or flip it to surface older sets first
+    cards.sort((a, b) => {
+      const da = a.released_at || "";
+      const db = b.released_at || "";
+      return db.localeCompare(da); // newest first
+    });
 
     resultsDiv.innerHTML = '';
 
-    cards.slice(0, 20).forEach(card => {
+    cards.slice(0, 80).forEach(card => {
       const imageUrl =
         card.image_uris?.normal ||
         card.card_faces?.[0]?.image_uris?.normal ||

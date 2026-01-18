@@ -575,7 +575,12 @@ app.post('/api/inventory', async (req, res) => {
     const { cardName, quantity, set, condition, foil, price } = req.body;
     let variantType = req.body.variantType || '';
 
-    if (!cardName || !quantity || !set || !condition) {
+    // ✅ NEW: accept these from frontend
+    const incomingColors = Array.isArray(req.body.colors) ? req.body.colors : [];
+    const incomingCardType = typeof req.body.cardType === 'string' ? req.body.cardType : '';
+    const incomingCreatureTypes = Array.isArray(req.body.creatureTypes) ? req.body.creatureTypes : [];
+
+    if (!cardName || quantity == null || !set || !condition) {
       return res.status(400).json({ message: 'Missing fields.' });
     }
 
@@ -597,25 +602,43 @@ app.post('/api/inventory', async (req, res) => {
     };
 
     console.log('🧩 Inventory check query:', query);
+    console.log('🧬 Incoming meta:', {
+      colors: incomingColors,
+      cardType: incomingCardType,
+      creatureTypes: incomingCreatureTypes
+    });
+
     const existingCard = await CardInventory.findOne(query);
 
     if (existingCard) {
-      // ✅ Update quantity + price
-      existingCard.quantity += parseInt(quantity);
+      // ✅ Update quantity + price + image
+      existingCard.quantity += parseInt(quantity, 10) || 0;
       existingCard.priceUsd = priceUsd;
       existingCard.priceUsdFoil = priceUsdFoil;
       existingCard.imageUrl = imageUrl;
+
+      // ✅ NEW: save meta fields
+      existingCard.colors = incomingColors;
+      existingCard.cardType = incomingCardType;
+      existingCard.creatureTypes = incomingCreatureTypes;
+
       await existingCard.save();
       return res.status(200).json({ message: 'Card updated in inventory!' });
     } else {
-      // ✅ Create new entry
+      // ✅ Create new entry (include meta fields)
       const newCard = new CardInventory({
         ...query,
-        quantity,
+        quantity: parseInt(quantity, 10) || 0,
         priceUsd,
         priceUsdFoil,
-        imageUrl
+        imageUrl,
+
+        // ✅ NEW
+        colors: incomingColors,
+        cardType: incomingCardType,
+        creatureTypes: incomingCreatureTypes
       });
+
       await newCard.save();
       return res.status(201).json({ message: 'Card added to inventory!' });
     }
@@ -625,7 +648,6 @@ app.post('/api/inventory', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
-
 
 
 app.post('/api/tradein', async (req, res) => {

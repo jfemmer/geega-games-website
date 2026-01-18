@@ -917,6 +917,64 @@
     }
   }
 
+  async function loadCollections() {
+  const list = document.getElementById('collections-list');
+  if (!list) return;
+
+  list.innerHTML = '<p>Loading incoming collections...</p>';
+
+  try {
+    const res = await fetch('https://geega-games-website-production.up.railway.app/api/collections');
+    if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+    const collections = await res.json();
+
+    if (!Array.isArray(collections) || collections.length === 0) {
+      list.innerHTML = '<p>No incoming collections yet.</p>';
+      return;
+    }
+
+    list.innerHTML = collections.map(c => `
+      <div class="section" style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div>
+            <strong>${(c.firstName || '—')} ${(c.lastName || '')}</strong><br/>
+            <span>${c.email || '—'}</span><br/>
+            <span>${c.phone || '—'}</span>
+          </div>
+          <div style="text-align:right;">
+            <div><strong>Status:</strong> ${c.status || 'New'}</div>
+            <div><strong>Total Cards:</strong> ${c.totalCards ?? (c.cards?.length || 0)}</div>
+            <div><strong>Est. Value:</strong> $${(c.estimatedValue || 0).toFixed(2)}</div>
+            <div style="font-size:0.85rem; color:#666;">
+              ${c.submittedAt ? new Date(c.submittedAt).toLocaleString() : ''}
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <strong>Notes:</strong>
+          <div style="white-space:pre-wrap;">${(c.notes || '')}</div>
+        </div>
+
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer; font-weight:bold;">Cards (${c.cards?.length || 0})</summary>
+          <ul style="padding-left:18px;">
+            ${(c.cards || []).slice(0, 200).map(card => `
+              <li>
+                ${card.quantity ? `${card.quantity}x ` : ''}${card.cardName || '—'}
+                — ${card.set || '—'} ${card.foil ? '(Foil)' : ''} ${card.condition ? `• ${card.condition}` : ''}
+              </li>
+            `).join('')}
+          </ul>
+        </details>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('❌ loadCollections error:', err);
+    list.innerHTML = '<p>❌ Failed to load incoming collections.</p>';
+  }
+}
+
   function saveMtgTrendsEntries(entries) {
     localStorage.setItem(MTG_TRENDS_STORAGE_KEY, JSON.stringify(entries));
   }

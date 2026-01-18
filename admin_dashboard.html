@@ -860,6 +860,44 @@
     if (target) target.style.display = 'block';
   }
 
+  async function loadInventorySummary() {
+  const countEl = document.getElementById('total-card-count');
+  const valueEl = document.getElementById('total-inventory-value');
+  if (!countEl || !valueEl) return;
+
+  countEl.textContent = 'Loading...';
+  valueEl.textContent = 'Loading...';
+
+  try {
+    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory");
+    if (!res.ok) throw new Error(`Inventory fetch failed: ${res.status}`);
+
+    const items = await res.json();
+    if (!Array.isArray(items)) throw new Error("Inventory response was not an array");
+
+    let totalCards = 0;
+    let totalValue = 0;
+
+    for (const item of items) {
+      const qty = parseInt(item.quantity, 10) || 0;
+      totalCards += qty;
+
+      const price =
+        (item.foil ? (parseFloat(item.priceUsdFoil) || 0) : (parseFloat(item.priceUsd) || 0));
+
+      totalValue += qty * price;
+    }
+
+    countEl.textContent = totalCards.toLocaleString();
+    valueEl.textContent = totalValue.toFixed(2);
+  } catch (err) {
+    console.error("❌ loadInventorySummary error:", err);
+    countEl.textContent = '—';
+    valueEl.textContent = '—';
+  }
+}
+
+
   // ===== MTG TRENDS LOGIC =====
   const MTG_TRENDS_STORAGE_KEY = 'mtgTrendsEntries';
 
@@ -1617,6 +1655,7 @@
     showSection('inventory-section');
     initMtgTrends();
     updateOrderCount();
+    loadInventorySummary();
   });
 
   // ===== UTILITIES =====

@@ -1293,6 +1293,20 @@
     return "Multicolor";
   }
 
+  function matchesColorFilter(card, selectedColor) {
+  // selectedColor should be: "", "Colorless", "W", "U", "B", "R", "G", "Multicolor"
+  if (!selectedColor) return true;
+
+  // Backward compatible: if old items don't have colorCategory yet
+  const cat = (card.colorCategory || computeColorCategory(card.colors || [])).trim();
+
+  // Multicolor cards only match Multicolor — never W/U/B/R/G
+  if (selectedColor === "Multicolor") return cat === "Multicolor";
+
+  // Single color and colorless must match exactly
+  return cat === selectedColor;
+}
+
   // ✅ FIXED: handle em dash OR hyphen in type line
   function extractCreatureTypesFromTypeLine(typeLine) {
     if (!/Creature/i.test(typeLine)) return [];

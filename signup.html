@@ -151,39 +151,52 @@
 </style>
 
  <script>
-  // We'll store the selected formatted address here
-  let selectedFormattedAddress = "";
+ let selectedFormattedAddress = "";
+let addressSelectionInProgress = false;
 
 async function initMap() {
-  // Import the Places library (new API pattern)
   await google.maps.importLibrary("places");
 
   const widget = document.getElementById("address-autocomplete");
   const hiddenAddressInput = document.getElementById("autocomplete");
-
   if (!widget || !hiddenAddressInput) return;
 
-  // Limit what you request (cost / performance friendly)
-  widget.requestedPlaceFields = [
-    "formattedAddress",
-    "addressComponents",
-    "location"
-  ];
+  widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
+
+  // Keep hidden input in sync while typing (optional but helps)
+  widget.addEventListener("input", () => {
+    // Don't overwrite a verified selection while we're fetching fields
+    if (!addressSelectionInProgress) {
+      hiddenAddressInput.value = (widget.value || "").trim();
+    }
+  });
 
   widget.addEventListener("gmp-placeselect", async (event) => {
-    const place = event.place;
+    addressSelectionInProgress = true;
 
-    await place.fetchFields({
-      fields: widget.requestedPlaceFields
-    });
+    // ✅ Set something immediately so submit won't fail
+    hiddenAddressInput.value = (widget.value || "").trim();
 
-    selectedFormattedAddress = place.formattedAddress || "";
-    hiddenAddressInput.value = selectedFormattedAddress;
+    try {
+      const place = event.place;
+
+      await place.fetchFields({ fields: widget.requestedPlaceFields });
+
+      selectedFormattedAddress = (place.formattedAddress || "").trim();
+
+      // ✅ Replace with the official formatted address once ready
+      if (selectedFormattedAddress) {
+        hiddenAddressInput.value = selectedFormattedAddress;
+      }
+    } finally {
+      addressSelectionInProgress = false;
+    }
   });
 }
 
-  window.initMap = initMap;
+window.initMap = initMap;
 </script>
+
 </head>
 
 <body>
@@ -384,9 +397,13 @@ async function initMap() {
         return;
       }
 
-     const fullAddress = document.getElementById('autocomplete').value.trim();
+     const hiddenVal = document.getElementById('autocomplete').value.trim();
+      const widgetVal = (document.getElementById('address-autocomplete').value || "").trim();
+      const fullAddress = hiddenVal || widgetVal;
+
       if (!fullAddress) {
-        errorMessage.textContent = "Please select an address from the suggestions.";
+        errorMessage.textContent = "Please enter your shipping address.";
+        document.getElementById("address-autocomplete").focus();
         return;
       }
 

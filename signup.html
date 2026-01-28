@@ -150,28 +150,34 @@
 }
 </style>
 
-  <!-- ✅ Autocomplete Setup Script BEFORE loading Maps -->
-  <script>
-    function initAutocomplete() {
-      const input = document.getElementById('autocomplete');
-      if (!input) return;
+ <script>
+  // We'll store the selected formatted address here
+  let selectedFormattedAddress = "";
 
-      const autocomplete = new google.maps.places.Autocomplete(input, {
-        types: ['address'],
-        componentRestrictions: { country: 'us' },
-        fields: ['formatted_address']
-      });
+  async function initMap() {
+    // New recommended pattern: import the places library
+    await google.maps.importLibrary("places"); // ensures the widget + place fields are available :contentReference[oaicite:4]{index=4}
 
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (place.formatted_address) {
-          input.value = place.formatted_address;
-        }
-      });
-    }
+    const widget = document.getElementById("address-autocomplete");
+    const hiddenAddressInput = document.getElementById("autocomplete");
 
-    window.initAutocomplete = initAutocomplete;
-  </script>
+    if (!widget || !hiddenAddressInput) return;
+
+    // Limit what you request (cost/perf friendly)
+    widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"]; :contentReference[oaicite:5]{index=5}
+
+    widget.addEventListener("gmp-placeselect", async (event) => {
+      const place = event.place;
+
+      await place.fetchFields({ fields: widget.requestedPlaceFields }); :contentReference[oaicite:6]{index=6}
+
+      selectedFormattedAddress = place.formattedAddress || "";
+      hiddenAddressInput.value = selectedFormattedAddress;
+    });
+  }
+
+  window.initMap = initMap;
+</script>
 </head>
 
 <body>
@@ -188,7 +194,14 @@
       <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
       <!-- ✅ Autocomplete Component -->
-      <input id="autocomplete" placeholder="Start typing your shipping address" type="text" required />
+      <!-- New Places widget (future-proof) -->
+      <gmp-place-autocomplete
+        id="address-autocomplete"
+        placeholder="Start typing your shipping address"
+      ></gmp-place-autocomplete>
+
+      <!-- Hidden input that your submit code already reads from -->
+      <input id="autocomplete" type="hidden" />
 
       <!-- ✅ Announcement Opt-In -->
       <!-- ✅ Announcement Opt-In -->
@@ -365,7 +378,11 @@
         return;
       }
 
-      const fullAddress = document.getElementById('autocomplete').value.trim();
+     const fullAddress = document.getElementById('autocomplete').value.trim();
+      if (!fullAddress) {
+        errorMessage.textContent = "Please select an address from the suggestions.";
+        return;
+      }
 
       const newUser = {
         firstName: document.getElementById('first-name').value.trim(),
@@ -475,10 +492,11 @@
   </script>
 
   <!-- ✅ Load Google Maps API LAST -->
-  <script
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initAutocomplete"
-    async defer loading="async">
-  </script>
+ <script
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initMap&loading=async"
+  async
+  defer>
+</script>
 
 
 </body>

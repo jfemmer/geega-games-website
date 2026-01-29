@@ -1,42 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Sign Up - Geega Games</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 
   <style>
-  body {
-    background-color: #f5f5f5;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
-    padding: 0;
-  }
+    body {
+      background-color: #f5f5f5;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
 
-  .signup-container {
-    width: 460px;
-    margin: 60px auto;
-    background: white;
-    border-radius: 16px;
-    padding: 40px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  }
+    .signup-container {
+      width: 460px;
+      margin: 60px auto;
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
 
-  .signup-container h2 {
-    margin-bottom: 30px;
-    color: rebeccapurple;
-    font-size: 1.9rem;
-    text-align: center;
-  }
+    .signup-container h2 {
+      margin-bottom: 30px;
+      color: rebeccapurple;
+      font-size: 1.9rem;
+      text-align: center;
+    }
 
-  .signup-container form {
+    .signup-container form {
       display: flex;
       flex-direction: column;
-      align-items: center;        /* ✅ center child elements */
+      align-items: center;
       gap: 16px;
     }
 
-  .signup-container input,
+    .signup-container input,
     .signup-container gmp-place-autocomplete,
     .signup-container .checkbox-section {
       width: 100%;
@@ -48,213 +48,221 @@
       font-size: 15px;
     }
 
-  .signup-container button {
-    width: 100%;
-    padding: 14px;
-    background-color: rebeccapurple;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-
-  .signup-container button:hover {
-    background-color: #5d2c8d;
-  }
-
-  .signup-container button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-  }
-
-  .signup-container p {
-    text-align: center;
-    font-size: 14px;
-    margin-top: 20px;
-  }
-
-  .signup-container a {
-    color: rebeccapurple;
-    text-decoration: none;
-    font-weight: bold;
-  }
-
-  .signup-container a:hover {
-    text-decoration: underline;
-  }
-
-  .error-message {
-    color: crimson;
-    font-size: 14px;
-    text-align: center;
-    margin-top: -8px;
-  }
-
- .checkbox-section {
-  padding: 16px 20px;
-  background-color: #f8f9fc;
-  border: 1px solid #dcdde0;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-  .checkbox-section > label {
-    font-weight: 600;
-    font-size: 15px;
-    margin-bottom: 8px;
-    display: block;
-  }
-
- .checkbox-suboptions {
-  display: flex;
-  justify-content: center; /* ✅ center horizontally */
-  gap: 30px;
-  flex-wrap: wrap;
-  padding-left: 0;
-}
-.checkbox-suboptions label {
-  font-weight: 500;
-  font-size: 14px;
-  color: #555;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-  input[type="checkbox"] {
-    transform: scale(1.2);
-    accent-color: rebeccapurple;
-    cursor: pointer;
-  }
-
-  .section-label {
-  font-weight: 600;
-  font-size: 15px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #333;
-}
-
-@media (max-width: 600px) {
-  .checkbox-suboptions {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
-}
-</style>
-
- <script>
- let selectedFormattedAddress = "";
-let addressSelectionInProgress = false;
-
-async function initMap() {
-  await google.maps.importLibrary("places");
-
-  const widget = document.getElementById("address-autocomplete");
-  const hiddenAddressInput = document.getElementById("autocomplete");
-  if (!widget || !hiddenAddressInput) return;
-
-  widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
-
-  // Keep hidden input in sync while typing (optional but helps)
-  widget.addEventListener("input", () => {
-    // Don't overwrite a verified selection while we're fetching fields
-    if (!addressSelectionInProgress) {
-      hiddenAddressInput.value = (widget.value || "").trim();
+    .signup-container button {
+      width: 100%;
+      padding: 14px;
+      background-color: rebeccapurple;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
     }
-  });
 
-  widget.addEventListener("gmp-placeselect", async (event) => {
-    addressSelectionInProgress = true;
+    .signup-container button:hover {
+      background-color: #5d2c8d;
+    }
 
-    // ✅ Set something immediately so submit won't fail
-    hiddenAddressInput.value = (widget.value || "").trim();
+    .signup-container button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
 
-    try {
-      const place = event.place;
+    .signup-container p {
+      text-align: center;
+      font-size: 14px;
+      margin-top: 20px;
+    }
 
-      await place.fetchFields({ fields: widget.requestedPlaceFields });
+    .signup-container a {
+      color: rebeccapurple;
+      text-decoration: none;
+      font-weight: bold;
+    }
 
-      selectedFormattedAddress = (place.formattedAddress || "").trim();
+    .signup-container a:hover {
+      text-decoration: underline;
+    }
 
-      // ✅ Replace with the official formatted address once ready
-      if (selectedFormattedAddress) {
-        hiddenAddressInput.value = selectedFormattedAddress;
+    .error-message {
+      color: crimson;
+      font-size: 14px;
+      text-align: center;
+      margin-top: -8px;
+      min-height: 18px;
+    }
+
+    .success-message {
+      color: #1b7f3a;
+      font-size: 14px;
+      text-align: center;
+      margin-top: -8px;
+      min-height: 18px;
+    }
+
+    .checkbox-section {
+      padding: 16px 20px;
+      background-color: #f8f9fc;
+      border: 1px solid #dcdde0;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .checkbox-section > label {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .checkbox-suboptions {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+      padding-left: 0;
+    }
+
+    .checkbox-suboptions label {
+      font-weight: 500;
+      font-size: 14px;
+      color: #555;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    input[type="checkbox"] {
+      transform: scale(1.2);
+      accent-color: rebeccapurple;
+      cursor: pointer;
+    }
+
+    .section-label {
+      font-weight: 600;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #333;
+    }
+
+    @media (max-width: 600px) {
+      .checkbox-suboptions {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
       }
-    } finally {
-      addressSelectionInProgress = false;
     }
-  });
-}
+  </style>
 
-window.initMap = initMap;
-</script>
+  <script>
+    let selectedFormattedAddress = "";
+    let addressSelectionInProgress = false;
 
+    async function initMap() {
+      await google.maps.importLibrary("places");
+
+      const widget = document.getElementById("address-autocomplete");
+      const hiddenAddressInput = document.getElementById("autocomplete");
+
+      if (!widget || !hiddenAddressInput) return;
+
+      widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
+
+      // Keep hidden input in sync while typing (helps if user doesn't click suggestion)
+      widget.addEventListener("input", () => {
+        if (!addressSelectionInProgress) {
+          hiddenAddressInput.value = (widget.value || "").trim();
+          selectedFormattedAddress = "";
+        }
+      });
+
+      widget.addEventListener("gmp-placeselect", async (event) => {
+        addressSelectionInProgress = true;
+
+        // Set immediately so submit won't fail if user clicks fast
+        hiddenAddressInput.value = (widget.value || "").trim();
+
+        try {
+          const place = event.place;
+          await place.fetchFields({ fields: widget.requestedPlaceFields });
+
+          selectedFormattedAddress = (place.formattedAddress || "").trim();
+
+          if (selectedFormattedAddress) {
+            hiddenAddressInput.value = selectedFormattedAddress;
+          }
+        } finally {
+          addressSelectionInProgress = false;
+        }
+      });
+    }
+
+    window.initMap = initMap;
+  </script>
 </head>
 
 <body>
   <div class="signup-container">
     <h2>Create a Geega Games Account</h2>
-    <form id="signup-form" autocomplete="on">
-      <input type="text" id="first-name" placeholder="First Name" autocomplete="given-name" required>
-      <input type="text" id="last-name" placeholder="Last Name" autocomplete="family-name" required>
-      <input type="text" id="new-username" placeholder="Username" autocomplete="username" required>
-      <input type="email" id="new-email" placeholder="Email" autocomplete="email" required>
-      <input type="password" id="new-password" placeholder="Password" autocomplete="new-password" required>
-      <input type="password" id="confirm-password" placeholder="Confirm Password" autocomplete="new-password" required>
-      <p id="error-message" class="error-message"></p>
-      <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required>
 
-      <!-- ✅ Autocomplete Component -->
-      <!-- New Places widget (future-proof) -->
+    <form id="signup-form" autocomplete="on">
+      <input type="text" id="first-name" placeholder="First Name" autocomplete="given-name" required />
+      <input type="text" id="last-name" placeholder="Last Name" autocomplete="family-name" required />
+      <input type="text" id="new-username" placeholder="Username" autocomplete="username" required />
+      <input type="email" id="new-email" placeholder="Email" autocomplete="email" required />
+      <input type="password" id="new-password" placeholder="Password" autocomplete="new-password" required />
+      <input type="password" id="confirm-password" placeholder="Confirm Password" autocomplete="new-password" required />
+
+      <p id="error-message" class="error-message"></p>
+      <p id="success-message" class="success-message"></p>
+
+      <input type="tel" id="phone" placeholder="Phone Number" autocomplete="tel" required />
+
+      <!-- ✅ Address Autocomplete -->
       <gmp-place-autocomplete
         id="address-autocomplete"
         placeholder="Start typing your shipping address"
       ></gmp-place-autocomplete>
 
-      <!-- Hidden input that your submit code already reads from -->
+      <!-- Hidden input your submit reads from -->
       <input id="autocomplete" type="hidden" />
 
       <!-- ✅ Announcement Opt-In -->
-      <!-- ✅ Announcement Opt-In -->
-<div class="checkbox-section">
-  <label class="section-label">
-    <input type="checkbox" id="opt-in-announcements" checked>
-    I want to receive announcements
-  </label>
-  <div id="announcement-options" class="checkbox-suboptions" style="display: none;">
-    <label> Email&nbsp&nbsp <input type="checkbox" id="notify-email" checked>  </label>
-    <label> Text&nbsp&nbsp  <input type="checkbox" id="notify-text" checked>  </label>
-  </div>
-</div>
+      <div class="checkbox-section">
+        <label class="section-label">
+          <input type="checkbox" id="opt-in-announcements" checked />
+          I want to receive announcements
+        </label>
+        <div id="announcement-options" class="checkbox-suboptions" style="display:none;">
+          <label> Email&nbsp;&nbsp;<input type="checkbox" id="notify-email" checked /></label>
+          <label> Text&nbsp;&nbsp;<input type="checkbox" id="notify-text" checked /></label>
+        </div>
+      </div>
 
-
-
-<!-- ✅ Shipping Notifications -->
-<div class="checkbox-section">
-  <label class="section-label">
-    <input type="checkbox" id="opt-in-shipping" checked>
-    I want shipping updates
-  </label>
-  <div id="shipping-options" class="checkbox-suboptions">
-    <label>Email&nbsp&nbsp <input type="checkbox" id="ship-email" checked>  </label>
-    <label>Text&nbsp&nbsp <input type="checkbox" id="ship-text">  </label>
-  </div>
-</div>
+      <!-- ✅ Shipping Notifications -->
+      <div class="checkbox-section">
+        <label class="section-label">
+          <input type="checkbox" id="opt-in-shipping" checked />
+          I want shipping updates
+        </label>
+        <div id="shipping-options" class="checkbox-suboptions">
+          <label>Email&nbsp;&nbsp;<input type="checkbox" id="ship-email" checked /></label>
+          <label>Text&nbsp;&nbsp;<input type="checkbox" id="ship-text" /></label>
+        </div>
+      </div>
 
       <button type="submit" id="signup-button">Sign Up</button>
     </form>
 
     <p>Already have an account? <a href="login.html">Log In</a></p>
 
-    <!-- ✅ Google Sign-In Button -->
+    <!-- ✅ Google Sign-In Button (unchanged) -->
     <div id="g_id_onload"
          data-client_id="633871000162-dfmg4dqnkaooasaddmsjbmcm16aujjn5.apps.googleusercontent.com"
          data-callback="handleGoogleLogin"
@@ -273,108 +281,119 @@ window.initMap = initMap;
   <script>
     const signupForm = document.getElementById('signup-form');
     const errorMessage = document.getElementById('error-message');
+    const successMessage = document.getElementById('success-message');
     const signupButton = document.getElementById('signup-button');
     const phoneInput = document.getElementById('phone');
-    
-  const emailInput = document.getElementById('new-email');
-  const suggestions = ['@gmail.com', '@yahoo.com', '@outlook.com', '@icloud.com'];
-  let suggestionBox;
-  let currentIndex = -1;
 
-  function removeSuggestionBox() {
-    if (suggestionBox) {
-      suggestionBox.remove();
-      suggestionBox = null;
-      currentIndex = -1;
+    // ✅ Email suggestion dropdown
+    const emailInput = document.getElementById('new-email');
+    const suggestions = ['@gmail.com', '@yahoo.com', '@outlook.com', '@icloud.com'];
+    let suggestionBox;
+    let currentIndex = -1;
+
+    function setError(msg) {
+      errorMessage.textContent = msg || "";
+      if (msg) successMessage.textContent = "";
     }
-  }
 
-  function createSuggestionBox(base) {
-    removeSuggestionBox();
+    function setSuccess(msg) {
+      successMessage.textContent = msg || "";
+      if (msg) errorMessage.textContent = "";
+    }
 
-    suggestionBox = document.createElement('div');
-    suggestionBox.style.position = 'absolute';
-    suggestionBox.style.backgroundColor = 'white';
-    suggestionBox.style.border = '1px solid #ccc';
-    suggestionBox.style.borderRadius = '6px';
-    suggestionBox.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
-    suggestionBox.style.zIndex = '1000';
-    suggestionBox.style.fontSize = '14px';
-    suggestionBox.style.padding = '5px 0';
-    suggestionBox.style.maxWidth = emailInput.offsetWidth + 'px';
-    suggestionBox.style.width = emailInput.offsetWidth + 'px';
+    function removeSuggestionBox() {
+      if (suggestionBox) {
+        suggestionBox.remove();
+        suggestionBox = null;
+        currentIndex = -1;
+      }
+    }
 
-    const rect = emailInput.getBoundingClientRect();
-    suggestionBox.style.left = rect.left + window.scrollX + 'px';
-    suggestionBox.style.top = rect.bottom + window.scrollY + 'px';
+    function createSuggestionBox(base) {
+      removeSuggestionBox();
 
-    suggestions.forEach((domain, i) => {
-      const suggestion = document.createElement('div');
-      suggestion.textContent = base + domain;
-      suggestion.dataset.index = i;
-      suggestion.style.padding = '8px 12px';
-      suggestion.style.cursor = 'pointer';
+      suggestionBox = document.createElement('div');
+      suggestionBox.style.position = 'absolute';
+      suggestionBox.style.backgroundColor = 'white';
+      suggestionBox.style.border = '1px solid #ccc';
+      suggestionBox.style.borderRadius = '6px';
+      suggestionBox.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
+      suggestionBox.style.zIndex = '1000';
+      suggestionBox.style.fontSize = '14px';
+      suggestionBox.style.padding = '5px 0';
+      suggestionBox.style.maxWidth = emailInput.offsetWidth + 'px';
+      suggestionBox.style.width = emailInput.offsetWidth + 'px';
 
-      suggestion.addEventListener('click', () => {
-        emailInput.value = base + domain;
-        removeSuggestionBox();
+      const rect = emailInput.getBoundingClientRect();
+      suggestionBox.style.left = rect.left + window.scrollX + 'px';
+      suggestionBox.style.top = rect.bottom + window.scrollY + 'px';
+
+      suggestions.forEach((domain, i) => {
+        const suggestion = document.createElement('div');
+        suggestion.textContent = base + domain;
+        suggestion.dataset.index = i;
+        suggestion.style.padding = '8px 12px';
+        suggestion.style.cursor = 'pointer';
+
+        suggestion.addEventListener('click', () => {
+          emailInput.value = base + domain;
+          removeSuggestionBox();
+        });
+
+        suggestionBox.appendChild(suggestion);
       });
 
-      suggestionBox.appendChild(suggestion);
+      document.body.appendChild(suggestionBox);
+    }
+
+    emailInput.addEventListener('input', () => {
+      const value = emailInput.value;
+      if (value.includes('@') || value.length < 2) {
+        removeSuggestionBox();
+        return;
+      }
+      createSuggestionBox(value);
     });
 
-    document.body.appendChild(suggestionBox);
-  }
+    emailInput.addEventListener('keydown', (e) => {
+      if (!suggestionBox) return;
 
-  emailInput.addEventListener('input', () => {
-    const value = emailInput.value;
-    if (value.includes('@') || value.length < 2) {
-      removeSuggestionBox();
-      return;
-    }
-    createSuggestionBox(value);
-  });
-
-  emailInput.addEventListener('keydown', (e) => {
-    if (!suggestionBox) return;
-
-    const items = suggestionBox.querySelectorAll('div');
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      currentIndex = (currentIndex + 1) % items.length;
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      currentIndex = (currentIndex - 1 + items.length) % items.length;
-    } else if (e.key === 'Enter') {
-      if (currentIndex >= 0 && currentIndex < items.length) {
+      const items = suggestionBox.querySelectorAll('div');
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
-        emailInput.value = items[currentIndex].textContent;
+        currentIndex = (currentIndex + 1) % items.length;
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        currentIndex = (currentIndex - 1 + items.length) % items.length;
+      } else if (e.key === 'Enter') {
+        if (currentIndex >= 0 && currentIndex < items.length) {
+          e.preventDefault();
+          emailInput.value = items[currentIndex].textContent;
+          removeSuggestionBox();
+        }
+      } else if (e.key === 'Escape') {
+        removeSuggestionBox();
+        return;
+      }
+
+      items.forEach((item, index) => {
+        item.style.backgroundColor = index === currentIndex ? '#eee' : 'transparent';
+      });
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target !== emailInput && suggestionBox && !suggestionBox.contains(e.target)) {
         removeSuggestionBox();
       }
-    } else if (e.key === 'Escape') {
-      removeSuggestionBox();
-      return;
-    }
-
-    items.forEach((item, index) => {
-      item.style.backgroundColor = index === currentIndex ? '#eee' : 'transparent';
     });
-  });
 
-  document.addEventListener('click', (e) => {
-    if (e.target !== emailInput && suggestionBox && !suggestionBox.contains(e.target)) {
-      removeSuggestionBox();
-    }
-  });
-
+    // ✅ Phone formatter
     phoneInput.addEventListener('input', (e) => {
       let digits = e.target.value.replace(/\D/g, '');
 
-      // Remove leading "1" if user starts with it
       if (digits.length > 10 && digits.startsWith('1')) {
         digits = digits.slice(1);
       }
-
       if (digits.length > 10) digits = digits.slice(0, 10);
 
       if (digits.length <= 3) {
@@ -386,23 +405,27 @@ window.initMap = initMap;
       }
     });
 
+    // ✅ Submit
     signupForm.addEventListener('submit', async function (event) {
       event.preventDefault();
+      setError("");
+      setSuccess("");
 
       const password = document.getElementById('new-password').value.trim();
       const confirmPassword = document.getElementById('confirm-password').value.trim();
 
       if (password !== confirmPassword) {
-        errorMessage.textContent = "Passwords do not match!";
+        setError("Passwords do not match!");
         return;
       }
 
-     const hiddenVal = document.getElementById('autocomplete').value.trim();
+      // Address: accept either verified formatted address OR the typed value
+      const hiddenVal = document.getElementById('autocomplete').value.trim();
       const widgetVal = (document.getElementById('address-autocomplete').value || "").trim();
       const fullAddress = hiddenVal || widgetVal;
 
       if (!fullAddress) {
-        errorMessage.textContent = "Please enter your shipping address.";
+        setError("Please enter your shipping address.");
         document.getElementById("address-autocomplete").focus();
         return;
       }
@@ -416,14 +439,12 @@ window.initMap = initMap;
         phone: formatPhoneForTwilio(document.getElementById('phone').value.trim()),
         address: fullAddress,
 
-        // 🆕 Announcement preferences
         announcementNotifications: {
           enabled: document.getElementById('opt-in-announcements').checked,
           byEmail: document.getElementById('notify-email').checked,
           byText: document.getElementById('notify-text').checked
         },
 
-        // 🆕 Shipping preferences
         shippingNotifications: {
           enabled: document.getElementById('opt-in-shipping').checked,
           byEmail: document.getElementById('ship-email').checked,
@@ -431,37 +452,38 @@ window.initMap = initMap;
         }
       };
 
-      console.log("📬 Submitting:", newUser);
-
       signupButton.disabled = true;
       signupButton.textContent = "Creating Account...";
-      errorMessage.textContent = "";
 
       try {
+        // ✅ Your server should create user as "unverified" and send verification email
         const response = await fetch('https://geega-games-website-production.up.railway.app/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newUser)
         });
 
-        const result = await response.json();
+        const result = await response.json().catch(() => ({}));
 
         if (response.ok) {
-          alert(result.message || "Account created successfully!");
+          // ✅ Do NOT auto-redirect to login anymore; tell them to verify email
+          setSuccess(result.message || "Account created! Check your email to verify your account, then log in.");
           signupForm.reset();
-          window.location.href = "login.html";
+          document.getElementById('autocomplete').value = "";
+          // keep button enabled so they can retry if needed
         } else {
-          errorMessage.textContent = result.message || "Signup failed. Please check your info.";
+          setError(result.message || "Signup failed. Please check your info.");
         }
       } catch (error) {
         console.error("Signup error:", error);
-        errorMessage.textContent = "Could not connect to the server. Try again later.";
+        setError("Could not connect to the server. Try again later.");
       } finally {
         signupButton.disabled = false;
         signupButton.textContent = "Sign Up";
       }
     });
 
+    // Google sign-in autofill (unchanged)
     async function handleGoogleLogin(response) {
       const { credential } = response;
       try {
@@ -476,51 +498,42 @@ window.initMap = initMap;
     }
 
     function formatPhoneForTwilio(phone) {
-  const digitsOnly = phone.replace(/\D/g, ''); // Remove all non-digits
-  if (digitsOnly.length === 10) {
-    return `+1${digitsOnly}`; // US-based 10-digit number
-  } else if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
-    return `+${digitsOnly}`; // Already US with leading 1
-  } else if (digitsOnly.startsWith('+' || digitsOnly.length >= 11)) {
-    return phone; // Assume already formatted correctly
-  } else {
-    console.warn("⚠️ Invalid phone number:", phone);
-    return phone;
-  }
-}
+      const digitsOnly = phone.replace(/\D/g, '');
+      if (digitsOnly.length === 10) return `+1${digitsOnly}`;
+      if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) return `+${digitsOnly}`;
+      if (phone.startsWith('+')) return phone;
+      return phone;
+    }
 
+    // checkbox show/hide
     const optInCheckbox = document.getElementById('opt-in-announcements');
-  const optionsDiv = document.getElementById('announcement-options');
+    const optionsDiv = document.getElementById('announcement-options');
 
-  optInCheckbox.addEventListener('change', () => {
-    optionsDiv.style.display = optInCheckbox.checked ? 'flex' : 'none';
-  });
+    optInCheckbox.addEventListener('change', () => {
+      optionsDiv.style.display = optInCheckbox.checked ? 'flex' : 'none';
+    });
 
-  // Trigger once on load (in case of autofill)
-  window.addEventListener('DOMContentLoaded', () => {
-    optionsDiv.style.display = optInCheckbox.checked ? 'flex' : 'none';
-  });
+    window.addEventListener('DOMContentLoaded', () => {
+      optionsDiv.style.display = optInCheckbox.checked ? 'flex' : 'none';
+    });
 
-  const optInShipping = document.getElementById('opt-in-shipping');
-  const shippingOptions = document.getElementById('shipping-options');
+    const optInShipping = document.getElementById('opt-in-shipping');
+    const shippingOptions = document.getElementById('shipping-options');
 
-  optInShipping.addEventListener('change', () => {
-    shippingOptions.style.display = optInShipping.checked ? 'flex' : 'none';
-  });
+    optInShipping.addEventListener('change', () => {
+      shippingOptions.style.display = optInShipping.checked ? 'flex' : 'none';
+    });
 
-  // Optional: Run on page load in case of autofill
-  window.addEventListener('DOMContentLoaded', () => {
-    shippingOptions.style.display = optInShipping.checked ? 'flex' : 'none';
-  });
+    window.addEventListener('DOMContentLoaded', () => {
+      shippingOptions.style.display = optInShipping.checked ? 'flex' : 'none';
+    });
   </script>
 
   <!-- ✅ Load Google Maps API LAST -->
- <script
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initMap&loading=async"
-  async
-  defer>
-</script>
-
-
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initMap&loading=async"
+    async
+    defer>
+  </script>
 </body>
 </html>

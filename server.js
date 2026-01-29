@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
+const crypto = require('crypto'); // ✅ NEW (email verification)
 require('dotenv').config();
 console.log("Stripe key exists?", !!process.env.STRIPE_SECRET_KEY);
 
@@ -40,6 +41,40 @@ const transporter = nodemailer.createTransport({
 
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
 
+// ✅ NEW: Email verification helpers
+function createEmailVerificationToken() {
+  const token = crypto.randomBytes(32).toString('hex'); // sent to user
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex'); // stored in DB
+  const expires = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours
+  return { token, tokenHash, expires };
+}
+
+async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.4">
+      <h2 style="color:#663399;margin:0 0 12px 0;">Verify your email</h2>
+      <p>Hey ${firstName || 'there'} 👋</p>
+      <p>Thanks for signing up for Geega Games! Click the button below to verify your email:</p>
+      <p>
+        <a href="${verifyUrl}"
+           style="display:inline-block;background:#663399;color:white;padding:12px 16px;border-radius:10px;text-decoration:none;font-weight:bold;">
+          Verify Email
+        </a>
+      </p>
+      <p style="font-size:12px;color:#666;margin-top:18px;">
+        If you didn’t create an account, you can ignore this email.
+      </p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `Geega Games <${process.env.NOTIFY_EMAIL}>`,
+    to: toEmail,
+    subject: 'Verify your Geega Games email',
+    html
+  });
+}
+
 // Middleware
 app.use(express.json());
 
@@ -49,7 +84,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type'],
   credentials: true
 }));
-
 
 // ✅ Scryfall Image Fetch Helper
 const fetchScryfallImageUrl = async (name, set, options = {}) => {
@@ -84,7 +118,7 @@ const EMPLOYEE_DB_URI = process.env.EMPLOYEE_DB_URI;
 const TRADEIN_DB_URI = process.env.TRADEIN_DB_URI;
 const port = process.env.PORT || 3000;
 
-if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI || !TRADEIN_DB_URI ) {
+if (!MONGODB_URI || !INVENTORY_DB_URI || !EMPLOYEE_DB_URI || !TRADEIN_DB_URI) {
   console.error('❌ One or more MongoDB URIs are missing in environment variables!');
   process.exit(1);
 }
@@ -98,11 +132,10 @@ const tradeInConnection = mongoose.createConnection(TRADEIN_DB_URI);
 const createCartModel = require('./models/Cart');
 const Cart = createCartModel(db1);
 
-
 // ✅ Connection Logs
 [db1, inventoryConnection, employeeConnection, tradeInConnection].forEach((db, i) => {
-  db.on('connected', () => console.log(`✅ Connected to MongoDB database #${i+1}`));
-  db.on('error', (err) => console.error(`❌ MongoDB connection error #${i+1}:`, err.message));
+  db.on('connected', () => console.log(`✅ Connected to MongoDB database #${i + 1}`));
+  db.on('error', (err) => console.error(`❌ MongoDB connection error #${i + 1}:`, err.message));
 });
 
 const userSchema = new mongoose.Schema({
@@ -117,12 +150,17 @@ const userSchema = new mongoose.Schema({
   zip: String,
   createdAt: { type: Date, default: Date.now },
 
+  // ✅ Email verification
+  isEmailVerified: { type: Boolean, default: false },
+  emailVerificationTokenHash: { type: String },
+  emailVerificationExpires: { type: Date },
+
   // ✅ Notification Preferences
   announcementNotifications: {
-  enabled: { type: Boolean, default: false },
-  byEmail: { type: Boolean, default: true },
-  byText: { type: Boolean, default: false }
-},
+    enabled: { type: Boolean, default: false },
+    byEmail: { type: Boolean, default: true },
+    byText: { type: Boolean, default: false }
+  },
 
   shippingNotifications: {
     enabled: { type: Boolean, default: true },
@@ -151,9 +189,12 @@ const inventorySchema = new mongoose.Schema({
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
 
 const employeeSchema = new mongoose.Schema({
-  role: { type: String, required: true }, firstName: { type: String, required: true },
-  lastName: { type: String, required: true }, phone: { type: String, required: true },
-  email: { type: String, required: true }, emergencyContact: { type: String, required: true },
+  role: { type: String, required: true },
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  phone: { type: String, required: true },
+  email: { type: String, required: true },
+  emergencyContact: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });
 const Employee = employeeConnection.model('Employee', employeeSchema, 'Employees');
@@ -184,7 +225,7 @@ const orderSchema = new mongoose.Schema({
   // 🆕 Status + Tracking Fields
   status: { type: String, default: 'Pending' }, // e.g. 'Packing', 'Dropped Off', 'Shipped'
   packedAt: Date,
-  droppedOffAt: Date, // ✅ Add this line
+  droppedOffAt: Date,
   trackingNumber: String,
   trackingCarrier: String, // e.g., 'USPS', 'UPS'
   trackingHistory: [
@@ -211,23 +252,20 @@ const tradeInSchema = new mongoose.Schema({
       foil: Boolean,
       condition: String,
       imageUrl: String,
-      quantity: { type: Number, default: 1 } // just in case you pass qty
+      quantity: { type: Number, default: 1 }
     },
   ],
-
-  // 🕒 When the trade-in / collection was submitted
   submittedAt: { type: Date, default: Date.now },
 
-  // 🆕 Incoming Collections fields
   status: {
     type: String,
-    default: 'New' // New, Reviewing, Offer Sent, Accepted, Declined, Completed
+    default: 'New'
   },
-  estimatedValue: Number,   // Your estimated payout / value
-  totalCards: Number,       // Total number of cards in the collection
-  source: String,           // e.g. 'Website form', 'Facebook', 'In-store'
-  notes: String,            // Seller-facing notes / description
-  internalNotes: String     // Only for you / staff
+  estimatedValue: Number,
+  totalCards: Number,
+  source: String,
+  notes: String,
+  internalNotes: String
 });
 
 const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
@@ -240,11 +278,77 @@ app.get('/', (req, res) => res.send('🧙‍♂️ Welcome to the Geega Games AP
 // Version Check
 app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js version'));
 
+// ✅ Email verification: click link route
+app.get('/verify-email', async (req, res) => {
+  try {
+    const { token, email } = req.query;
+    if (!token || !email) return res.status(400).send('Missing token or email.');
 
-// 🔁 Get cart
-// ✅ GET cart
-// ✅ GET cart
-// ✅ GET cart
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+      emailVerificationTokenHash: tokenHash,
+      emailVerificationExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).send('Verification link is invalid or expired.');
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationTokenHash = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    const siteUrl = process.env.PUBLIC_SITE_URL || 'https://www.geega-games.com';
+    return res.redirect(`${siteUrl}/login.html?verified=1`);
+  } catch (err) {
+    console.error('❌ verify-email error:', err);
+    return res.status(500).send('Server error verifying email.');
+  }
+});
+
+// ✅ Email verification: resend
+app.post('/api/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const normalizedEmail = String(email || '').toLowerCase().trim();
+
+    // Always respond safely so you don't leak whether an email exists
+    const safeOk = () => res.status(200).json({ message: 'If that email exists, we sent a new verification link.' });
+
+    if (!normalizedEmail) return safeOk();
+
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) return safeOk();
+
+    if (user.isEmailVerified) {
+      return res.status(200).json({ message: 'Email is already verified. You can log in.' });
+    }
+
+    const { token, tokenHash, expires } = createEmailVerificationToken();
+    user.emailVerificationTokenHash = tokenHash;
+    user.emailVerificationExpires = expires;
+    await user.save();
+
+    const apiBase = process.env.API_BASE_URL || 'https://geega-games-website-production.up.railway.app';
+    const verifyUrl = `${apiBase}/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+
+    await sendVerificationEmail({
+      toEmail: normalizedEmail,
+      firstName: user.firstName,
+      verifyUrl
+    });
+
+    return res.status(200).json({ message: 'Verification email resent. Check your inbox.' });
+  } catch (err) {
+    console.error('❌ resend-verification error:', err);
+    return res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
 // 🛒 GET cart
 app.get('/api/cart', async (req, res) => {
   const { userId } = req.query;
@@ -361,7 +465,6 @@ app.post('/create-payment-intent', async (req, res) => {
   }
 });
 
-
 // 🗑️ POST remove item by index
 app.post('/api/cart/remove', async (req, res) => {
   const { userId, index, quantity = 1 } = req.body;
@@ -411,7 +514,6 @@ app.post('/api/cart/remove', async (req, res) => {
   }
 });
 
-
 // 🧹 POST clear cart
 app.post('/api/cart/clear', async (req, res) => {
   const { userId } = req.body;
@@ -448,7 +550,7 @@ app.get('/api/inventory/creature-types', async (req, res) => {
   }
 });
 
-
+// ✅ SIGNUP (UPDATED: creates user + emails verification link)
 app.post('/signup', async (req, res) => {
   try {
     const {
@@ -469,21 +571,27 @@ app.post('/signup', async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
-    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    const normalizedEmail = String(email).toLowerCase().trim();
+
+    const existing = await User.findOne({ $or: [{ email: normalizedEmail }, { username }] });
     if (existing) return res.status(409).json({ message: 'User already exists.' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // ✅ Create email verification token
+    const { token, tokenHash, expires } = createEmailVerificationToken();
 
     await new User({
       firstName,
       lastName,
       username,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       phone,
       address,
       state,
       zip,
+
       announcementNotifications: {
         enabled: announcementNotifications?.enabled ?? false,
         byEmail: announcementNotifications?.byEmail ?? true,
@@ -493,31 +601,56 @@ app.post('/signup', async (req, res) => {
         enabled: shippingNotifications?.enabled ?? true,
         byEmail: shippingNotifications?.byEmail ?? true,
         byText: shippingNotifications?.byText ?? false
-      }
+      },
+
+      // ✅ Verification fields
+      isEmailVerified: false,
+      emailVerificationTokenHash: tokenHash,
+      emailVerificationExpires: expires
     }).save();
 
-    res.status(201).json({ message: '🐶 Welcome to the Pack!' });
+    const apiBase = process.env.API_BASE_URL || 'https://geega-games-website-production.up.railway.app';
+    const verifyUrl = `${apiBase}/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+
+    await sendVerificationEmail({
+      toEmail: normalizedEmail,
+      firstName,
+      verifyUrl
+    });
+
+    res.status(201).json({
+      message: '🐶 Welcome to the Pack! Check your email to verify your account before logging in.'
+    });
   } catch (err) {
     console.error('❌ Signup error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
-// Login
+// Login (UPDATED: blocks unverified email)
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const normalizedEmail = String(email).toLowerCase().trim();
+
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        message: 'Please verify your email before logging in. Check your inbox for the verification link.',
+        code: 'EMAIL_NOT_VERIFIED'
+      });
     }
 
     res.json({
       message: 'Login successful',
       userId: user._id,
       username: user.username,
-      firstName: user.firstName  // ✅ make sure this is here
+      firstName: user.firstName
     });
   } catch (err) {
     console.error('❌ Login error:', err);
@@ -575,7 +708,6 @@ app.post('/api/inventory', async (req, res) => {
     const { cardName, quantity, set, condition, foil, price } = req.body;
     let variantType = req.body.variantType || '';
 
-    // ✅ NEW: accept these from frontend
     const incomingColors = Array.isArray(req.body.colors) ? req.body.colors : [];
     const incomingCardType = typeof req.body.cardType === 'string' ? req.body.cardType : '';
     const incomingCreatureTypes = Array.isArray(req.body.creatureTypes) ? req.body.creatureTypes : [];
@@ -584,7 +716,6 @@ app.post('/api/inventory', async (req, res) => {
       return res.status(400).json({ message: 'Missing fields.' });
     }
 
-    // 🧼 Normalize variantType
     variantType = variantType.trim().toLowerCase();
 
     const imageUrl = req.body.imageUrl?.trim() || await fetchScryfallImageUrl(cardName, set);
@@ -611,13 +742,11 @@ app.post('/api/inventory', async (req, res) => {
     const existingCard = await CardInventory.findOne(query);
 
     if (existingCard) {
-      // ✅ Update quantity + price + image
       existingCard.quantity += parseInt(quantity, 10) || 0;
       existingCard.priceUsd = priceUsd;
       existingCard.priceUsdFoil = priceUsdFoil;
       existingCard.imageUrl = imageUrl;
 
-      // ✅ NEW: save meta fields
       existingCard.colors = incomingColors;
       existingCard.cardType = incomingCardType;
       existingCard.creatureTypes = incomingCreatureTypes;
@@ -625,15 +754,12 @@ app.post('/api/inventory', async (req, res) => {
       await existingCard.save();
       return res.status(200).json({ message: 'Card updated in inventory!' });
     } else {
-      // ✅ Create new entry (include meta fields)
       const newCard = new CardInventory({
         ...query,
         quantity: parseInt(quantity, 10) || 0,
         priceUsd,
         priceUsdFoil,
         imageUrl,
-
-        // ✅ NEW
         colors: incomingColors,
         cardType: incomingCardType,
         creatureTypes: incomingCreatureTypes
@@ -642,13 +768,11 @@ app.post('/api/inventory', async (req, res) => {
       await newCard.save();
       return res.status(201).json({ message: 'Card added to inventory!' });
     }
-
   } catch (err) {
     console.error('❌ Add inventory error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
-
 
 app.post('/api/tradein', async (req, res) => {
   const { userId, cards, estimatedValue, source, notes } = req.body;
@@ -661,7 +785,6 @@ app.post('/api/tradein', async (req, res) => {
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ message: 'User not found.' });
 
-    // 🧮 Compute total cards (if quantity exists, use it; otherwise default 1)
     const totalCards = cards.reduce(
       (sum, c) => sum + (typeof c.quantity === 'number' ? c.quantity : 1),
       0
@@ -674,13 +797,11 @@ app.post('/api/tradein', async (req, res) => {
       email: user.email,
       phone: user.phone,
       cards,
-
-      // Incoming Collections meta
       estimatedValue: typeof estimatedValue === 'number' ? estimatedValue : undefined,
       totalCards,
       source: source || 'Website Trade-In',
       notes: notes || '',
-      status: 'New' // default state when submitted
+      status: 'New'
     };
 
     await new TradeIn(tradeInData).save();
@@ -705,14 +826,7 @@ app.get('/api/collections', async (req, res) => {
 // Update a single collection (status, internal notes, etc.)
 app.patch('/api/collections/:id', async (req, res) => {
   const { id } = req.params;
-  const {
-    status,
-    internalNotes,
-    estimatedValue,
-    totalCards,
-    source,
-    notes
-  } = req.body;
+  const { status, internalNotes, estimatedValue, totalCards, source, notes } = req.body;
 
   try {
     const update = {};
@@ -724,11 +838,7 @@ app.patch('/api/collections/:id', async (req, res) => {
     if (typeof estimatedValue === 'number') update.estimatedValue = estimatedValue;
     if (typeof totalCards === 'number') update.totalCards = totalCards;
 
-    const updated = await TradeIn.findByIdAndUpdate(
-      id,
-      update,
-      { new: true }
-    );
+    const updated = await TradeIn.findByIdAndUpdate(id, update, { new: true });
 
     if (!updated) {
       return res.status(404).json({ message: 'Collection not found.' });
@@ -740,7 +850,6 @@ app.patch('/api/collections/:id', async (req, res) => {
     res.status(500).json({ message: 'Server error while updating collection.' });
   }
 });
-
 
 app.get('/api/inventory', async (req, res) => {
   try {
@@ -832,7 +941,6 @@ app.patch('/api/inventory/update-price', async (req, res) => {
   }
 });
 
-
 app.post('/api/inventory/prices', async (req, res) => {
   try {
     const { cards } = req.body;
@@ -844,10 +952,8 @@ app.post('/api/inventory/prices', async (req, res) => {
     for (const { cardName, set, foil } of cards) {
       if (!cardName || !set) continue;
 
-      // Try exact match
       let match = await CardInventory.findOne({ cardName, set, foil: !!foil });
 
-      // Try case-insensitive fallback
       if (!match) {
         match = await CardInventory.findOne({
           cardName: { $regex: `^${cardName}$`, $options: 'i' },
@@ -860,7 +966,7 @@ app.post('/api/inventory/prices', async (req, res) => {
         const key = `${normalize(cardName)}|${normalize(set)}|${foil ? '1' : '0'}`;
         let rawPrice = foil ? match.priceUsdFoil : match.priceUsd;
         if (rawPrice == null && match.price != null) {
-          rawPrice = match.price;  // ✅ fallback to general price
+          rawPrice = match.price;
         }
         prices[key] = parseFloat(rawPrice) || 0;
       }
@@ -876,19 +982,8 @@ app.post('/api/inventory/prices', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   console.log('🧾 Incoming order data:', req.body);
 
-  const {
-    userId,
-    firstName,
-    lastName,
-    email,
-    address,
-    cards,
-    shippingMethod,
-    paymentMethod,
-    orderTotal
-  } = req.body;
+  const { userId, firstName, lastName, email, address, cards, shippingMethod, paymentMethod, orderTotal } = req.body;
 
-  // ✅ Validate required fields
   if (!userId || !firstName || !lastName || !email || !address || !Array.isArray(cards)) {
     return res.status(400).json({ message: 'Missing required fields in order.' });
   }
@@ -921,9 +1016,7 @@ app.post('/api/orders', async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // 🔻 Decrement inventory and sanitize prices
     for (const item of cards) {
-      // Sanitize item.priceUsd just in case it came from a bad string
       const parsedPrice = parseFloat(item.priceUsd);
       item.priceUsd = !isNaN(parsedPrice) ? parseFloat(parsedPrice.toFixed(2)) : 0;
 
@@ -945,7 +1038,6 @@ app.post('/api/orders', async (req, res) => {
         });
       }
 
-      // 🛡️ Sanitize match.priceUsd/priceUsdFoil to avoid crashing on save
       const parsedMatchPrice = parseFloat(match.priceUsd);
       const parsedMatchFoilPrice = parseFloat(match.priceUsdFoil);
       match.priceUsd = !isNaN(parsedMatchPrice) ? parsedMatchPrice : 0;
@@ -960,7 +1052,6 @@ app.post('/api/orders', async (req, res) => {
       }
     }
 
-    // 🧹 Clear cart
     await Cart.findOneAndUpdate(
       { userId },
       { items: [], updatedAt: new Date() }
@@ -990,15 +1081,7 @@ app.patch('/api/inventory/decrement', async (req, res) => {
   console.log('🛠️ PATCH /api/inventory/decrement called with:', req.body);
 
   try {
-    const {
-      cardName,
-      set,
-      foil,
-      variantType,
-      colors = [],
-      cardType = '',
-      creatureTypes = []
-    } = req.body;
+    const { cardName, set, foil, variantType, colors = [], cardType = '', creatureTypes = [] } = req.body;
 
     if (!cardName || !set) {
       return res.status(400).json({ message: 'Missing cardName or set.' });
@@ -1006,20 +1089,18 @@ app.patch('/api/inventory/decrement', async (req, res) => {
 
     const variantKey = (variantType || '').trim().toLowerCase();
 
-    // 🔍 Build exact match query
     const exactQuery = {
       cardName,
       set,
       foil: !!foil,
       variantType: variantKey,
-      colors: { $all: colors }, // Order-agnostic match
+      colors: { $all: colors },
       cardType,
       creatureTypes: { $all: creatureTypes }
     };
 
     let card = await CardInventory.findOne(exactQuery);
 
-    // 🔁 Fallback: match by cardName, set, foil, and loosely by variant
     if (!card) {
       card = await CardInventory.findOne({
         cardName,
@@ -1035,15 +1116,7 @@ app.patch('/api/inventory/decrement', async (req, res) => {
     }
 
     if (!card) {
-      console.warn('⚠️ Card not found for:', {
-        cardName,
-        set,
-        foil,
-        variantKey,
-        colors,
-        cardType,
-        creatureTypes
-      });
+      console.warn('⚠️ Card not found for:', { cardName, set, foil, variantKey, colors, cardType, creatureTypes });
       return res.status(404).json({ message: 'Card not found.' });
     }
 
@@ -1083,7 +1156,6 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
-
 app.patch('/api/orders/:id/status', async (req, res) => {
   const { id } = req.params;
   const { status, trackingNumber } = req.body;
@@ -1093,16 +1165,16 @@ app.patch('/api/orders/:id/status', async (req, res) => {
     if (!order) return res.status(404).json({ message: 'Order not found.' });
 
     if (status) {
-  order.status = status;
+      order.status = status;
 
-  if (status.toLowerCase() === 'packing') {
-    order.packedAt = new Date();
-  }
+      if (status.toLowerCase() === 'packing') {
+        order.packedAt = new Date();
+      }
 
-  if (status.toLowerCase() === 'dropped off') {
-    order.droppedOffAt = new Date(); // ✅ Save current time
-  }
-}
+      if (status.toLowerCase() === 'dropped off') {
+        order.droppedOffAt = new Date();
+      }
+    }
     if (trackingNumber) order.trackingNumber = trackingNumber;
     await order.save();
 
@@ -1117,7 +1189,6 @@ app.patch('/api/orders/:id/status', async (req, res) => {
         (trackingNumber ? ` (Tracking #: ${trackingNumber})` : '');
 
       try {
-        // ✅ Email
         if (user.shippingNotifications.byEmail && user.email) {
           console.log('📧 Sending email to', user.email);
           await transporter.sendMail({
@@ -1128,7 +1199,6 @@ app.patch('/api/orders/:id/status', async (req, res) => {
           });
         }
 
-        // ✅ SMS
         if (user.shippingNotifications.byText && user.phone) {
           const formattedPhone = user.phone.startsWith('+') ? user.phone : `+1${user.phone}`;
           console.log('📱 Sending SMS to', formattedPhone);
@@ -1140,7 +1210,6 @@ app.patch('/api/orders/:id/status', async (req, res) => {
         }
       } catch (notifyErr) {
         console.error('❌ Notification error:', notifyErr.message);
-        // Optionally log notifyErr.stack if needed
       }
     }
 
@@ -1233,7 +1302,7 @@ app.post('/upload-card-image', upload.single('cardImage'), async (req, res) => {
               image: card.image_uris?.normal || '',
               price: card.prices.usd || 'N/A',
             });
-            break; // stop after first valid match per slice
+            break;
           } catch (err) {
             console.warn(`❌ No match on Scryfall for "${line}"`);
           }
@@ -1280,7 +1349,7 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
     if (debug) {
       console.log('📦 FULL USPS RESPONSE:');
       console.dir(trackInfo, { depth: null });
-      return res.json(trackInfo); // return entire object for inspection
+      return res.json(trackInfo);
     }
 
     const summary = trackInfo?.TrackSummary?.[0];
@@ -1347,7 +1416,6 @@ app.post('/api/shippo/label', async (req, res) => {
 });
 
 // ✅ Add this to server.js near other routes
-
 app.get('/api/send-email-optin', async (req, res) => {
   try {
     const users = await User.find({
@@ -1380,7 +1448,6 @@ app.get('/api/send-email-optin', async (req, res) => {
     res.status(500).json({ message: 'Failed to send opt-in emails' });
   }
 });
-
 
 app.get('/api/manual-update-optin', async (req, res) => {
   const updates = [
@@ -1421,8 +1488,6 @@ app.get('/api/manual-update-optin', async (req, res) => {
     res.status(500).send('Failed to update users.');
   }
 });
-
-
 
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

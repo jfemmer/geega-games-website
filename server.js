@@ -283,86 +283,145 @@ const inventorySchema = new mongoose.Schema({
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
 
 app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
+  const started = Date.now();
+
   try {
     const { condition, foil } = req.body;
     const files = req.files;
+
+    console.log("📥 [fi8170] HIT", {
+      time: new Date().toISOString(),
+      files: files?.length || 0,
+      condition,
+      foil
+    });
 
     if (!files || files.length === 0) {
       return res.status(400).json({ message: "No images uploaded." });
     }
 
+    const isFoil = String(foil) === "true";
     const results = [];
 
     for (const file of files) {
-      // 1️⃣ OCR
-      const ocr = await recognizeWithTimeout(file.path, 30000);
-      const rawText = ocr.data.text;
-
-      // Try extracting first strong line (usually card name)
-      const lines = rawText.split("\n").map(l => l.trim()).filter(Boolean);
-      const guessedName = lines[0];
-
-      if (!guessedName) {
-        results.push({ error: "Could not detect card name." });
-        continue;
-      }
-
-      let card;
+      const perFileStart = Date.now();
+      const originalPath = file.path;
+      const prePath = `${file.path}-pre.png`;
 
       try {
-        const scryRes = await axios.get(
-          `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
-        );
+        console.log("🖼️ [fi8170] file start:", {
+          originalname: file.originalname,
+          path: file.path,
+          size: file.size
+        });
 
-        card = scryRes.data;
+        // 0) OPTIONAL: Preprocess to speed OCR + increase accuracy
+        // (If sharp ever throws, you can comment this out temporarily.)
+        await sharp(originalPath)
+          .resize({ width: 1200, withoutEnlargement: true })
+          .grayscale()
+          .normalise()
+          .toFile(prePath);
+
+        // 1) OCR (bump timeout for hosted envs)
+        console.log("🔤 [fi8170] OCR start");
+        const ocr = await recognizeWithTimeout(prePath, 90000);
+        console.log("🔤 [fi8170] OCR done");
+
+        const rawText = ocr?.data?.text || "";
+
+        // 2) Pick a stronger guessed name:
+        // - prefer first line with letters, length >= 3
+        // - ignore lines that look like set codes / numbers / junk
+        const lines = rawText
+          .split("\n")
+          .map(l => l.trim())
+          .filter(Boolean);
+
+        const guessedName =
+          lines.find(l => /[A-Za-z]/.test(l) && l.length >= 3 && !/^\d+$/.test(l)) || "";
+
+        console.log("🧠 [fi8170] guessedName:", guessedName);
+
+        if (!guessedName) {
+          results.push({
+            file: file.originalname,
+            error: "Could not detect card name."
+          });
+          continue;
+        }
+
+        // 3) Scryfall lookup
+        console.log("🧙 [fi8170] Scryfall start");
+        let card;
+        try {
+          const scryRes = await axios.get(
+            `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+          );
+          card = scryRes.data;
+        } catch (err) {
+          results.push({
+            file: file.originalname,
+            error: `Scryfall not found: ${guessedName}`
+          });
+          continue;
+        }
+        console.log("🧙 [fi8170] Scryfall ok:", card?.name);
+
+        const price = isFoil
+          ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
+          : parseFloat(card?.prices?.usd || 0);
+
+        // 4) Save to inventory
+        const inventoryItem = {
+          cardName: card.name,
+          set: card.set_name,
+          quantity: 1,
+          condition,
+          foil: isFoil,
+          priceUsd: price,
+          imageUrl: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ""
+        };
+
+        console.log("💾 [fi8170] DB upsert start");
+        await CardInventory.findOneAndUpdate(
+          {
+            cardName: inventoryItem.cardName,
+            set: inventoryItem.set,
+            foil: inventoryItem.foil,
+            condition: inventoryItem.condition
+          },
+          { $inc: { quantity: 1 }, $setOnInsert: inventoryItem },
+          { upsert: true }
+        );
+        console.log("💾 [fi8170] DB upsert done");
+
+        results.push({
+          file: file.originalname,
+          success: card.name,
+          ms: Date.now() - perFileStart
+        });
 
       } catch (err) {
-        results.push({ error: `Scryfall not found: ${guessedName}` });
-        continue;
-      }
-
-      const price = foil === "true"
-        ? parseFloat(card.prices.usd_foil || card.prices.usd || 0)
-        : parseFloat(card.prices.usd || 0);
-
-      // 3️⃣ Save to inventory
-      const inventoryItem = {
-        cardName: card.name,
-        set: card.set_name,
-        quantity: 1,
-        condition,
-        foil: foil === "true",
-        priceUsd: price,
-        imageUrl: card.image_uris?.normal
-      };
-
-      await CardInventory.findOneAndUpdate(
-        {
-          cardName: inventoryItem.cardName,
-          set: inventoryItem.set,
-          foil: inventoryItem.foil,
-          condition: inventoryItem.condition
-        },
-        { $inc: { quantity: 1 }, $setOnInsert: inventoryItem },
-        { upsert: true }
-      );
-
-      results.push({ success: card.name });
-      
-      try {
-        // OCR + Scryfall + Save
+        console.error("❌ [fi8170] per-file error:", file?.originalname, err?.message || err);
+        results.push({
+          file: file.originalname,
+          error: err?.message || "Unknown error",
+          ms: Date.now() - perFileStart
+        });
       } finally {
-        if (fs.existsSync(file.path)) {
-            fs.unlinkSync(file.path);
-        }
+        // Cleanup both preprocessed + original uploads
+        try { if (fs.existsSync(prePath)) fs.unlinkSync(prePath); } catch {}
+        try { if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath); } catch {}
       }
     }
 
-    res.json({ results });
+    console.log("✅ [fi8170] DONE ms:", Date.now() - started);
+    return res.json({ results });
 
   } catch (err) {
-    console.error("❌ fi8170 scan error:", err);
-    res.status(500).json({ error: "Server error processing scans." });
+    console.error("❌ [fi8170] route error:", err);
+    return res.status(500).json({ error: "Server error processing scans." });
   }
 });
 

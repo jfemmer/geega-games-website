@@ -20,14 +20,20 @@ const sharp = require('sharp');
 
 const uspsUserID = process.env.USPS_USER_ID;
 const getShippo = require('./shippo-wrapper');
+const UPLOAD_DIR = path.join(__dirname, "uploads");
+
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
 
 const upload = multer({
-  dest: "uploads/",
-  limits: { 
-    fileSize: 5 * 1024 * 1024,   // reduce to 5MB
-    files: 5                   // max 10 images per upload
+  dest: UPLOAD_DIR,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 5   // good idea to limit
   }
-})
+});
 
 // Email + Twilio
 const nodemailer = require('nodemailer');

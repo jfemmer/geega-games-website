@@ -882,10 +882,12 @@
     if (target) target.style.display = 'block';
   }
 
-  async function uploadFi8170() {
+async function uploadFi8170() {
   const input = document.getElementById("fi8170Upload");
   const condition = document.getElementById("fi8170Condition").value;
   const foil = document.getElementById("fi8170Foil").checked;
+  const resultsDiv = document.getElementById("fi8170Results");
+  const button = document.querySelector("button[onclick='uploadFi8170()']");
 
   if (!input.files.length) {
     alert("Select scanned images first.");
@@ -900,20 +902,53 @@
   formData.append("condition", condition);
   formData.append("foil", foil);
 
-  const res = await fetch(
-    "https://geega-games-website-production.up.railway.app/api/fi8170/scan-to-inventory",
-    {
-      method: "POST",
-      body: formData
+  try {
+    button.disabled = true;
+    button.textContent = "Processing...";
+    resultsDiv.innerHTML = "<p>Uploading and processing scans...</p>";
+
+    const res = await fetch(
+      "https://geega-games-website-production.up.railway.app/api/fi8170/scan-to-inventory",
+      {
+        method: "POST",
+        body: formData
+      }
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Upload failed (${res.status}): ${text.slice(0, 200)}`);
     }
-  );
 
-  const data = await res.json();
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const text = await res.text();
+      throw new Error(`Expected JSON but received: ${text.slice(0, 200)}`);
+    }
 
-  document.getElementById("fi8170Results").innerHTML =
-    "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+    const data = await res.json();
 
-  alert("Scan complete.");
+    resultsDiv.innerHTML =
+      "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+
+    alert("✅ Scan complete.");
+
+    // Refresh inventory summary automatically
+    if (typeof loadInventorySummary === "function") {
+      loadInventorySummary();
+    }
+
+    // Clear file input
+    input.value = "";
+
+  } catch (err) {
+    console.error("❌ fi8170 Upload Error:", err);
+    resultsDiv.innerHTML = `<p style="color:red;">${err.message}</p>`;
+    alert("❌ " + err.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Scan & Add to Inventory";
+  }
 }
 
   async function uploadCSV() {

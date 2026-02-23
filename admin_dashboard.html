@@ -660,6 +660,28 @@
   </div>
 
   <h2>Add Inventory</h2>
+  <h3>Scan fi-8170 → Auto Add</h3>
+
+<input type="file" id="fi8170Upload" multiple accept="image/*" />
+
+<label>Condition</label>
+<select id="fi8170Condition">
+  <option value="NM">Near Mint</option>
+  <option value="LP">Lightly Played</option>
+  <option value="MP">Moderately Played</option>
+  <option value="HP">Heavily Played</option>
+  <option value="DMG">Damaged</option>
+</select>
+
+<label>
+  <input type="checkbox" id="fi8170Foil" />
+  Foil
+</label>
+
+<button onclick="uploadFi8170()">Scan & Add to Inventory</button>
+
+<div id="fi8170Results"></div>
+
   <h3>Search Magic Card</h3>
   <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
   <div id="search-results" style="margin-top: 10px;"></div>
@@ -859,6 +881,71 @@
     const target = document.getElementById(sectionId);
     if (target) target.style.display = 'block';
   }
+
+  async function uploadFi8170() {
+  const input = document.getElementById("fi8170Upload");
+  const condition = document.getElementById("fi8170Condition").value;
+  const foil = document.getElementById("fi8170Foil").checked;
+
+  if (!input.files.length) {
+    alert("Select scanned images first.");
+    return;
+  }
+
+  const formData = new FormData();
+  for (const file of input.files) {
+    formData.append("cardImages", file);
+  }
+
+  formData.append("condition", condition);
+  formData.append("foil", foil);
+
+  const res = await fetch(
+    "https://geega-games-website-production.up.railway.app/api/fi8170/scan-to-inventory",
+    {
+      method: "POST",
+      body: formData
+    }
+  );
+
+  const data = await res.json();
+
+  document.getElementById("fi8170Results").innerHTML =
+    "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+
+  alert("Scan complete.");
+}
+
+  async function uploadCSV() {
+  const fileInput = document.getElementById("csvUpload");
+  const file = fileInput.files[0];
+  if (!file) return alert("Select a CSV file first.");
+
+  const text = await file.text();
+  const rows = text.split("\n").slice(1); // skip header
+
+  for (const row of rows) {
+    if (!row.trim()) continue;
+
+    const [cardName, set, quantity, condition, foil, price, variantType] = row.split(",");
+
+    await fetch("https://geega-games-website-production.up.railway.app/api/inventory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cardName: cardName.trim(),
+        set: set.trim(),
+        quantity: parseInt(quantity),
+        condition: condition.trim(),
+        foil: foil === "true",
+        price: parseFloat(price),
+        variantType: variantType?.trim() || ""
+      })
+    });
+  }
+
+  alert("Bulk upload complete.");
+}
 
   async function loadInventorySummary() {
   const countEl = document.getElementById('total-card-count');

@@ -22,9 +22,12 @@ const uspsUserID = process.env.USPS_USER_ID;
 const getShippo = require('./shippo-wrapper');
 
 const upload = multer({
-  dest: "uploads/", // temp folder
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
-});
+  dest: "uploads/",
+  limits: { 
+    fileSize: 5 * 1024 * 1024,   // reduce to 5MB
+    files: 5                   // max 10 images per upload
+  }
+})
 
 // Email + Twilio
 const nodemailer = require('nodemailer');
@@ -51,6 +54,31 @@ function createEmailVerificationToken() {
   return { token, tokenHash, expires };
 }
 
+app.use(express.json());
+
+const allowedOrigins = [
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+  'https://jfemmer.github.io',
+  'https://www.geega-games.com',
+  'https://geega-games.com'
+];
+
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(null, false); // <-- no throw
+  },
+  credentials: true,
+  methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
   try {
     const { condition, foil } = req.body;
@@ -64,7 +92,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
 
     for (const file of files) {
       // 1️⃣ OCR
-      const ocr = await Tesseract.recognize(file.path, "eng");
+      const ocr = await recognizeWithTimeout(file.path);
       const rawText = ocr.data.text;
 
       // Try extracting first strong line (usually card name)
@@ -76,14 +104,19 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         continue;
       }
 
-      // 2️⃣ Scryfall lookup
-      const scryRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`);
-      if (!scryRes.ok) {
+      let card;
+
+      try {
+        const scryRes = await axios.get(
+          `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+        );
+
+        card = scryRes.data;
+
+      } catch (err) {
         results.push({ error: `Scryfall not found: ${guessedName}` });
         continue;
       }
-
-      const card = await scryRes.json();
 
       const price = foil === "true"
         ? parseFloat(card.prices.usd_foil || card.prices.usd || 0)
@@ -100,7 +133,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         imageUrl: card.image_uris?.normal
       };
 
-      await Inventory.findOneAndUpdate(
+      await CardInventory.findOneAndUpdate(
         {
           cardName: inventoryItem.cardName,
           set: inventoryItem.set,
@@ -113,8 +146,13 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
 
       results.push({ success: card.name });
       
-      // delete temp file
-      fs.unlinkSync(file.path);
+      try {
+        // OCR + Scryfall + Save
+      } finally {
+        if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+        }
+      }
     }
 
     res.json({ results });
@@ -201,36 +239,8 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
   }
 });
 
-// Middleware
-app.use(express.json());
 
-const allowedOrigins = new Set([
-  'http://localhost:5500',
-  'http://127.0.0.1:5500',
-  'https://jfemmer.github.io',
-  'https://www.geega-games.com',
-  'https://geega-games.com'
-]);
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow non-browser tools like Postman
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.has(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error('CORS blocked origin: ' + origin));
-  },
-  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 204
-}));
-
-// Handle preflight requests globally
-app.options('*', cors());
 
 // ✅ Scryfall Image Fetch Helper
 const fetchScryfallImageUrl = async (name, set, options = {}) => {

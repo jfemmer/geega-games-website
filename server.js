@@ -21,8 +21,10 @@ const sharp = require('sharp');
 const uspsUserID = process.env.USPS_USER_ID;
 const getShippo = require('./shippo-wrapper');
 
-// Setup for multer file uploads
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({
+  dest: "uploads/", // temp folder
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
 
 // Email + Twilio
 const nodemailer = require('nodemailer');
@@ -49,6 +51,80 @@ function createEmailVerificationToken() {
   return { token, tokenHash, expires };
 }
 
+app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
+  try {
+    const { condition, foil } = req.body;
+    const files = req.files;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No images uploaded." });
+    }
+
+    const results = [];
+
+    for (const file of files) {
+      // 1️⃣ OCR
+      const ocr = await Tesseract.recognize(file.path, "eng");
+      const rawText = ocr.data.text;
+
+      // Try extracting first strong line (usually card name)
+      const lines = rawText.split("\n").map(l => l.trim()).filter(Boolean);
+      const guessedName = lines[0];
+
+      if (!guessedName) {
+        results.push({ error: "Could not detect card name." });
+        continue;
+      }
+
+      // 2️⃣ Scryfall lookup
+      const scryRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`);
+      if (!scryRes.ok) {
+        results.push({ error: `Scryfall not found: ${guessedName}` });
+        continue;
+      }
+
+      const card = await scryRes.json();
+
+      const price = foil === "true"
+        ? parseFloat(card.prices.usd_foil || card.prices.usd || 0)
+        : parseFloat(card.prices.usd || 0);
+
+      // 3️⃣ Save to inventory
+      const inventoryItem = {
+        cardName: card.name,
+        set: card.set_name,
+        quantity: 1,
+        condition,
+        foil: foil === "true",
+        priceUsd: price,
+        imageUrl: card.image_uris?.normal
+      };
+
+      await Inventory.findOneAndUpdate(
+        {
+          cardName: inventoryItem.cardName,
+          set: inventoryItem.set,
+          foil: inventoryItem.foil,
+          condition: inventoryItem.condition
+        },
+        { $inc: { quantity: 1 }, $setOnInsert: inventoryItem },
+        { upsert: true }
+      );
+
+      results.push({ success: card.name });
+      
+      // delete temp file
+      fs.unlinkSync(file.path);
+    }
+
+    res.json({ results });
+
+  } catch (err) {
+    console.error("❌ fi8170 scan error:", err);
+    res.status(500).json({ error: "Server error processing scans." });
+  }
+});
+
 async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.4">
@@ -74,6 +150,56 @@ async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
     html
   });
 }
+
+// ✅ IMPORTANT: place this ABOVE app.use(express.json())
+app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error('❌ Webhook signature failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    if (event.type === 'payment_intent.succeeded') {
+      const pi = event.data.object;
+
+      const updated = await Order.findOneAndUpdate(
+        { stripePaymentIntentId: pi.id },
+        { paymentStatus: 'paid' },
+        { new: true }
+      );
+
+      if (!updated) {
+        console.warn('⚠️ No order found for PaymentIntent:', pi.id);
+      } else {
+        console.log('✅ Order marked paid:', updated._id, pi.id);
+      }
+    }
+
+    if (event.type === 'payment_intent.payment_failed') {
+      const pi = event.data.object;
+      await Order.findOneAndUpdate(
+        { stripePaymentIntentId: pi.id },
+        { paymentStatus: 'unpaid' }
+      );
+      console.log('⚠️ Payment failed:', pi.id);
+    }
+
+    return res.json({ received: true });
+  } catch (e) {
+    console.error('❌ Webhook handler error:', e);
+    // Still return 200 so Stripe doesn’t hammer retries while you debug
+    return res.json({ received: true });
+  }
+});
 
 // Middleware
 app.use(express.json());
@@ -219,15 +345,20 @@ const orderSchema = new mongoose.Schema({
   ],
   shippingMethod: String,
   paymentMethod: String,
+
+  // ✅ NEW: Stripe reconciliation fields
+  stripePaymentIntentId: String,
+  paymentStatus: { type: String, default: 'unpaid' }, // unpaid, paid, refunded
+
   orderTotal: Number,
   submittedAt: { type: Date, default: Date.now },
 
   // 🆕 Status + Tracking Fields
-  status: { type: String, default: 'Pending' }, // e.g. 'Packing', 'Dropped Off', 'Shipped'
+  status: { type: String, default: 'Pending' },
   packedAt: Date,
   droppedOffAt: Date,
   trackingNumber: String,
-  trackingCarrier: String, // e.g., 'USPS', 'UPS'
+  trackingCarrier: String,
   trackingHistory: [
     {
       timestamp: Date,
@@ -449,19 +580,108 @@ app.post('/api/cart', async (req, res) => {
 });
 
 app.post('/create-payment-intent', async (req, res) => {
-  const { amount } = req.body;
-
   try {
+    const { userId, shippingMethod } = req.body;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid userId.' });
+    }
+
+    const method = (shippingMethod || 'tracked').toLowerCase();
+    if (!['tracked', 'pwe'].includes(method)) {
+      return res.status(400).json({ error: 'Invalid shipping method.' });
+    }
+
+    // 1) Load cart from DB
+    const objectId = new mongoose.Types.ObjectId(userId);
+    const cart = await Cart.findOne({ userId: objectId }).lean();
+    const items = cart?.items || [];
+
+    if (!items.length) {
+      return res.status(400).json({ error: 'Cart is empty.' });
+    }
+
+    // 2) Reprice items from inventory (server-trusted)
+    let subtotal = 0;
+
+    for (const item of items) {
+      const qty = Number(item.quantity || 1);
+
+      // Match your inventory item as closely as possible
+      const variantKey = (item.variantType || '').trim().toLowerCase();
+
+      const inv = await CardInventory.findOne({
+        cardName: item.cardName,
+        set: item.set,
+        foil: !!item.foil,
+        condition: item.condition,
+        variantType: variantKey
+      }).lean();
+
+      // If variantType doesn’t match or older rows have blank variantType, fall back
+      const invFallback = inv || await CardInventory.findOne({
+        cardName: item.cardName,
+        set: item.set,
+        foil: !!item.foil,
+        condition: item.condition,
+        $or: [
+          { variantType: { $exists: false } },
+          { variantType: '' },
+          { variantType: null }
+        ]
+      }).lean();
+
+      if (!invFallback) {
+        return res.status(400).json({
+          error: `Item not available: ${item.cardName} (${item.set}) ${item.foil ? 'Foil' : 'Non-Foil'} ${item.condition}`
+        });
+      }
+
+      const unitPrice = item.foil
+        ? Number(invFallback.priceUsdFoil ?? 0)
+        : Number(invFallback.priceUsd ?? 0);
+
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        return res.status(400).json({
+          error: `Invalid price for: ${item.cardName} (${item.set})`
+        });
+      }
+
+      subtotal += unitPrice * qty;
+    }
+
+    // 3) Shipping rules (matches your UI)
+    let shippingCost = 0;
+    if (method === 'tracked') {
+      shippingCost = subtotal >= 75 ? 0 : 5;
+    } else if (method === 'pwe') {
+      shippingCost = 1.25;
+    }
+
+    const orderTotal = Number((subtotal + shippingCost).toFixed(2));
+    const amountCents = Math.round(orderTotal * 100);
+
+    // 4) Create PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // convert dollars to cents
+      amount: amountCents,
       currency: 'usd',
-      payment_method_types: ['card'],
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        userId: String(userId),
+        shippingMethod: method,
+        subtotal: subtotal.toFixed(2),
+        shippingCost: shippingCost.toFixed(2)
+      }
     });
 
-    res.json({ clientSecret: paymentIntent.client_secret });
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      orderTotal,
+      paymentIntentId: paymentIntent.id
+    });
   } catch (error) {
-    console.error('❌ Stripe error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('❌ Stripe create-payment-intent error:', error);
+    res.status(500).json({ error: error.message || 'Stripe error' });
   }
 });
 
@@ -982,7 +1202,11 @@ app.post('/api/inventory/prices', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   console.log('🧾 Incoming order data:', req.body);
 
-  const { userId, firstName, lastName, email, address, cards, shippingMethod, paymentMethod, orderTotal } = req.body;
+ const {
+  userId, firstName, lastName, email, address, cards,
+  shippingMethod, paymentMethod, orderTotal,
+  stripePaymentIntentId, paymentStatus
+} = req.body;
 
   if (!userId || !firstName || !lastName || !email || !address || !Array.isArray(cards)) {
     return res.status(400).json({ message: 'Missing required fields in order.' });
@@ -1010,6 +1234,11 @@ app.post('/api/orders', async (req, res) => {
       cards,
       shippingMethod,
       paymentMethod,
+
+      // ✅ save Stripe info
+      stripePaymentIntentId: stripePaymentIntentId || null,
+      paymentStatus: paymentStatus || (paymentMethod === 'card' ? 'paid' : 'unpaid'),
+
       orderTotal: isNaN(parsedOrderTotal) ? 0 : parsedOrderTotal,
       status: req.body.status || 'Pending'
     });

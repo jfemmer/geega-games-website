@@ -68,7 +68,6 @@ function createEmailVerificationToken() {
   return { token, tokenHash, expires };
 }
 
-app.use(express.json());
 
 const allowedOrigins = [
   'http://localhost:5500',
@@ -79,10 +78,15 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(null, false); // <-- no throw
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      console.log("❌ Blocked by CORS:", origin);
+      return callback(new Error("Not allowed by CORS"));
+    }
   },
   credentials: true,
   methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
@@ -92,6 +96,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+
 
 
 async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
@@ -171,7 +176,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
 });
 
 
-
+app.use(express.json());
 
 // ✅ Scryfall Image Fetch Helper
 const fetchScryfallImageUrl = async (name, set, options = {}) => {

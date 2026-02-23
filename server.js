@@ -204,12 +204,33 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
 // Middleware
 app.use(express.json());
 
+const allowedOrigins = new Set([
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+  'https://jfemmer.github.io',
+  'https://www.geega-games.com',
+  'https://geega-games.com'
+]);
+
 app.use(cors({
-  origin: ['http://localhost:5500', 'https://jfemmer.github.io', 'https://www.geega-games.com'],
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type'],
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow non-browser tools like Postman
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('CORS blocked origin: ' + origin));
+  },
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 204
 }));
+
+// Handle preflight requests globally
+app.options('*', cors());
 
 // ✅ Scryfall Image Fetch Helper
 const fetchScryfallImageUrl = async (name, set, options = {}) => {

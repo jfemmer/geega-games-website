@@ -20,6 +20,14 @@ const sharp = require('sharp');
 
 const uspsUserID = process.env.USPS_USER_ID;
 const getShippo = require('./shippo-wrapper');
+const recognizeWithTimeout = (imagePath, ms = 30000) => {
+  return Promise.race([
+    Tesseract.recognize(imagePath, 'eng'),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`OCR timeout after ${ms}ms`)), ms)
+    )
+  ]);
+};
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -282,7 +290,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
 
     for (const file of files) {
       // 1️⃣ OCR
-      const ocr = await recognizeWithTimeout(file.path);
+      const ocr = await recognizeWithTimeout(file.path, 30000);
       const rawText = ocr.data.text;
 
       // Try extracting first strong line (usually card name)

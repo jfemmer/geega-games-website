@@ -78,102 +78,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-p.
-app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
-  const files = req.files || [];
 
-  try {
-    const condition = (req.body.condition || "NM").trim();
-    const foil = req.body.foil === "true" || req.body.foil === true;
-
-    if (!files.length) {
-      return res.status(400).json({ message: "No images uploaded." });
-    }
-
-    // Optional safety limit (recommended)
-    if (files.length > 10) {
-      return res.status(413).json({ message: "Too many images at once. Upload 10 or fewer." });
-    }
-
-    const results = [];
-
-    for (const file of files) {
-      try {
-        // 1) OCR
-        const ocr = await Tesseract.recognize(file.path, "eng");
-        const rawText = ocr?.data?.text || "";
-
-        const lines = rawText
-          .split("\n")
-          .map(l => l.trim())
-          .filter(Boolean);
-
-        const guessedName = lines[0];
-
-        if (!guessedName) {
-          results.push({ file: file.originalname, error: "Could not detect card name." });
-          continue;
-        }
-
-        // 2) Scryfall lookup
-        const scryRes = await axios.get(
-          `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
-        );
-
-        const card = scryRes.data;
-
-        const parsed = foil
-          ? parseFloat(card.prices?.usd_foil || card.prices?.usd || 0)
-          : parseFloat(card.prices?.usd || 0);
-
-        const priceUsd = foil ? 0 : parsed;
-        const priceUsdFoil = foil ? parsed : 0;
-
-        const imageUrl =
-          card.image_uris?.normal ||
-          card.card_faces?.[0]?.image_uris?.normal ||
-          "";
-
-        const doc = {
-          cardName: card.name,
-          set: card.set_name,
-          quantity: 1,
-          condition,
-          foil,
-          priceUsd,
-          priceUsdFoil,
-          imageUrl
-        };
-
-        // 3) Save/update inventory
-        await CardInventory.findOneAndUpdate(
-          { cardName: doc.cardName, set: doc.set, foil: doc.foil, condition: doc.condition },
-          { $inc: { quantity: 1 }, $setOnInsert: doc },
-          { upsert: true, new: true }
-        );
-
-        results.push({ file: file.originalname, success: true, matched: card.name });
-      } catch (innerErr) {
-        results.push({
-          file: file.originalname,
-          error: innerErr?.response?.data?.details || innerErr.message || "Unknown error"
-        });
-      } finally {
-        // Always cleanup temp file
-        try { fs.unlinkSync(file.path); } catch (_) {}
-      }
-    }
-
-    return res.json({ results });
-  } catch (err) {
-    console.error("❌ fi8170 scan error:", err);
-    // cleanup if something blew up before loop cleanup
-    for (const f of files) {
-      try { fs.unlinkSync(f.path); } catch (_) {}
-    }
-    return res.status(500).json({ error: "Server error processing scans." });
-  }
-});
 
 async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
   const html = `
@@ -355,7 +260,92 @@ const inventorySchema = new mongoose.Schema({
   variantType: String,  // ✅ Add this
   addedAt: { type: Date, default: Date.now }
 });
+
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
+
+app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
+  try {
+    const { condition, foil } = req.body;
+    const files = req.files;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No images uploaded." });
+    }
+
+    const results = [];
+
+    for (const file of files) {
+      // 1️⃣ OCR
+      const ocr = await recognizeWithTimeout(file.path);
+      const rawText = ocr.data.text;
+
+      // Try extracting first strong line (usually card name)
+      const lines = rawText.split("\n").map(l => l.trim()).filter(Boolean);
+      const guessedName = lines[0];
+
+      if (!guessedName) {
+        results.push({ error: "Could not detect card name." });
+        continue;
+      }
+
+      let card;
+
+      try {
+        const scryRes = await axios.get(
+          `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+        );
+
+        card = scryRes.data;
+
+      } catch (err) {
+        results.push({ error: `Scryfall not found: ${guessedName}` });
+        continue;
+      }
+
+      const price = foil === "true"
+        ? parseFloat(card.prices.usd_foil || card.prices.usd || 0)
+        : parseFloat(card.prices.usd || 0);
+
+      // 3️⃣ Save to inventory
+      const inventoryItem = {
+        cardName: card.name,
+        set: card.set_name,
+        quantity: 1,
+        condition,
+        foil: foil === "true",
+        priceUsd: price,
+        imageUrl: card.image_uris?.normal
+      };
+
+      await CardInventory.findOneAndUpdate(
+        {
+          cardName: inventoryItem.cardName,
+          set: inventoryItem.set,
+          foil: inventoryItem.foil,
+          condition: inventoryItem.condition
+        },
+        { $inc: { quantity: 1 }, $setOnInsert: inventoryItem },
+        { upsert: true }
+      );
+
+      results.push({ success: card.name });
+      
+      try {
+        // OCR + Scryfall + Save
+      } finally {
+        if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+        }
+      }
+    }
+
+    res.json({ results });
+
+  } catch (err) {
+    console.error("❌ fi8170 scan error:", err);
+    res.status(500).json({ error: "Server error processing scans." });
+  }
+});
 
 const employeeSchema = new mongoose.Schema({
   role: { type: String, required: true },

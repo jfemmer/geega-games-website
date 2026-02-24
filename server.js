@@ -27,6 +27,14 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+const DEBUG_OCR = true;
+
+const DEBUG_DIR = path.join(__dirname, "ocr_debug");
+
+if (!fs.existsSync(DEBUG_DIR)) {
+  fs.mkdirSync(DEBUG_DIR, { recursive: true });
+}
+
 
 const upload = multer({
   dest: UPLOAD_DIR,
@@ -174,6 +182,12 @@ async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false) {
   }
 
   await pipeline.toFile(outPath);
+
+  if (DEBUG_OCR) {
+    const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
+    await sharp(outPath).toFile(debugCopy);
+    console.log("🟣 Saved NAME crop to:", debugCopy);
+  }
 }
 
 // Updated recognizeWithTimeout: supports passing Tesseract options
@@ -271,6 +285,11 @@ async function cropAndPrepBottomLine(originalPath, outPath, useThreshold = false
   if (useThreshold) pipeline = pipeline.threshold(180);
 
   await pipeline.toFile(outPath);
+  if (DEBUG_OCR) {
+    const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
+    await sharp(outPath).toFile(debugCopy);
+    console.log("🔵 Saved BOTTOM crop to:", debugCopy);
+  }
 }
 
 async function ocrCollectorNumberHighAccuracy(originalPath, tmpDir) {

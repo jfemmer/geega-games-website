@@ -162,11 +162,11 @@ async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false) {
     W === FIXED_DIMS.w && H === FIXED_DIMS.h
       ? CROP.nameBar
       : {
-          left: Math.floor(W * 0.05),
-          top: Math.floor(H * 0.03),
-          width: Math.floor(W * 0.90),
-          height: Math.floor(H * 0.16),
-        };
+  left: Math.floor(W * 0.08),   // was 0.05
+  top: Math.floor(H * 0.025),   // was 0.03
+  width: Math.floor(W * 0.75),  // was 0.90
+  height: Math.floor(H * 0.09), // was 0.16
+}
 
   let pipeline = sharp(originalPath)
     .extract(region)

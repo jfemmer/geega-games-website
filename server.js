@@ -292,22 +292,43 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue;
         }
 
-        // 2) Scryfall lookup (fuzzy)
-        console.log("🧙 [fi8170] Scryfall start");
-        let card;
-        try {
-          const scryRes = await axios.get(
-            `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
-          );
-          card = scryRes.data;
-        } catch (err) {
-          results.push({
-            file: file.originalname,
-            error: `Scryfall not found: ${guessedName}`,
-            ms: Date.now() - perFileStart
-          });
-          continue;
-        }
+       console.log("🧙 [fi8170] Scryfall start");
+
+let card;
+const setCode = (req.body.setCode || "").trim().toLowerCase();
+
+try {
+  if (setCode) {
+    // Force exact name match inside a specific set
+    const query = `!"${guessedName}" set:${setCode}`;
+
+    const scryRes = await axios.get(
+      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`
+    );
+
+    card = scryRes.data.data?.[0];
+
+    if (!card) {
+      throw new Error("No match found in that set");
+    }
+  } else {
+    // fallback to fuzzy if no set provided
+    const scryRes = await axios.get(
+      `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+    );
+    card = scryRes.data;
+  }
+
+} catch (err) {
+  results.push({
+    file: file.originalname,
+    error: setCode
+      ? `Scryfall not found in set ${setCode}: ${guessedName}`
+      : `Scryfall not found: ${guessedName}`,
+    ms: Date.now() - perFileStart
+  });
+  continue;
+}
         console.log("🧙 [fi8170] Scryfall ok:", card?.name);
 
         const price = isFoil

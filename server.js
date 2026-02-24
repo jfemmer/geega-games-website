@@ -133,7 +133,7 @@ const CROP = {
   nameBar: { left: 38, top: 31, width: 694, height: 138 },
 
   // Optional later if you want collector # matching:
-  // bottomLine: { left: 154, top: 923, width: 462, height: 127 },
+  bottomLine: { left: 154, top: 923, width: 462, height: 127 },
 };
 
 function cleanCardName(text) {
@@ -229,7 +229,92 @@ async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
   return { name: name1 || name2 || "", confidence: Math.max(conf1, conf2) };
 }
 
-// ---------- UPDATED ROUTE ----------
+function cleanBottomText(text) {
+  return (text || "")
+    .replace(/\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseCollectorNumber(bottomText) {
+  // "123/281" or "123 / 281"
+  const m = bottomText.match(/(\d{1,4})\s*\/\s*\d{1,4}/);
+  if (m) return m[1];
+
+  // fallback: first standalone number (less safe, but useful)
+  const m2 = bottomText.match(/\b(\d{1,4})\b/);
+  return m2 ? m2[1] : null;
+}
+
+async function cropAndPrepBottomLine(originalPath, outPath, useThreshold = false) {
+  const meta = await sharp(originalPath).metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  const region =
+    W === FIXED_DIMS.w && H === FIXED_DIMS.h
+      ? CROP.bottomLine
+      : {
+          left: Math.floor(W * 0.20),
+          top: Math.floor(H * 0.87),
+          width: Math.floor(W * 0.60),
+          height: Math.floor(H * 0.12),
+        };
+
+  let pipeline = sharp(originalPath)
+    .extract(region)
+    .grayscale()
+    .normalize()
+    .sharpen()
+    .resize({ width: 1600, withoutEnlargement: false });
+
+  if (useThreshold) pipeline = pipeline.threshold(180);
+
+  await pipeline.toFile(outPath);
+}
+
+async function ocrCollectorNumberHighAccuracy(originalPath, tmpDir) {
+  const ts = Date.now();
+  const bottomCrop1 = path.join(tmpDir, `bottom_${ts}_p1.png`);
+  const bottomCrop2 = path.join(tmpDir, `bottom_${ts}_p2.png`);
+
+  const opts = {
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK, // PSM 6
+    tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/ ",
+  };
+
+  await cropAndPrepBottomLine(originalPath, bottomCrop1, false);
+  const ocr1 = await recognizeWithTimeout(bottomCrop1, 90000, opts);
+  const text1 = cleanBottomText(ocr1?.data?.text);
+  const conf1 = ocr1?.data?.confidence ?? 0;
+
+  await cropAndPrepBottomLine(originalPath, bottomCrop2, true);
+  const ocr2 = await recognizeWithTimeout(bottomCrop2, 90000, opts);
+  const text2 = cleanBottomText(ocr2?.data?.text);
+  const conf2 = ocr2?.data?.confidence ?? 0;
+
+  for (const p of [bottomCrop1, bottomCrop2]) {
+    try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
+  }
+
+  const bestText = conf2 > conf1 ? text2 : text1;
+  const bestConf = Math.max(conf1, conf2);
+
+  return {
+    text: bestText,
+    confidence: bestConf,
+    collectorNumber: parseCollectorNumber(bestText),
+  };
+}
+
+// ---------- UPDATED ROUTE (FULL) ----------
+// Assumes you already have:
+// - upload (multer) configured
+// - fs, path, axios imported
+// - CardInventory model
+// - ocrCardNameHighAccuracy(...) helper
+// - ocrCollectorNumberHighAccuracy(...) helper (bottom-line OCR)
+// - pickPrintingByCollector(...) helper (optional but recommended)
 
 app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
   const started = Date.now();
@@ -242,7 +327,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
       time: new Date().toISOString(),
       files: files?.length || 0,
       condition,
-      foil
+      foil,
+      setCode: req.body?.setCode
     });
 
     if (!files || files.length === 0) {
@@ -256,6 +342,9 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
     const tmpDir = path.join(__dirname, "uploads");
     try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
 
+    // Batch-level setCode (optional, best if you can provide it)
+    const setCodeFromBody = (req.body.setCode || "").trim().toLowerCase();
+
     for (const file of files) {
       const perFileStart = Date.now();
       const originalPath = file.path;
@@ -267,10 +356,14 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           size: file.size
         });
 
-        // 1) HIGH-ACCURACY OCR: crop name bar + preprocess + retry + confidence
+        // 1) HIGH-ACCURACY OCR: NAME BAR
         console.log("🔤 [fi8170] OCR(name bar) start");
-        const { name: guessedName, confidence } = await ocrCardNameHighAccuracy(originalPath, tmpDir);
-        console.log("🔤 [fi8170] OCR(name bar) done", { guessedName, confidence });
+        const { name: guessedName, confidence: nameConf } =
+          await ocrCardNameHighAccuracy(originalPath, tmpDir);
+        console.log("🔤 [fi8170] OCR(name bar) done", {
+          guessedName,
+          nameConf: Math.round(nameConf)
+        });
 
         if (!guessedName || guessedName.length < 3) {
           results.push({
@@ -282,60 +375,88 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         }
 
         // Optional safety: avoid auto-inserting if OCR is too uncertain
-        if (confidence < 45) {
+        if (nameConf < 45) {
           results.push({
             file: file.originalname,
-            error: `Low OCR confidence (${Math.round(confidence)}). Needs review.`,
+            error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,
             guessedName,
             ms: Date.now() - perFileStart
           });
           continue;
         }
 
-       console.log("🧙 [fi8170] Scryfall start");
+        // 1b) HIGH-ACCURACY OCR: COLLECTOR NUMBER (bottom line)
+        // This enables “99% correct printing” selection.
+        console.log("🔢 [fi8170] OCR(bottom line) start");
+        const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
+        const collectorNumber = bottom.collectorNumber; // may be null
+        console.log("🔢 [fi8170] OCR(bottom line) done", {
+          bottomText: bottom.text,
+          bottomConf: Math.round(bottom.confidence),
+          collectorNumber
+        });
 
-let card;
-const setCode = (req.body.setCode || "").trim().toLowerCase();
+        // 2) SCRYFALL: pick the RIGHT set/printing
+        console.log("🧙 [fi8170] Scryfall start");
 
-try {
-  if (setCode) {
-    // Force exact name match inside a specific set
-    const query = `!"${guessedName}" set:${setCode}`;
+        let card = null;
 
-    const scryRes = await axios.get(
-      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`
-    );
+        try {
+          // Always get a base card first (fast + reliable)
+          const baseRes = await axios.get(
+            `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+          );
+          const base = baseRes.data;
 
-    card = scryRes.data.data?.[0];
+          if (collectorNumber) {
+            // Best path: if you know the set code, do exact set+collector lookup
+            if (setCodeFromBody) {
+              const exactRes = await axios.get(
+                `https://api.scryfall.com/cards/${encodeURIComponent(setCodeFromBody)}/${encodeURIComponent(collectorNumber)}`
+              );
+              card = exactRes.data;
+            } else if (base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
+              // Strong path even without setCode: search printings and match collector_number
+              const picked = await pickPrintingByCollector(base.prints_search_uri, collectorNumber, isFoil);
+              card = picked || base;
+            } else {
+              // Fallback if prints_search_uri helper not present
+              card = base;
+            }
+          } else {
+            // No collector number available: still try to constrain by set code if provided
+            if (setCodeFromBody) {
+              const query = `!"${guessedName}" set:${setCodeFromBody}`;
+              const s = await axios.get(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`);
+              card = s.data.data?.[0] || base;
+            } else {
+              card = base;
+            }
+          }
 
-    if (!card) {
-      throw new Error("No match found in that set");
-    }
-  } else {
-    // fallback to fuzzy if no set provided
-    const scryRes = await axios.get(
-      `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
-    );
-    card = scryRes.data;
-  }
+          if (!card) throw new Error("No Scryfall card selected");
 
-} catch (err) {
-  results.push({
-    file: file.originalname,
-    error: setCode
-      ? `Scryfall not found in set ${setCode}: ${guessedName}`
-      : `Scryfall not found: ${guessedName}`,
-    ms: Date.now() - perFileStart
-  });
-  continue;
-}
-        console.log("🧙 [fi8170] Scryfall ok:", card?.name);
+        } catch (err) {
+          results.push({
+            file: file.originalname,
+            error: `Scryfall lookup failed: ${guessedName}`,
+            ms: Date.now() - perFileStart
+          });
+          continue;
+        }
+
+        console.log("🧙 [fi8170] Scryfall chosen:", {
+          name: card?.name,
+          set: card?.set,
+          set_name: card?.set_name,
+          collector_number: card?.collector_number
+        });
 
         const price = isFoil
           ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
           : parseFloat(card?.prices?.usd || 0);
 
-        // 3) Save to inventory (FIXED quantity conflict)
+        // 3) Save to inventory (no quantity conflict)
         const inventoryItem = {
           cardName: card.name,
           set: card.set_name,
@@ -354,9 +475,8 @@ try {
             condition: inventoryItem.condition
           },
           {
-            $inc: { quantity: 1 },
-            // ✅ Only set quantity on insert (prevents: "Updating the path 'quantity' would create a conflict")
-            $setOnInsert: inventoryItem
+            $inc: { quantity: 1 },        // creates quantity on insert automatically
+            $setOnInsert: inventoryItem    // do NOT include quantity here
           },
           { upsert: true }
         );
@@ -366,7 +486,11 @@ try {
           file: file.originalname,
           success: card.name,
           guessedName,
-          confidence: Math.round(confidence),
+          nameConfidence: Math.round(nameConf),
+          collectorNumber: collectorNumber || null,
+          chosenSet: card?.set || null,
+          chosenSetName: card?.set_name || null,
+          chosenCollector: card?.collector_number || null,
           ms: Date.now() - perFileStart
         });
 

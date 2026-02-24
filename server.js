@@ -28,6 +28,7 @@ const recognizeWithTimeout = (imagePath, ms = 30000) => {
     )
   ]);
 };
+
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -124,6 +125,259 @@ async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
     html
   });
 }
+
+
+// ✅ High-accuracy FI-8170 OCR upgrade for /api/fi8170/scan-to-inventory
+// Requires: sharp, fs, path, Tesseract, axios, CardInventory already set up
+
+// ---------- High-accuracy OCR helpers (put these ABOVE the route) ----------
+
+// Your FI-8170 sample image format (you said all scans match this):
+const FIXED_DIMS = { w: 771, h: 1061 };
+
+// Tuned crop boxes for the FI-8170 format
+const CROP = {
+  // Top name bar strip
+  nameBar: { left: 38, top: 31, width: 694, height: 138 },
+
+  // Optional later if you want collector # matching:
+  // bottomLine: { left: 154, top: 923, width: 462, height: 127 },
+};
+
+function cleanCardName(text) {
+  return (text || "")
+    .replace(/\n/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/[^A-Za-z0-9 ',-/]/g, "") // keep split cards: Fire // Ice
+    .trim();
+}
+
+async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false) {
+  const meta = await sharp(originalPath).metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  // Fixed coords if exact match, otherwise % fallback
+  const region =
+    W === FIXED_DIMS.w && H === FIXED_DIMS.h
+      ? CROP.nameBar
+      : {
+          left: Math.floor(W * 0.05),
+          top: Math.floor(H * 0.03),
+          width: Math.floor(W * 0.90),
+          height: Math.floor(H * 0.16),
+        };
+
+  let pipeline = sharp(originalPath)
+    .extract(region)
+    .grayscale()
+    .normalize()
+    .sharpen()
+    // Upscale the CROP (not the whole image) for better OCR edges:
+    .resize({ width: 1400, withoutEnlargement: false });
+
+  if (useThreshold) {
+    // Stronger second pass when confidence is low
+    pipeline = pipeline.threshold(180);
+  }
+
+  await pipeline.toFile(outPath);
+}
+
+// Updated recognizeWithTimeout: supports passing Tesseract options
+function recognizeWithTimeout(imagePath, ms = 30000, tesseractOptions = {}) {
+  return Promise.race([
+    Tesseract.recognize(imagePath, "eng", tesseractOptions),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`OCR timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
+  const ts = Date.now();
+  const nameCrop1 = path.join(tmpDir, `name_${ts}_p1.png`);
+  const nameCrop2 = path.join(tmpDir, `name_${ts}_p2.png`);
+
+  const tesseractOptions = {
+    // SINGLE_LINE = PSM 7 (best for a name bar)
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
+    tessedit_char_whitelist:
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ',-/",
+  };
+
+  // Pass 1 (normal)
+  await cropAndPrepNameBar(originalPath, nameCrop1, false);
+  const ocr1 = await recognizeWithTimeout(nameCrop1, 90000, tesseractOptions);
+  const name1 = cleanCardName(ocr1?.data?.text);
+  const conf1 = ocr1?.data?.confidence ?? 0;
+
+  // If pass 1 is good, return early
+  if (name1 && conf1 >= 65) {
+    try { if (fs.existsSync(nameCrop1)) fs.unlinkSync(nameCrop1); } catch {}
+    return { name: name1, confidence: conf1 };
+  }
+
+  // Pass 2 (threshold retry)
+  await cropAndPrepNameBar(originalPath, nameCrop2, true);
+  const ocr2 = await recognizeWithTimeout(nameCrop2, 90000, tesseractOptions);
+  const name2 = cleanCardName(ocr2?.data?.text);
+  const conf2 = ocr2?.data?.confidence ?? 0;
+
+  // Cleanup
+  for (const p of [nameCrop1, nameCrop2]) {
+    try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
+  }
+
+  // Choose best
+  if (!name1 && name2) return { name: name2, confidence: conf2 };
+  if (!name2 && name1) return { name: name1, confidence: conf1 };
+  if (name2 && conf2 > conf1) return { name: name2, confidence: conf2 };
+
+  return { name: name1 || name2 || "", confidence: Math.max(conf1, conf2) };
+}
+
+// ---------- UPDATED ROUTE ----------
+
+app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
+  const started = Date.now();
+
+  try {
+    const { condition, foil } = req.body;
+    const files = req.files;
+
+    console.log("📥 [fi8170] HIT", {
+      time: new Date().toISOString(),
+      files: files?.length || 0,
+      condition,
+      foil
+    });
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No images uploaded." });
+    }
+
+    const isFoil = String(foil) === "true";
+    const results = [];
+
+    // Use a temp dir for crops (you can change this if you want)
+    const tmpDir = path.join(__dirname, "uploads");
+    try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
+
+    for (const file of files) {
+      const perFileStart = Date.now();
+      const originalPath = file.path;
+
+      try {
+        console.log("🖼️ [fi8170] file start:", {
+          originalname: file.originalname,
+          path: file.path,
+          size: file.size
+        });
+
+        // 1) HIGH-ACCURACY OCR: crop name bar + preprocess + retry + confidence
+        console.log("🔤 [fi8170] OCR(name bar) start");
+        const { name: guessedName, confidence } = await ocrCardNameHighAccuracy(originalPath, tmpDir);
+        console.log("🔤 [fi8170] OCR(name bar) done", { guessedName, confidence });
+
+        if (!guessedName || guessedName.length < 3) {
+          results.push({
+            file: file.originalname,
+            error: "Could not detect card name from name bar.",
+            ms: Date.now() - perFileStart
+          });
+          continue;
+        }
+
+        // Optional safety: avoid auto-inserting if OCR is too uncertain
+        if (confidence < 45) {
+          results.push({
+            file: file.originalname,
+            error: `Low OCR confidence (${Math.round(confidence)}). Needs review.`,
+            guessedName,
+            ms: Date.now() - perFileStart
+          });
+          continue;
+        }
+
+        // 2) Scryfall lookup (fuzzy)
+        console.log("🧙 [fi8170] Scryfall start");
+        let card;
+        try {
+          const scryRes = await axios.get(
+            `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+          );
+          card = scryRes.data;
+        } catch (err) {
+          results.push({
+            file: file.originalname,
+            error: `Scryfall not found: ${guessedName}`,
+            ms: Date.now() - perFileStart
+          });
+          continue;
+        }
+        console.log("🧙 [fi8170] Scryfall ok:", card?.name);
+
+        const price = isFoil
+          ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
+          : parseFloat(card?.prices?.usd || 0);
+
+        // 3) Save to inventory (FIXED quantity conflict)
+        const inventoryItem = {
+          cardName: card.name,
+          set: card.set_name,
+          condition,
+          foil: isFoil,
+          priceUsd: price,
+          imageUrl: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ""
+        };
+
+        console.log("💾 [fi8170] DB upsert start");
+        await CardInventory.findOneAndUpdate(
+          {
+            cardName: inventoryItem.cardName,
+            set: inventoryItem.set,
+            foil: inventoryItem.foil,
+            condition: inventoryItem.condition
+          },
+          {
+            $inc: { quantity: 1 },
+            // ✅ Only set quantity on insert (prevents: "Updating the path 'quantity' would create a conflict")
+            $setOnInsert: { ...inventoryItem, quantity: 1 }
+          },
+          { upsert: true }
+        );
+        console.log("💾 [fi8170] DB upsert done");
+
+        results.push({
+          file: file.originalname,
+          success: card.name,
+          guessedName,
+          confidence: Math.round(confidence),
+          ms: Date.now() - perFileStart
+        });
+
+      } catch (err) {
+        console.error("❌ [fi8170] per-file error:", file?.originalname, err?.message || err);
+        results.push({
+          file: file.originalname,
+          error: err?.message || "Unknown error",
+          ms: Date.now() - perFileStart
+        });
+      } finally {
+        // Cleanup original uploads (keep if you want debugging)
+        try { if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath); } catch {}
+      }
+    }
+
+    console.log("✅ [fi8170] DONE ms:", Date.now() - started);
+    return res.json({ results });
+
+  } catch (err) {
+    console.error("❌ [fi8170] route error:", err);
+    return res.status(500).json({ error: "Server error processing scans." });
+  }
+});
 
 // ✅ IMPORTANT: place this ABOVE app.use(express.json())
 app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -282,148 +536,6 @@ const inventorySchema = new mongoose.Schema({
 
 const CardInventory = inventoryConnection.model('CardInventory', inventorySchema, 'Card Inventory');
 
-app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
-  const started = Date.now();
-
-  try {
-    const { condition, foil } = req.body;
-    const files = req.files;
-
-    console.log("📥 [fi8170] HIT", {
-      time: new Date().toISOString(),
-      files: files?.length || 0,
-      condition,
-      foil
-    });
-
-    if (!files || files.length === 0) {
-      return res.status(400).json({ message: "No images uploaded." });
-    }
-
-    const isFoil = String(foil) === "true";
-    const results = [];
-
-    for (const file of files) {
-      const perFileStart = Date.now();
-      const originalPath = file.path;
-      const prePath = `${file.path}-pre.png`;
-
-      try {
-        console.log("🖼️ [fi8170] file start:", {
-          originalname: file.originalname,
-          path: file.path,
-          size: file.size
-        });
-
-        // 0) OPTIONAL: Preprocess to speed OCR + increase accuracy
-        // (If sharp ever throws, you can comment this out temporarily.)
-        await sharp(originalPath)
-          .resize({ width: 1200, withoutEnlargement: true })
-          .grayscale()
-          .normalise()
-          .toFile(prePath);
-
-        // 1) OCR (bump timeout for hosted envs)
-        console.log("🔤 [fi8170] OCR start");
-        const ocr = await recognizeWithTimeout(prePath, 90000);
-        console.log("🔤 [fi8170] OCR done");
-
-        const rawText = ocr?.data?.text || "";
-
-        // 2) Pick a stronger guessed name:
-        // - prefer first line with letters, length >= 3
-        // - ignore lines that look like set codes / numbers / junk
-        const lines = rawText
-          .split("\n")
-          .map(l => l.trim())
-          .filter(Boolean);
-
-        const guessedName =
-          lines.find(l => /[A-Za-z]/.test(l) && l.length >= 3 && !/^\d+$/.test(l)) || "";
-
-        console.log("🧠 [fi8170] guessedName:", guessedName);
-
-        if (!guessedName) {
-          results.push({
-            file: file.originalname,
-            error: "Could not detect card name."
-          });
-          continue;
-        }
-
-        // 3) Scryfall lookup
-        console.log("🧙 [fi8170] Scryfall start");
-        let card;
-        try {
-          const scryRes = await axios.get(
-            `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
-          );
-          card = scryRes.data;
-        } catch (err) {
-          results.push({
-            file: file.originalname,
-            error: `Scryfall not found: ${guessedName}`
-          });
-          continue;
-        }
-        console.log("🧙 [fi8170] Scryfall ok:", card?.name);
-
-        const price = isFoil
-          ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
-          : parseFloat(card?.prices?.usd || 0);
-
-        // 4) Save to inventory
-        const inventoryItem = {
-          cardName: card.name,
-          set: card.set_name,
-          quantity: 1,
-          condition,
-          foil: isFoil,
-          priceUsd: price,
-          imageUrl: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ""
-        };
-
-        console.log("💾 [fi8170] DB upsert start");
-        await CardInventory.findOneAndUpdate(
-          {
-            cardName: inventoryItem.cardName,
-            set: inventoryItem.set,
-            foil: inventoryItem.foil,
-            condition: inventoryItem.condition
-          },
-          { $inc: { quantity: 1 }, $setOnInsert: inventoryItem },
-          { upsert: true }
-        );
-        console.log("💾 [fi8170] DB upsert done");
-
-        results.push({
-          file: file.originalname,
-          success: card.name,
-          ms: Date.now() - perFileStart
-        });
-
-      } catch (err) {
-        console.error("❌ [fi8170] per-file error:", file?.originalname, err?.message || err);
-        results.push({
-          file: file.originalname,
-          error: err?.message || "Unknown error",
-          ms: Date.now() - perFileStart
-        });
-      } finally {
-        // Cleanup both preprocessed + original uploads
-        try { if (fs.existsSync(prePath)) fs.unlinkSync(prePath); } catch {}
-        try { if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath); } catch {}
-      }
-    }
-
-    console.log("✅ [fi8170] DONE ms:", Date.now() - started);
-    return res.json({ results });
-
-  } catch (err) {
-    console.error("❌ [fi8170] route error:", err);
-    return res.status(500).json({ error: "Server error processing scans." });
-  }
-});
 
 const employeeSchema = new mongoose.Schema({
   role: { type: String, required: true },

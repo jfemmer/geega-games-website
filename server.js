@@ -335,7 +335,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           {
             $inc: { quantity: 1 },
             // ✅ Only set quantity on insert (prevents: "Updating the path 'quantity' would create a conflict")
-            $setOnInsert: { ...inventoryItem, quantity: 1 }
+            $setOnInsert: inventoryItem
           },
           { upsert: true }
         );

@@ -587,6 +587,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
 
 
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ✅ Scryfall Image Fetch Helper
 const fetchScryfallImageUrl = async (name, set, options = {}) => {

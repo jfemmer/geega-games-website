@@ -269,10 +269,10 @@ async function cropAndPrepBottomLine(originalPath, outPath, useThreshold = false
     W === FIXED_DIMS.w && H === FIXED_DIMS.h
       ? CROP.bottomLine
       : {
-          left: Math.floor(W * 0.08),
-          top: Math.floor(H * 0.82),
-          width: Math.floor(W * 0.15),
-          height: Math.floor(H * 0.12),
+         left: Math.floor(W * 0.06),   // slightly more left
+          top: Math.floor(H * 0.90),    // push much lower
+          width: Math.floor(W * 0.22),  // wider to capture full number
+          height: Math.floor(H * 0.06), // MUCH shorter height
         };
 
   let pipeline = sharp(originalPath)

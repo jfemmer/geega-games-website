@@ -272,7 +272,7 @@ async function cropAndPrepBottomLine(originalPath, outPath, useThreshold = false
          left: Math.floor(W * 0.06),   // slightly more left
           top: Math.floor(H * 0.90),    // push much lower
           width: Math.floor(W * 0.22),  // wider to capture full number
-          height: Math.floor(H * 0.06), // MUCH shorter height
+          height: Math.floor(H * 0.03), // MUCH shorter height
         };
 
   let pipeline = sharp(originalPath)

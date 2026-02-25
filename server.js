@@ -270,9 +270,9 @@ async function cropAndPrepBottomLine(originalPath, outPath, useThreshold = false
       ? CROP.bottomLine
       : {
           left: Math.floor(W * 0.08),
-          top: Math.floor(H * 0.87),
-          width: Math.floor(W * 0.2),
-          height: Math.floor(H * 0.07),
+          top: Math.floor(H * 0.82),
+          width: Math.floor(W * 0.15),
+          height: Math.floor(H * 0.12),
         };
 
   let pipeline = sharp(originalPath)

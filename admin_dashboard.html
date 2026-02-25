@@ -894,55 +894,81 @@ async function uploadFi8170() {
     return;
   }
 
-  const formData = new FormData();
-  for (const file of input.files) {
-    formData.append("cardImages", file);
-  }
+  // ⚠️ Put this in a safer place later (e.g. employee login).
+  // For now: quick proof-of-life.
+  const INGEST_KEY = "PUT_YOUR_INGEST_KEY_HERE";
 
-  formData.append("condition", condition);
-  formData.append("foil", foil);
+  const files = Array.from(input.files);
 
   try {
     button.disabled = true;
-    button.textContent = "Processing...";
-    resultsDiv.innerHTML = "<p>Uploading and processing scans...</p>";
+    button.textContent = "Queueing...";
+    resultsDiv.innerHTML = `<p>Queueing ${files.length} scans...</p>`;
 
-    const res = await fetch(
-      "https://geega-games-website-production.up.railway.app/api/fi8170/scan-to-inventory",
-      {
-        method: "POST",
-        body: formData
+    const jobIds = [];
+
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("originalName", file.name);
+      formData.append("condition", condition);
+      formData.append("foil", foil);
+
+      const res = await fetch(
+        "https://geega-games-website-production.up.railway.app/api/scan-ingest",
+        {
+          method: "POST",
+          headers: { "x-ingest-key": INGEST_KEY },
+          body: formData
+        }
+      );
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Ingest failed (${res.status}): ${text.slice(0, 200)}`);
       }
-    );
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Upload failed (${res.status}): ${text.slice(0, 200)}`);
+      const json = await res.json();
+      jobIds.push(json.jobId);
     }
 
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      const text = await res.text();
-      throw new Error(`Expected JSON but received: ${text.slice(0, 200)}`);
-    }
+    resultsDiv.innerHTML = `
+      <p>✅ Queued ${jobIds.length} scans.</p>
+      <p>Tracking…</p>
+      <pre>${JSON.stringify(jobIds, null, 2)}</pre>
+    `;
 
-    const data = await res.json();
+    // Poll status until everything is done/failed
+    const poll = async () => {
+      const rows = await Promise.all(
+        jobIds.map(async (id) => {
+          const r = await fetch(`https://geega-games-website-production.up.railway.app/api/scan-jobs/${id}`);
+          return r.ok ? r.json() : { _id: id, status: "unknown" };
+        })
+      );
 
-    resultsDiv.innerHTML =
-      "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+      const doneCount = rows.filter(x => x.status === "done").length;
+      const failCount = rows.filter(x => x.status === "failed").length;
 
-    alert("✅ Scan complete.");
+      resultsDiv.innerHTML = `
+        <p>Processing: ✅ ${doneCount} done, ❌ ${failCount} failed, ⏳ ${rows.length - doneCount - failCount} in progress</p>
+        <pre>${JSON.stringify(rows, null, 2)}</pre>
+      `;
 
-    // Refresh inventory summary automatically
-    if (typeof loadInventorySummary === "function") {
-      loadInventorySummary();
-    }
+      if (doneCount + failCount === rows.length) {
+        alert("✅ Queue finished.");
+        if (typeof loadInventorySummary === "function") loadInventorySummary();
+        input.value = "";
+        return;
+      }
 
-    // Clear file input
-    input.value = "";
+      setTimeout(poll, 1500);
+    };
+
+    poll();
 
   } catch (err) {
-    console.error("❌ fi8170 Upload Error:", err);
+    console.error("❌ Queue upload error:", err);
     resultsDiv.innerHTML = `<p style="color:red;">${err.message}</p>`;
     alert("❌ " + err.message);
   } finally {

@@ -270,7 +270,7 @@ async function cropAndPrepBottomLine(originalPath, outPath, useThreshold = false
       ? CROP.bottomLine
       : {
          left: Math.floor(W * 0.06),   // slightly more left
-          top: Math.floor(H * 0.931),    // push much lower
+          top: Math.floor(H * 0.929),    // push much lower
           width: Math.floor(W * 0.22),  // wider to capture full number
           height: Math.floor(H * 0.015), // MUCH shorter height
         };

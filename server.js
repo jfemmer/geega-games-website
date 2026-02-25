@@ -91,7 +91,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  allowedHeaders: ['Content-Type','Authorization','x-ingest-key'],
   optionsSuccessStatus: 204
 };
 
@@ -250,31 +250,23 @@ function cleanBottomText(text) {
     .trim();
 }
 
-function parseCollectorNumber(bottomText) {
-  // "123/281" or "123 / 281"
-  const m = bottomText.match(/(\d{1,4})\s*\/\s*\d{1,4}/);
-  if (m) return m[1];
+function parseCollectorNumberStrict(bottomText) {
+  const s = (bottomText || "")
+    .replace(/\s+/g, " ")
+    .replace(/[|]/g, "/")         // common OCR swap
+    .replace(/[^0-9/ ]/g, "")     // keep only digits + slash + spaces
+    .trim();
 
-  // fallback: first standalone number (less safe, but useful)
-  const m2 = bottomText.match(/\b(\d{1,4})\b/);
+  // Prefer formats like "123/350"
+  const m1 = s.match(/(\d{1,4})\s*\/\s*(\d{1,4})/);
+  if (m1) return m1[1];
+
+  // Fallback: standalone number (less safe)
+  const m2 = s.match(/\b(\d{1,4})\b/);
   return m2 ? m2[1] : null;
 }
 
-async function cropAndPrepBottomLine(originalPath, outPath, useThreshold = false) {
-  const meta = await sharp(originalPath).metadata();
-  const W = meta.width;
-  const H = meta.height;
-
-  const region =
-    W === FIXED_DIMS.w && H === FIXED_DIMS.h
-      ? CROP.bottomLine
-      : {
-         left: Math.floor(W * 0.06),   // slightly more left
-          top: Math.floor(H * 0.929),    // push much lower
-          width: Math.floor(W * 0.22),  // wider to capture full number
-          height: Math.floor(H * 0.015), // MUCH shorter height
-        };
-
+async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold = false) {
   let pipeline = sharp(originalPath)
     .extract(region)
     .grayscale()
@@ -285,44 +277,117 @@ async function cropAndPrepBottomLine(originalPath, outPath, useThreshold = false
   if (useThreshold) pipeline = pipeline.threshold(180);
 
   await pipeline.toFile(outPath);
+
   if (DEBUG_OCR) {
     const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
     await sharp(outPath).toFile(debugCopy);
     console.log("🔵 Saved BOTTOM crop to:", debugCopy);
   }
 }
+function buildCollectorRegions(W, H) {
+  // If your FI-8170 scans are consistently 771x1061, you can tune these.
+  // These are *percentage-based* so they still work if resolution changes.
+  // The idea: try bottom-left in a few slightly different spots/heights.
+  return [
+    // Template A: modern-ish bottom-left, tight
+    {
+      left: Math.floor(W * 0.05),
+      top: Math.floor(H * 0.93),
+      width: Math.floor(W * 0.28),
+      height: Math.floor(H * 0.020),
+    },
+    // Template B: slightly higher (some layouts shift up)
+    {
+      left: Math.floor(W * 0.05),
+      top: Math.floor(H * 0.915),
+      width: Math.floor(W * 0.30),
+      height: Math.floor(H * 0.024),
+    },
+    // Template C: a bit more to the right (different left margin)
+    {
+      left: Math.floor(W * 0.10),
+      top: Math.floor(H * 0.93),
+      width: Math.floor(W * 0.30),
+      height: Math.floor(H * 0.020),
+    },
+    // Template D: slightly wider (if slash/denominator is being clipped)
+    {
+      left: Math.floor(W * 0.05),
+      top: Math.floor(H * 0.93),
+      width: Math.floor(W * 0.36),
+      height: Math.floor(H * 0.022),
+    },
+  ];
+}
 
 async function ocrCollectorNumberHighAccuracy(originalPath, tmpDir) {
   const ts = Date.now();
-  const bottomCrop1 = path.join(tmpDir, `bottom_${ts}_p1.png`);
-  const bottomCrop2 = path.join(tmpDir, `bottom_${ts}_p2.png`);
+  const meta = await sharp(originalPath).metadata();
+  const W = meta.width;
+  const H = meta.height;
 
-  const opts = {
-    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK, // PSM 6
-    tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/ ",
+  const regions = buildCollectorRegions(W, H);
+
+  // ✅ Collector number works best as SINGLE_LINE (PSM 7) with numeric whitelist
+  const optsStrict = {
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE, // PSM 7
+    tessedit_char_whitelist: "0123456789/ ",
   };
 
-  await cropAndPrepBottomLine(originalPath, bottomCrop1, false);
-  const ocr1 = await recognizeWithTimeout(bottomCrop1, 90000, opts);
-  const text1 = cleanBottomText(ocr1?.data?.text);
-  const conf1 = ocr1?.data?.confidence ?? 0;
+  // We'll try: each region with (normal + threshold)
+  const candidates = [];
 
-  await cropAndPrepBottomLine(originalPath, bottomCrop2, true);
-  const ocr2 = await recognizeWithTimeout(bottomCrop2, 90000, opts);
-  const text2 = cleanBottomText(ocr2?.data?.text);
-  const conf2 = ocr2?.data?.confidence ?? 0;
+  for (let i = 0; i < regions.length; i++) {
+    const region = regions[i];
 
-  for (const p of [bottomCrop1, bottomCrop2]) {
-    try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
+    const p1 = path.join(tmpDir, `bottom_${ts}_r${i}_p1.png`);
+    const p2 = path.join(tmpDir, `bottom_${ts}_r${i}_p2.png`);
+
+    try {
+      await cropAndPrepBottomLine(originalPath, p1, region, false);
+      const o1 = await recognizeWithTimeout(p1, 90000, optsStrict);
+      const t1 = cleanBottomText(o1?.data?.text);
+      const c1 = o1?.data?.confidence ?? 0;
+      const cn1 = parseCollectorNumberStrict(t1);
+
+      candidates.push({ regionIndex: i, pass: 1, text: t1, conf: c1, collectorNumber: cn1 });
+
+      // Early win: clean parse + decent conf
+      if (cn1 && c1 >= 55) {
+        // cleanup temp files
+        for (const p of [p1, p2]) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {} }
+        return { text: t1, confidence: c1, collectorNumber: cn1 };
+      }
+
+      await cropAndPrepBottomLine(originalPath, p2, region, true);
+      const o2 = await recognizeWithTimeout(p2, 90000, optsStrict);
+      const t2 = cleanBottomText(o2?.data?.text);
+      const c2 = o2?.data?.confidence ?? 0;
+      const cn2 = parseCollectorNumberStrict(t2);
+
+      candidates.push({ regionIndex: i, pass: 2, text: t2, conf: c2, collectorNumber: cn2 });
+
+      if (cn2 && c2 >= 45) {
+        for (const p of [p1, p2]) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {} }
+        return { text: t2, confidence: c2, collectorNumber: cn2 };
+      }
+    } finally {
+      // cleanup temp files
+      for (const p of [p1, p2]) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {} }
+    }
   }
 
-  const bestText = conf2 > conf1 ? text2 : text1;
-  const bestConf = Math.max(conf1, conf2);
+  // Pick best candidate:
+  // 1) prefer those that parsed a collector number
+  // 2) higher confidence
+  candidates.sort((a, b) => (b.collectorNumber ? 1 : 0) - (a.collectorNumber ? 1 : 0) || b.conf - a.conf);
+
+  const best = candidates[0] || { text: "", conf: 0, collectorNumber: null };
 
   return {
-    text: bestText,
-    confidence: bestConf,
-    collectorNumber: parseCollectorNumber(bestText),
+    text: best.text,
+    confidence: best.conf,
+    collectorNumber: best.collectorNumber || null,
   };
 }
 
@@ -408,7 +473,15 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         // This enables “99% correct printing” selection.
         console.log("🔢 [fi8170] OCR(bottom line) start");
         const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
-        const collectorNumber = bottom.collectorNumber; // may be null
+
+        let collectorNumber = bottom.collectorNumber || null;
+
+        // ✅ Safety gate — ignore low-confidence collector numbers
+        if (collectorNumber && (bottom.confidence ?? 0) < 35) {
+          console.log("⚠️ Ignoring collectorNumber due to low confidence:", bottom.confidence);
+          collectorNumber = null;
+        }
+
         console.log("🔢 [fi8170] OCR(bottom line) done", {
           bottomText: bottom.text,
           bottomConf: Math.round(bottom.confidence),
@@ -838,7 +911,13 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
 
   // 1b) OCR: bottom line (collector number)
   const bottom = await ocrCollectorNumberHighAccuracy(filePath, tmpDir);
-  const collectorNumber = bottom.collectorNumber || null;
+
+let collectorNumber = bottom.collectorNumber || null;
+
+// ✅ Safety gate
+if (collectorNumber && (bottom.confidence ?? 0) < 35) {
+  collectorNumber = null;
+}
 
   // 2) Scryfall select printing
   let card = null;

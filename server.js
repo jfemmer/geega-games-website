@@ -643,6 +643,41 @@ const Cart = createCartModel(db1);
   db.on('error', (err) => console.error(`❌ MongoDB connection error #${i + 1}:`, err.message));
 });
 
+const scanJobSchema = new mongoose.Schema(
+  {
+    status: { type: String, enum: ["queued", "processing", "done", "failed"], default: "queued" },
+
+    // File info
+    filePath: { type: String, required: true },
+    originalName: { type: String, default: "" },
+
+    // Batch inputs
+    condition: { type: String, default: "NM" },
+    foil: { type: Boolean, default: false },
+    setCode: { type: String, default: "" },
+
+    // Results
+    guessedName: String,
+    nameConfidence: Number,
+    collectorNumber: String,
+    chosenSet: String,
+    chosenSetName: String,
+    chosenCollector: String,
+    ocrTextName: String,
+    ocrTextBottom: String,
+
+    // Ops
+    attempts: { type: Number, default: 0 },
+    lastError: String,
+    lockedAt: Date,
+    finishedAt: Date
+  },
+  { timestamps: true }
+);
+
+// Use primary DB for jobs
+const ScanJob = db1.model("ScanJob", scanJobSchema, "Scan Jobs");
+
 const userSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
@@ -781,6 +816,134 @@ const tradeInSchema = new mongoose.Schema({
 });
 
 const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
+
+async function processSingleScanToInventory({ filePath, originalName, condition, foil, setCode }) {
+  const perFileStart = Date.now();
+  const tmpDir = path.join(__dirname, "uploads");
+  try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
+
+  const isFoil = !!foil;
+  const setCodeFromBody = (setCode || "").trim().toLowerCase();
+
+  // 1) OCR: name bar
+  const { name: guessedName, confidence: nameConf } = await ocrCardNameHighAccuracy(filePath, tmpDir);
+
+  if (!guessedName || guessedName.length < 3) {
+    throw new Error("Could not detect card name from name bar.");
+  }
+
+  if (nameConf < 45) {
+    throw new Error(`Low OCR confidence (${Math.round(nameConf)}). Needs review.`);
+  }
+
+  // 1b) OCR: bottom line (collector number)
+  const bottom = await ocrCollectorNumberHighAccuracy(filePath, tmpDir);
+  const collectorNumber = bottom.collectorNumber || null;
+
+  // 2) Scryfall select printing
+  let card = null;
+
+  const baseRes = await axios.get(
+    `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+  );
+  const base = baseRes.data;
+
+  if (collectorNumber) {
+    if (setCodeFromBody) {
+      const exactRes = await axios.get(
+        `https://api.scryfall.com/cards/${encodeURIComponent(setCodeFromBody)}/${encodeURIComponent(collectorNumber)}`
+      );
+      card = exactRes.data;
+    } else if (base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
+      const picked = await pickPrintingByCollector(base.prints_search_uri, collectorNumber, isFoil);
+      card = picked || base;
+    } else {
+      card = base;
+    }
+  } else {
+    if (setCodeFromBody) {
+      const query = `!"${guessedName}" set:${setCodeFromBody}`;
+      const s = await axios.get(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`);
+      card = s.data.data?.[0] || base;
+    } else {
+      card = base;
+    }
+  }
+
+  if (!card) throw new Error("No Scryfall card selected");
+
+  const price = isFoil
+    ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
+    : parseFloat(card?.prices?.usd || 0);
+
+  const inventoryItem = {
+    cardName: card.name,
+    set: card.set_name,
+    condition,
+    foil: isFoil,
+    priceUsd: price,
+    imageUrl: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ""
+  };
+
+  await CardInventory.findOneAndUpdate(
+    {
+      cardName: inventoryItem.cardName,
+      set: inventoryItem.set,
+      foil: inventoryItem.foil,
+      condition: inventoryItem.condition
+    },
+    {
+      $inc: { quantity: 1 },
+      $setOnInsert: inventoryItem
+    },
+    { upsert: true }
+  );
+
+  return {
+    ms: Date.now() - perFileStart,
+    guessedName,
+    nameConfidence: Math.round(nameConf),
+    collectorNumber,
+    chosenSet: card?.set || null,
+    chosenSetName: card?.set_name || null,
+    chosenCollector: card?.collector_number || null,
+    ocrTextName: null,                 // optional: store raw Tesseract output if you want
+    ocrTextBottom: bottom?.text || null
+  };
+}
+
+function requireIngestKey(req, res, next) {
+  const key = req.headers["x-ingest-key"];
+  if (!process.env.INGEST_KEY || key !== process.env.INGEST_KEY) {
+    return res.status(401).send("Unauthorized");
+  }
+  next();
+}
+
+// Single-file ingest (separate from your fi8170 batch route)
+app.post("/api/scan-ingest", requireIngestKey, upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file?.path) return res.status(400).json({ message: "No image uploaded." });
+
+    const condition = (req.body.condition || "NM").trim();
+    const foil = String(req.body.foil) === "true";
+    const setCode = (req.body.setCode || "").trim().toLowerCase();
+
+    const job = await ScanJob.create({
+      status: "queued",
+      filePath: req.file.path,
+      originalName: req.body.originalName || req.file.originalname || "",
+      condition,
+      foil,
+      setCode
+    });
+
+    res.json({ jobId: String(job._id), status: job.status });
+  } catch (e) {
+    console.error("❌ scan-ingest error:", e);
+    res.status(500).json({ message: "Failed to ingest scan." });
+  }
+});
 
 // ✅ Routes
 
@@ -1979,6 +2142,19 @@ app.get('/api/track-usps/:trackingNumber', async (req, res) => {
   }
 });
 
+app.get("/api/scan-jobs", async (req, res) => {
+  const status = (req.query.status || "").trim();
+  const q = status ? { status } : {};
+  const jobs = await ScanJob.find(q).sort({ createdAt: -1 }).limit(200).lean();
+  res.json(jobs);
+});
+
+app.get("/api/scan-jobs/:id", async (req, res) => {
+  const job = await ScanJob.findById(req.params.id).lean();
+  if (!job) return res.status(404).send("Not found");
+  res.json(job);
+});
+
 app.post('/api/shippo/label', async (req, res) => {
   try {
     const shippo = await getShippo();
@@ -2098,6 +2274,87 @@ app.get('/api/manual-update-optin', async (req, res) => {
     res.status(500).send('Failed to update users.');
   }
 });
+
+const SCAN_WORKERS = Number(process.env.SCAN_WORKERS || 2); // keep 1-3
+const SCAN_MAX_ATTEMPTS = Number(process.env.SCAN_MAX_ATTEMPTS || 5);
+const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+
+let scanInFlight = 0;
+
+async function claimNextScanJob() {
+  const lockExpired = new Date(Date.now() - LOCK_TIMEOUT_MS);
+
+  return ScanJob.findOneAndUpdate(
+    {
+      status: { $in: ["queued", "processing"] },
+      $or: [
+        { status: "queued" },
+        { status: "processing", lockedAt: { $lt: lockExpired } }
+      ]
+    },
+    {
+      $set: { status: "processing", lockedAt: new Date() },
+      $inc: { attempts: 1 }
+    },
+    { sort: { createdAt: 1 }, new: true }
+  );
+}
+
+async function scanWorkerTick() {
+  while (scanInFlight < SCAN_WORKERS) {
+    const job = await claimNextScanJob();
+    if (!job) break;
+
+    scanInFlight++;
+
+    (async () => {
+      try {
+        const result = await processSingleScanToInventory({
+          filePath: job.filePath,
+          originalName: job.originalName,
+          condition: job.condition,
+          foil: job.foil,
+          setCode: job.setCode
+        });
+
+        job.status = "done";
+        job.finishedAt = new Date();
+        job.lastError = null;
+
+        job.guessedName = result.guessedName;
+        job.nameConfidence = result.nameConfidence;
+        job.collectorNumber = result.collectorNumber;
+        job.chosenSet = result.chosenSet;
+        job.chosenSetName = result.chosenSetName;
+        job.chosenCollector = result.chosenCollector;
+        job.ocrTextBottom = result.ocrTextBottom;
+
+        await job.save();
+      } catch (e) {
+        job.lastError = e?.message || String(e);
+
+        if (job.attempts >= SCAN_MAX_ATTEMPTS) {
+          job.status = "failed";
+          job.finishedAt = new Date();
+        } else {
+          job.status = "queued";
+        }
+
+        await job.save();
+      } finally {
+        // cleanup original uploaded file
+        try { if (job.filePath && fs.existsSync(job.filePath)) fs.unlinkSync(job.filePath); } catch {}
+
+        scanInFlight--;
+      }
+    })();
+  }
+}
+
+// Start worker loop
+setInterval(() => {
+  scanWorkerTick().catch(err => console.error("❌ scanWorkerTick:", err));
+}, 1000);
 
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

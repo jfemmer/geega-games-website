@@ -273,12 +273,19 @@ function parseCollectorNumberStrict(bottomText) {
 
   // Prefer formats like "123/350"
   const m1 = s.match(/(\d{1,4})\s*\/\s*(\d{1,4})/);
-  if (m1) return m1[1];
+  if (m1) {
+    const n = parseInt(m1[1], 10);
+    return Number.isFinite(n) ? String(n) : null;
+  }
 
   // Fallback: standalone number (less safe)
   const m2 = s.match(/\b(\d{1,4})\b/);
-  return m2 ? m2[1] : null;
-}
+  if (m2) {
+    const n = parseInt(m2[1], 10);
+    return Number.isFinite(n) ? String(n) : null;
+  }
+  return null;
+  }
 
 async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold = false) {
   let pipeline = sharp(originalPath)
@@ -459,7 +466,7 @@ async function fetchAllScryfallPages(url, maxPages = 20) {
  * pickPrintingByCollector(prints_search_uri, collectorNumber, isFoil)
  * Returns the best matching Scryfall card object, or null.
  */
-async function pickPrintingByCollector(printsSearchUri, collectorNumber, isFoil) {
+async function pickPrintingByCollector(printsSearchUri, collectorNumber, isFoil, preferOldest = false) {
   const target = normalizeCollector(collectorNumber);
   if (!target) return null;
 

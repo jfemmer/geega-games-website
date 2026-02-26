@@ -549,7 +549,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         }
 
         // Optional safety: avoid auto-inserting if OCR is too uncertain
-        if (nameConf < 45) {
+        if (nameConf < 30) {
           results.push({
             file: file.originalname,
             error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,

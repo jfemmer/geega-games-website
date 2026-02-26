@@ -548,27 +548,14 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue;
         }
 
-        // Optional safety: avoid auto-inserting if OCR is too uncertain
-        if (nameConf < 30) {
-          results.push({
-            file: file.originalname,
-            error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,
-            guessedName,
-            ms: Date.now() - perFileStart
-          });
-          continue;
-        }
-
-        // 1b) HIGH-ACCURACY OCR: COLLECTOR NUMBER (bottom line)
-        // This enables “99% correct printing” selection.
-        console.log("🔢 [fi8170] OCR(bottom line) start");
+        // 1b) OCR: bottom line (RUN EARLY FOR DEBUG)
+        console.log("🔢 [fi8170] OCR(bottom line) start (debug)");
         const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
 
         let collectorNumber = bottom.collectorNumber || null;
 
-        // ✅ Safety gate — ignore low-confidence collector numbers
+        // Safety gate
         if (collectorNumber && (bottom.confidence ?? 0) < 35) {
-          console.log("⚠️ Ignoring collectorNumber due to low confidence:", bottom.confidence);
           collectorNumber = null;
         }
 
@@ -577,6 +564,19 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           bottomConf: Math.round(bottom.confidence),
           collectorNumber
         });
+
+        // NOW apply name confidence gate
+        if (nameConf < 45) {
+          results.push({
+            file: file.originalname,
+            error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,
+            bottomText: bottom?.text || null,
+            bottomConf: Math.round(bottom?.confidence || 0),
+            ms: Date.now() - perFileStart
+          });
+          continue;
+        }
+
 
         // 2) SCRYFALL: pick the RIGHT set/printing
         console.log("🧙 [fi8170] Scryfall start");
@@ -994,6 +994,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
   if (!guessedName || guessedName.length < 3) {
     throw new Error("Could not detect card name from name bar.");
   }
+
+  
 
   if (nameConf < 45) {
     throw new Error(`Low OCR confidence (${Math.round(nameConf)}). Needs review.`);

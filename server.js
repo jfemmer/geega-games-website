@@ -994,31 +994,51 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
 
   const isFoil = !!foil;
   const setCodeFromBody = (setCode || "").trim().toLowerCase();
+  const safeCondition = (condition || "NM").trim();
 
   // 1) OCR: name bar
+  console.log("🔤 [scan-ingest] OCR(name bar) start", { originalName, filePath });
   const { name: guessedName, confidence: nameConf } = await ocrCardNameHighAccuracy(filePath, tmpDir);
+  console.log("🔤 [scan-ingest] OCR(name bar) done", {
+    guessedName,
+    nameConf: Math.round(nameConf)
+  });
 
   if (!guessedName || guessedName.length < 3) {
     throw new Error("Could not detect card name from name bar.");
   }
 
-  
-
-  if (nameConf < 45) {
-    throw new Error(`Low OCR confidence (${Math.round(nameConf)}). Needs review.`);
-  }
-
-  // 1b) OCR: bottom line (collector number)
+  // 1b) OCR: bottom line (RUN EVEN IF NAME CONF IS LOW)
+  console.log("🔢 [scan-ingest] OCR(bottom line) start");
   const bottom = await ocrCollectorNumberHighAccuracy(filePath, tmpDir);
 
-let collectorNumber = bottom.collectorNumber || null;
+  let collectorNumber = bottom.collectorNumber || null;
 
-// ✅ Safety gate
-if (collectorNumber && (bottom.confidence ?? 0) < 35) {
-  collectorNumber = null;
-}
+  // ✅ Safety gate — ignore low-confidence collector numbers
+  if (collectorNumber && (bottom.confidence ?? 0) < 35) {
+    collectorNumber = null;
+  }
+
+  console.log("🔢 [scan-ingest] OCR(bottom line) done", {
+    bottomText: bottom?.text || "",
+    bottomConf: Math.round(bottom?.confidence || 0),
+    collectorNumber
+  });
+
+  // Decide whether to allow low-confidence names through
+  const needsReview = nameConf < 45;
+  if (needsReview) {
+    console.log("⚠️ [scan-ingest] Low name OCR confidence, continuing anyway", {
+      nameConf: Math.round(nameConf),
+      guessedName,
+      collectorNumber
+    });
+    // If you still want to hard-stop low-confidence jobs, swap the next line in:
+    // throw new Error(`Low OCR confidence (${Math.round(nameConf)}). Needs review.`);
+  }
 
   // 2) Scryfall select printing
+  console.log("🧙 [scan-ingest] Scryfall start", { guessedName, setCodeFromBody, collectorNumber, isFoil });
   let card = null;
 
   const baseRes = await axios.get(
@@ -1050,18 +1070,33 @@ if (collectorNumber && (bottom.confidence ?? 0) < 35) {
 
   if (!card) throw new Error("No Scryfall card selected");
 
+  console.log("🧙 [scan-ingest] Scryfall chosen", {
+    name: card?.name,
+    set: card?.set,
+    set_name: card?.set_name,
+    collector_number: card?.collector_number
+  });
+
   const price = isFoil
     ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
     : parseFloat(card?.prices?.usd || 0);
 
+  // 3) Save to inventory
   const inventoryItem = {
     cardName: card.name,
     set: card.set_name,
-    condition,
+    condition: safeCondition,
     foil: isFoil,
     priceUsd: price,
     imageUrl: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ""
   };
+
+  console.log("💾 [scan-ingest] DB upsert start", {
+    cardName: inventoryItem.cardName,
+    set: inventoryItem.set,
+    foil: inventoryItem.foil,
+    condition: inventoryItem.condition
+  });
 
   await CardInventory.findOneAndUpdate(
     {
@@ -1077,15 +1112,18 @@ if (collectorNumber && (bottom.confidence ?? 0) < 35) {
     { upsert: true }
   );
 
+  console.log("💾 [scan-ingest] DB upsert done");
+
   return {
     ms: Date.now() - perFileStart,
     guessedName,
     nameConfidence: Math.round(nameConf),
+    needsReview,
     collectorNumber,
     chosenSet: card?.set || null,
     chosenSetName: card?.set_name || null,
     chosenCollector: card?.collector_number || null,
-    ocrTextName: null,                 // optional: store raw Tesseract output if you want
+    ocrTextName: null, // optional: store raw Tesseract output if you want
     ocrTextBottom: bottom?.text || null
   };
 }

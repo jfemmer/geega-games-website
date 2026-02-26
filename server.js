@@ -2567,6 +2567,46 @@ async function scanWorkerTick() {
   }
 }
 
+const WATCH_DIR = path.join(__dirname, "watch_folder");
+
+if (!fs.existsSync(WATCH_DIR)) {
+  fs.mkdirSync(WATCH_DIR, { recursive: true });
+}
+
+console.log("👀 Watching folder:", WATCH_DIR);
+
+fs.watch(WATCH_DIR, async (eventType, filename) => {
+  if (!filename) return;
+
+  const filePath = path.join(WATCH_DIR, filename);
+
+  // Only process images
+  if (!filename.match(/\.(jpg|jpeg|png|tif|tiff)$/i)) return;
+
+  console.log("📥 New file detected:", filename);
+
+  // Small delay so file finishes writing
+  setTimeout(async () => {
+    try {
+      await processSingleScanToInventory({
+        filePath,
+        originalName: filename,
+        condition: "NM",
+        foil: false,
+        setCode: ""
+      });
+
+      console.log("✅ Processed:", filename);
+
+      // Optional: delete file after processing
+      fs.unlinkSync(filePath);
+
+    } catch (err) {
+      console.error("❌ Failed processing:", filename, err.message);
+    }
+  }, 1000);
+});
+
 // Start worker loop
 setInterval(() => {
   scanWorkerTick().catch(err => console.error("❌ scanWorkerTick:", err));

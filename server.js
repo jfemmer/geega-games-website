@@ -503,18 +503,20 @@ async function pickPrintingByCollector(printsSearchUri, collectorNumber, isFoil)
   // - non-promo over promo
   // - newest release date (often correct for “same # reused” edge cases)
   pool.sort((a, b) => {
-    const aLang = (a.lang === "en") ? 1 : 0;
-    const bLang = (b.lang === "en") ? 1 : 0;
-    if (bLang !== aLang) return bLang - aLang;
+  const aLang = (a.lang === "en") ? 1 : 0;
+  const bLang = (b.lang === "en") ? 1 : 0;
+  if (bLang !== aLang) return bLang - aLang;
 
-    const aPromo = a.promo ? 1 : 0;
-    const bPromo = b.promo ? 1 : 0;
-    if (aPromo !== bPromo) return aPromo - bPromo; // prefer non-promo
+  const aPromo = a.promo ? 1 : 0;
+  const bPromo = b.promo ? 1 : 0;
+  if (aPromo !== bPromo) return aPromo - bPromo; // prefer non-promo
 
-    const ad = Date.parse(a.released_at || "1970-01-01");
-    const bd = Date.parse(b.released_at || "1970-01-01");
-    return bd - ad; // newest first
-  });
+  const ad = Date.parse(a.released_at || "1970-01-01");
+  const bd = Date.parse(b.released_at || "1970-01-01");
+
+  // ✅ key change:
+  return preferOldest ? (ad - bd) : (bd - ad);
+});
 
   return pool[0] || null;
 }
@@ -584,7 +586,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         let collectorNumber = bottom.collectorNumber || null;
 
         // Safety gate
-        if (collectorNumber && (bottom.confidence ?? 0) < 35) {
+        if (collectorNumber && (bottom.confidence ?? 0) < 45) {
           collectorNumber = null;
         }
 
@@ -629,7 +631,16 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             } else if (base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
               // Strong path even without setCode: search printings and match collector_number
               const picked = await pickPrintingByCollector(base.prints_search_uri, collectorNumber, isFoil);
-              card = picked || base;
+
+              if (!picked) {
+                // IMPORTANT: if we have a collector number and it didn't match, do NOT fall back to base.
+                // That is how you silently add the wrong card.
+                throw new Error(
+                  `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}". Needs review.`
+                );
+              }
+
+              card = picked;
             } else {
               // Fallback if prints_search_uri helper not present
               card = base;
@@ -1009,6 +1020,20 @@ const tradeInSchema = new mongoose.Schema({
 
 const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
 
+async function detectWhiteBorder(filePath) {
+  const { data } = await sharp(filePath)
+    .extract({ left: 5, top: 5, width: 60, height: 60 })
+    .grayscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) sum += data[i];
+  const mean = sum / data.length;
+
+  return mean > 190;
+}
+
 async function processSingleScanToInventory({ filePath, originalName, condition, foil, setCode }) {
   const perFileStart = Date.now();
   const tmpDir = path.join(__dirname, "uploads");
@@ -1037,7 +1062,7 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
   let collectorNumber = bottom.collectorNumber || null;
 
   // ✅ Safety gate — ignore low-confidence collector numbers
-  if (collectorNumber && (bottom.confidence ?? 0) < 35) {
+  if (collectorNumber && (bottom.confidence ?? 0) < 45) {
     collectorNumber = null;
   }
 
@@ -1076,19 +1101,28 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
       card = exactRes.data;
     } else if (base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
       const picked = await pickPrintingByCollector(base.prints_search_uri, collectorNumber, isFoil);
-      card = picked || base;
-    } else {
-      card = base;
-    }
-  } else {
-    if (setCodeFromBody) {
-      const query = `!"${guessedName}" set:${setCodeFromBody}`;
-      const s = await axios.get(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`);
-      card = s.data.data?.[0] || base;
-    } else {
-      card = base;
-    }
-  }
+
+      if (!picked) {
+        // IMPORTANT: if we have a collector number and it didn't match, do NOT fall back to base.
+        // That is how you silently add the wrong card.
+        throw new Error(
+          `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}". Needs review.`
+        );
+      }
+
+    card = picked;
+        } else {
+          card = base;
+        }
+      } else {
+        if (setCodeFromBody) {
+          const query = `!"${guessedName}" set:${setCodeFromBody}`;
+          const s = await axios.get(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`);
+          card = s.data.data?.[0] || base;
+        } else {
+          card = base;
+        }
+      }
 
   if (!card) throw new Error("No Scryfall card selected");
 

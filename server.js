@@ -152,34 +152,37 @@ function cleanCardName(text) {
     .trim();
 }
 
-async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false) {
+async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, dx = 0, dy = 0) {
   const meta = await sharp(originalPath).metadata();
   const W = meta.width;
   const H = meta.height;
 
-  // Fixed coords if exact match, otherwise % fallback
-  const region =
-  W === FIXED_DIMS.w && H === FIXED_DIMS.h
-    ? CROP.nameBar
-    : {
-        left: Math.floor(W * 0.08),
-        top: Math.floor(H * 0.055),
-        width: Math.floor(W * 0.78),
-        height: Math.floor(H * 0.055),
-      };
+  const base =
+    W === FIXED_DIMS.w && H === FIXED_DIMS.h
+      ? CROP.nameBar
+      : {
+          left: Math.floor(W * 0.08),
+          top: Math.floor(H * 0.055),
+          width: Math.floor(W * 0.78),
+          height: Math.floor(H * 0.055),
+        };
+
+  // apply offset + clamp inside image
+  const region = {
+    left: Math.max(0, Math.min(W - 1, base.left + dx)),
+    top: Math.max(0, Math.min(H - 1, base.top + dy)),
+    width: Math.min(base.width, W - Math.max(0, base.left + dx)),
+    height: Math.min(base.height, H - Math.max(0, base.top + dy)),
+  };
 
   let pipeline = sharp(originalPath)
     .extract(region)
     .grayscale()
     .normalize()
     .sharpen()
-    // Upscale the CROP (not the whole image) for better OCR edges:
     .resize({ width: 1400, withoutEnlargement: false });
 
-  if (useThreshold) {
-    // Stronger second pass when confidence is low
-    pipeline = pipeline.threshold(180);
-  }
+  if (useThreshold) pipeline = pipeline.threshold(180);
 
   await pipeline.toFile(outPath);
 
@@ -202,45 +205,56 @@ function recognizeWithTimeout(imagePath, ms = 30000, tesseractOptions = {}) {
 
 async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
   const ts = Date.now();
-  const nameCrop1 = path.join(tmpDir, `name_${ts}_p1.png`);
-  const nameCrop2 = path.join(tmpDir, `name_${ts}_p2.png`);
 
   const tesseractOptions = {
-    // SINGLE_LINE = PSM 7 (best for a name bar)
     tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
     tessedit_char_whitelist:
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ',-/",
+    // extra stability knobs:
+    tessedit_ocr_engine_mode: 1,   // LSTM only
+    load_system_dawg: 0,
+    load_freq_dawg: 0,
+    preserve_interword_spaces: 1,
   };
 
-  // Pass 1 (normal)
-  await cropAndPrepNameBar(originalPath, nameCrop1, false);
-  const ocr1 = await recognizeWithTimeout(nameCrop1, 90000, tesseractOptions);
-  const name1 = cleanCardName(ocr1?.data?.text);
-  const conf1 = ocr1?.data?.confidence ?? 0;
+  const offsets = [
+    { dx: 0, dy: 0 },
+    { dx: 4, dy: 0 }, { dx: -4, dy: 0 },
+    { dx: 0, dy: 4 }, { dx: 0, dy: -4 },
+    { dx: 6, dy: 2 }, { dx: -6, dy: 2 },
+    { dx: 6, dy: -2 }, { dx: -6, dy: -2 },
+  ];
 
-  // If pass 1 is good, return early
-  if (name1 && conf1 >= 65) {
-    try { if (fs.existsSync(nameCrop1)) fs.unlinkSync(nameCrop1); } catch {}
-    return { name: name1, confidence: conf1 };
+  const candidates = [];
+
+  for (let i = 0; i < offsets.length; i++) {
+    const { dx, dy } = offsets[i];
+
+    const p1 = path.join(tmpDir, `name_${ts}_o${i}_p1.png`);
+    const p2 = path.join(tmpDir, `name_${ts}_o${i}_p2.png`);
+
+    // pass 1
+    await cropAndPrepNameBar(originalPath, p1, false, dx, dy);
+    const o1 = await recognizeWithTimeout(p1, 90000, tesseractOptions);
+    const name1 = cleanCardName(o1?.data?.text);
+    const conf1 = o1?.data?.confidence ?? 0;
+    if (name1) candidates.push({ name: name1, confidence: conf1 });
+
+    // pass 2 (threshold) if needed
+    if (conf1 < 70) {
+      await cropAndPrepNameBar(originalPath, p2, true, dx, dy);
+      const o2 = await recognizeWithTimeout(p2, 90000, tesseractOptions);
+      const name2 = cleanCardName(o2?.data?.text);
+      const conf2 = o2?.data?.confidence ?? 0;
+      if (name2) candidates.push({ name: name2, confidence: conf2 });
+    }
   }
 
-  // Pass 2 (threshold retry)
-  await cropAndPrepNameBar(originalPath, nameCrop2, true);
-  const ocr2 = await recognizeWithTimeout(nameCrop2, 90000, tesseractOptions);
-  const name2 = cleanCardName(ocr2?.data?.text);
-  const conf2 = ocr2?.data?.confidence ?? 0;
+  // Pick best candidate (confidence first, then longer name)
+  candidates.sort((a, b) => (b.confidence - a.confidence) || (b.name.length - a.name.length));
 
-  // Cleanup
-  for (const p of [nameCrop1, nameCrop2]) {
-    try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
-  }
-
-  // Choose best
-  if (!name1 && name2) return { name: name2, confidence: conf2 };
-  if (!name2 && name1) return { name: name1, confidence: conf1 };
-  if (name2 && conf2 > conf1) return { name: name2, confidence: conf2 };
-
-  return { name: name1 || name2 || "", confidence: Math.max(conf1, conf2) };
+  const best = candidates[0] || { name: "", confidence: 0 };
+  return best;
 }
 
 function cleanBottomText(text) {
@@ -324,6 +338,14 @@ function buildCollectorRegions(W, H) {
       width: Math.floor(W * 0.36),
       height: Math.floor(H * 0.022),
     },
+    // Template F: taller height to capture clipped text
+    {
+      left: Math.floor(W * 0.05),
+      top: Math.floor(H * 0.925),
+      width: Math.floor(W * 0.36),
+      height: Math.floor(H * 0.030),
+    },
+
   ];
 }
 
@@ -2612,5 +2634,126 @@ setInterval(() => {
   scanWorkerTick().catch(err => console.error("❌ scanWorkerTick:", err));
 }, 1000);
 
+// -------------------- ScanJob Worker --------------------
+// Put this BELOW: ScanJob model + processSingleScanToInventory(...)
+
+const WORKER_ENABLED = String(process.env.SCAN_WORKER_ENABLED || "true") === "true";
+const WORKER_POLL_MS = Number(process.env.SCAN_WORKER_POLL_MS || 1500);
+const WORKER_CONCURRENCY = Number(process.env.SCAN_WORKER_CONCURRENCY || 1);
+
+async function lockNextJob() {
+  // Atomically claim 1 queued job
+  const now = new Date();
+  return await ScanJob.findOneAndUpdate(
+    { status: "queued" },
+    {
+      $set: { status: "processing", lockedAt: now },
+      $inc: { attempts: 1 }
+    },
+    { sort: { createdAt: 1 }, new: true }
+  );
+}
+
+async function runOneJob(job) {
+  const { _id, filePath, originalName, condition, foil, setCode } = job;
+
+  try {
+    const result = await processSingleScanToInventory({
+      filePath,
+      originalName,
+      condition,
+      foil,
+      setCode
+    });
+
+    // Mark done + store useful debug fields
+    await ScanJob.findByIdAndUpdate(_id, {
+      $set: {
+        status: "done",
+        finishedAt: new Date(),
+        guessedName: result.guessedName,
+        nameConfidence: result.nameConfidence,
+        collectorNumber: result.collectorNumber,
+        chosenSet: result.chosenSet,
+        chosenSetName: result.chosenSetName,
+        chosenCollector: result.chosenCollector,
+        ocrTextName: result.ocrTextName,
+        ocrTextBottom: result.ocrTextBottom,
+        lastError: ""
+      }
+    });
+
+    return { ok: true, jobId: String(_id), ...result };
+  } catch (e) {
+    const msg = e?.message || String(e);
+
+    await ScanJob.findByIdAndUpdate(_id, {
+      $set: {
+        status: "failed",
+        finishedAt: new Date(),
+        lastError: msg
+      }
+    });
+
+    return { ok: false, jobId: String(_id), error: msg };
+  } finally {
+    // Optional: delete original file after processing
+    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+  }
+}
+
+async function workerTick() {
+  // Simple concurrency: claim + process up to N jobs per tick
+  const jobs = [];
+  for (let i = 0; i < WORKER_CONCURRENCY; i++) {
+    // eslint-disable-next-line no-await-in-loop
+    const job = await lockNextJob();
+    if (!job) break;
+    jobs.push(job);
+  }
+  if (!jobs.length) return;
+
+  await Promise.all(jobs.map(j => runOneJob(j)));
+}
+
+function startScanWorker() {
+  if (!WORKER_ENABLED) {
+    console.log("⏸️ Scan worker disabled (SCAN_WORKER_ENABLED=false)");
+    return;
+  }
+
+  console.log("🧵 Scan worker started", {
+    pollMs: WORKER_POLL_MS,
+    concurrency: WORKER_CONCURRENCY
+  });
+
+  setInterval(() => {
+    workerTick().catch(err => console.error("❌ workerTick error:", err));
+  }, WORKER_POLL_MS);
+}
+
+// Get one job
+app.get("/api/scan-jobs/:id", async (req, res) => {
+  try {
+    const job = await ScanJob.findById(req.params.id).lean();
+    if (!job) return res.status(404).json({ message: "Not found" });
+    res.json(job);
+  } catch (e) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// List recent jobs (for debugging)
+app.get("/api/scan-jobs", async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 50), 200);
+    const jobs = await ScanJob.find({}).sort({ createdAt: -1 }).limit(limit).lean();
+    res.json({ jobs });
+  } catch (e) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
+startScanWorker();

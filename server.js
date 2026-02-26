@@ -289,7 +289,14 @@ function buildCollectorRegions(W, H) {
   // These are *percentage-based* so they still work if resolution changes.
   // The idea: try bottom-left in a few slightly different spots/heights.
   return [
-    // Template A: modern-ish bottom-left, tight
+    // Template E: older frame higher collector number
+    {
+      left: Math.floor(W * 0.05),
+      top: Math.floor(H * 0.885),
+      width: Math.floor(W * 0.35),
+      height: Math.floor(H * 0.028),
+    },
+        // Template A: modern-ish bottom-left, tight
     {
       left: Math.floor(W * 0.05),
       top: Math.floor(H * 0.93),

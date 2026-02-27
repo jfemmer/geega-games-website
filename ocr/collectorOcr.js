@@ -1,3 +1,15 @@
+const fs = require("fs");
+const path = require("path");
+const Tesseract = require("tesseract.js");
+
+const { recognizeWithTimeout } = require("./nameOcr");
+const {
+  cropAndPrepBottomLine,
+  buildCollectorRegions
+} = require("./imageUtils");
+
+const { cleanCollectorNumber } = require("./constants");
+
 function cleanBottomText(text) {
   return (text || "")
     .replace(/\n/g, " ")

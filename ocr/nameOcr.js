@@ -5,11 +5,27 @@ const { cropAndPrepNameBar } = require("./imageUtils");
 const { OCR_THRESHOLDS, NAME_OFFSETS } = require("./constants");
 
 function cleanCardName(text) {
-  return (text || "")
+  let s = (text || "")
     .replace(/\n/g, " ")
     .replace(/\s+/g, " ")
-    .replace(/[^A-Za-z0-9 ',-/]/g, "") // keep split cards: Fire // Ice
     .trim();
+
+  // Common OCR junk at the start from borders/glare:
+  // - leading punctuation
+  // - repeated letters like "EEE " or "III "
+  s = s.replace(/^[^A-Za-z0-9]+/g, "");              // trim non-alnum prefix
+  s = s.replace(/^([A-Z])\1{2,}\s+/g, "");           // "EEE Lightning Bolt" -> "Lightning Bolt"
+  s = s.replace(/^([ilI\|]){2,}\s+/g, "");           // "||| Counterspell" -> "Counterspell"
+
+  // Keep split cards like "Fire // Ice"
+  s = s.replace(/[^A-Za-z0-9 ',-/]/g, "").trim();
+
+  // If there’s still a tiny junk prefix like "E Lightning Bolt", strip it
+  if (s.length > 4) {
+    s = s.replace(/^[A-Z]\s+(?=[A-Za-z]{3,})/, "");
+  }
+
+  return s;
 }
 
 // Updated recognizeWithTimeout: supports passing Tesseract options

@@ -32,10 +32,6 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 }
 
 
-if (!fs.existsSync(DEBUG_DIR)) {
-  fs.mkdirSync(DEBUG_DIR, { recursive: true });
-}
-
 
 const upload = multer({
   dest: UPLOAD_DIR,

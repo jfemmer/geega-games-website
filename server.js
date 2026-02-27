@@ -31,6 +31,11 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+const OCR_DEBUG_DIR = path.join(__dirname, "ocr_debug");
+if (!fs.existsSync(OCR_DEBUG_DIR)) {
+  fs.mkdirSync(OCR_DEBUG_DIR, { recursive: true });
+}
+
 const inFlightUploads = new Set();
 
 
@@ -167,7 +172,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
     const results = [];
 
     // Use a temp dir for crops (you can change this if you want)
-    const tmpDir = path.join(__dirname, "uploads");
+    const tmpDir = OCR_DEBUG_DIR; // <-- send crops here
     try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
 
     // Batch-level setCode (optional, best if you can provide it)
@@ -710,7 +715,7 @@ const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
 
 async function processSingleScanToInventory({ filePath, originalName, condition, foil, setCode }) {
   const perFileStart = Date.now();
-  const tmpDir = path.join(__dirname, "uploads");
+  const tmpDir = OCR_DEBUG_DIR;
   try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
 
   const isFoil = !!foil;

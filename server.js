@@ -2247,7 +2247,13 @@ async function scanWorkerTick() {
         await job.save();
       } finally {
         // cleanup original uploaded file
-        try { if (job.filePath && fs.existsSync(job.filePath)) fs.unlinkSync(job.filePath); } catch {}
+        // NEW (only delete when done/failed)
+      try {
+        const terminal = job.status === "done" || job.status === "failed";
+        if (terminal && job.filePath && fs.existsSync(job.filePath)) {
+          fs.unlinkSync(job.filePath);
+        }
+      } catch {}
 
         scanInFlight--;
       }

@@ -1,3 +1,5 @@
+const path = require("path");
+const fs = require("fs");
 const FIXED_DIMS = { w: 771, h: 1061 };
 
 
@@ -12,7 +14,7 @@ const CROP = {
 
 const DEBUG_OCR = true;
 
-const DEBUG_DIR = path.join(__dirname, "ocr_debug");
+const DEBUG_DIR = path.join(__dirname, "..", "ocr_debug");
 
 module.exports = {
   FIXED_DIMS,

@@ -143,13 +143,7 @@ async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
 // ---------- UPDATED ROUTE ----------
 app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
   const started = Date.now();
-  const reqId = crypto.randomUUID();
-
-  console.log("🚨 [fi8170] ROUTE HIT", {
-    reqId,
-    time: new Date().toISOString(),
-    files: req.files?.length || 0
-  });
+  const reqId = `fi8170_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
   try {
     const { condition, foil } = req.body;
@@ -165,52 +159,32 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
     });
 
     if (!files || files.length === 0) {
-      return res.status(400).json({ message: "No images uploaded." });
+      return res.status(400).json({ message: "No images uploaded.", reqId });
     }
 
     const isFoil = String(foil) === "true";
     const results = [];
 
-    // Use a temp dir for crops (you can change this if you want)
-    const tmpDir = OCR_DEBUG_DIR; // <-- send crops here
+    // temp dir for crops
+    const tmpDir = path.join(__dirname, "uploads");
     try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
 
-    // Batch-level setCode (optional, best if you can provide it)
+    // Batch-level setCode (optional)
     const setCodeFromBody = (req.body.setCode || "").trim().toLowerCase();
 
-    // ✅ De-dupe within the SAME request (prevents repeated OCR on same multer entry)
-    const seenInRequest = new Set();
+    // ✅ OPTIONAL: dedupe repeated uploads (helps if multer or client retries)
+    const seen = new Set();
     const uniqueFiles = [];
     for (const f of files) {
-      const key = f.path || `${f.originalname}__${f.size}`;
-      if (seenInRequest.has(key)) {
-        console.log("🛑 [fi8170] DUP FILE IN REQUEST - SKIP", {
-          reqId,
-          originalname: f.originalname,
-          path: f.path,
-          size: f.size
-        });
-        continue;
-      }
-      seenInRequest.add(key);
+      const key = `${f.originalname}:${f.size}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       uniqueFiles.push(f);
     }
 
     for (const file of uniqueFiles) {
       const perFileStart = Date.now();
       const originalPath = file.path;
-      const uploadKey = file.path; // multer disk path
-
-      // ✅ Global in-flight guard (prevents concurrent duplicate processing)
-      if (inFlightUploads.has(uploadKey)) {
-        console.log("🛑 [fi8170] IN-FLIGHT DUPLICATE - SKIP", {
-          reqId,
-          originalname: file.originalname,
-          path: file.path
-        });
-        continue;
-      }
-      inFlightUploads.add(uploadKey);
 
       try {
         console.log("🖼️ [fi8170] file start:", {
@@ -220,45 +194,34 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           size: file.size
         });
 
-        // 1) HIGH-ACCURACY OCR: NAME BAR
-        console.log("🔤 [fi8170] OCR(name bar) start", {
-          reqId,
-          file: file.originalname,
-          path: file.path
-        });
-
-        const { name: guessedName, confidence: nameConf } =
+        // OCR
+        console.log("🔤 [fi8170] OCR(name bar) start", { reqId, originalName: file.originalname, filePath: file.path });
+        const { name: guessedName, confidence: nameConf, error: nameErr } =
           await ocrCardNameHighAccuracy(originalPath, tmpDir);
 
         console.log("🔤 [fi8170] OCR(name bar) done", {
           reqId,
           guessedName,
-          nameConf: Math.round(nameConf)
+          nameConf: Math.round(nameConf),
+          nameErr: nameErr || null
         });
 
         if (!guessedName || guessedName.length < 3) {
           results.push({
             file: file.originalname,
             error: "Could not detect card name from name bar.",
+            nameErr: nameErr || null,
             ms: Date.now() - perFileStart
           });
           continue;
         }
 
-        // 1b) OCR: bottom line (RUN EARLY FOR DEBUG)
-        console.log("🔢 [fi8170] OCR(bottom line) start (debug)", {
-          reqId,
-          file: file.originalname,
-          path: file.path
-        });
-
+        // Collector OCR (early for debug)
+        console.log("🔢 [fi8170] OCR(bottom line) start", { reqId });
         const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
-        let collectorNumber = bottom.collectorNumber || null;
 
-        // Safety gate
-        if (collectorNumber && (bottom.confidence ?? 0) < 45) {
-          collectorNumber = null;
-        }
+        let collectorNumber = bottom.collectorNumber || null;
+        if (collectorNumber && (bottom.confidence ?? 0) < 45) collectorNumber = null;
 
         console.log("🔢 [fi8170] OCR(bottom line) done", {
           reqId,
@@ -267,11 +230,12 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           collectorNumber
         });
 
-        // NOW apply name confidence gate
+        // Name confidence gate
         if (nameConf < 45) {
           results.push({
             file: file.originalname,
             error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,
+            guessedName,
             bottomText: bottom?.text || null,
             bottomConf: Math.round(bottom?.confidence || 0),
             ms: Date.now() - perFileStart
@@ -279,44 +243,37 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue;
         }
 
-        // 2) SCRYFALL: pick the RIGHT set/printing
-        console.log("🧙 [fi8170] Scryfall start", { reqId, guessedName });
+        // Scryfall pick
+        console.log("🧙 [fi8170] Scryfall start", { reqId });
 
         let card = null;
 
         try {
-          // Always get a base card first (fast + reliable)
           const baseRes = await axios.get(
             `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
           );
           const base = baseRes.data;
 
           if (collectorNumber) {
-            // Best path: if you know the set code, do exact set+collector lookup
             if (setCodeFromBody) {
               const exactRes = await axios.get(
                 `https://api.scryfall.com/cards/${encodeURIComponent(setCodeFromBody)}/${encodeURIComponent(collectorNumber)}`
               );
               card = exactRes.data;
             } else if (base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
-              // Strong path even without setCode: search printings and match collector_number
               const picked = await pickPrintingByCollector(base.prints_search_uri, collectorNumber, isFoil);
 
               if (!picked) {
-                // IMPORTANT: if we have a collector number and it didn't match, do NOT fall back to base.
-                // That is how you silently add the wrong card.
                 throw new Error(
-                  `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}". Needs review.`
+                  `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}".`
                 );
               }
 
               card = picked;
             } else {
-              // Fallback if prints_search_uri helper not present
               card = base;
             }
           } else {
-            // No collector number available: still try to constrain by set code if provided
             if (setCodeFromBody) {
               const query = `!"${guessedName}" set:${setCodeFromBody}`;
               const s = await axios.get(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`);
@@ -349,7 +306,6 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
           : parseFloat(card?.prices?.usd || 0);
 
-        // 3) Save to inventory (no quantity conflict)
         const inventoryItem = {
           cardName: card.name,
           set: card.set_name,
@@ -375,8 +331,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             condition: inventoryItem.condition
           },
           {
-            $inc: { quantity: 1 },        // creates quantity on insert automatically
-            $setOnInsert: inventoryItem    // do NOT include quantity here
+            $inc: { quantity: 1 },
+            $setOnInsert: inventoryItem
           },
           { upsert: true }
         );
@@ -408,10 +364,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           ms: Date.now() - perFileStart
         });
       } finally {
-        // ✅ release in-flight guard
-        inFlightUploads.delete(uploadKey);
-
-        // Cleanup original uploads (keep if you want debugging)
+        // Cleanup original upload for THIS batch route
         try { if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath); } catch {}
       }
     }
@@ -425,8 +378,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
     return res.json({ reqId, results });
 
   } catch (err) {
-    console.error("❌ [fi8170] route error:", { reqId, err });
-    return res.status(500).json({ error: "Server error processing scans.", reqId });
+    console.error("❌ [fi8170] route error:", { err });
+    return res.status(500).json({ error: "Server error processing scans." });
   }
 });
 

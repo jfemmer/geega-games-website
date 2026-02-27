@@ -1,7 +1,7 @@
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
-const { FIXED_DIMS, CROP } = require("./constants");
+const { FIXED_DIMS, CROP, DEBUG_OCR, DEBUG_DIR } = require("./constants");
 
 async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, dx = 0, dy = 0) {
   const meta = await sharp(originalPath).metadata();

@@ -1,3 +1,5 @@
+const axios = require("axios");
+
 function normalizeCollector(str) {
   return String(str || "")
     .toLowerCase()

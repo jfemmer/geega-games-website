@@ -1,3 +1,8 @@
+const sharp = require("sharp");
+const path = require("path");
+const fs = require("fs");
+const { FIXED_DIMS, CROP } = require("./constants");
+
 async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, dx = 0, dy = 0) {
   const meta = await sharp(originalPath).metadata();
   const W = meta.width;
@@ -122,3 +127,10 @@ function buildCollectorRegions(W, H) {
 
   ];
 }
+
+module.exports = {
+  cropAndPrepNameBar,
+  cropAndPrepBottomLine,
+  buildCollectorRegions,
+  detectWhiteBorder
+};

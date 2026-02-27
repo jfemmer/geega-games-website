@@ -23,6 +23,7 @@ const {
   shouldAutoIngest,
   enqueueForReview
 } = require("./ocr");
+const { refineByArtworkHash } = require("./ocr/scryfallPicker");
 
 
 const uspsUserID = process.env.USPS_USER_ID;
@@ -296,28 +297,46 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             card = exactRes.data;
             matchCount = 1;
           }
-          // Otherwise: use prints_search_uri + pro picker (returns meta)
           else if (collectorNumber && base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
             const meta = await pickPrintingByCollector(
               base.prints_search_uri,
               collectorNumber,
               isFoil,
               false,
-              {
-                returnMeta: true,
-                // If batch setCode exists but no exact endpoint was used (eg missing collector), you can still pass it.
-                // setCode: setCodeFromBody || undefined,
-              }
+              { returnMeta: true }
             );
 
-            card = meta?.chosen || null;
-            matchCount = meta?.matchCount ?? 999;
+            let chosen = meta?.chosen || null;
+            let matchCount = meta?.matchCount ?? 999;
+            const pool = meta?.pool || [];
 
-            if (!card) {
+            // 🧠 NEW: Artwork hash refinement (only if ambiguous)
+            if (pool.length > 1) {
+              const { chosen: hashChosen, bestDist } =
+                await refineByArtworkHash(originalPath, pool, { maxDist: 8 });
+
+              if (hashChosen) {
+                chosen = hashChosen;
+                matchCount = 1;
+
+                console.log("🧩 [fi8170] Hash-resolved printing", {
+                  reqId,
+                  bestDist,
+                  set: chosen.set,
+                  collector: chosen.collector_number
+                });
+              } else {
+                console.log("🧩 [fi8170] Hash match inconclusive (kept original choice)");
+              }
+            }
+
+            if (!chosen) {
               throw new Error(
                 `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}".`
               );
             }
+
+            card = chosen;
           }
           // No collector number: if setCode given, do a search constrained to set
           else if (!collectorNumber && setCodeFromBody) {

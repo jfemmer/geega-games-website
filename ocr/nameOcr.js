@@ -2,6 +2,7 @@ const path = require("path");
 const fs = require("fs");
 const Tesseract = require("tesseract.js");
 const { cropAndPrepNameBar } = require("./imageUtils");
+const { OCR_THRESHOLDS, NAME_OFFSETS } = require("./constants");
 
 function cleanCardName(text) {
   return (text || "")
@@ -53,74 +54,39 @@ async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
     preserve_interword_spaces: 1,
   };
 
-  const offsets = [
-    { dx: 0, dy: 0 },
-    { dx: 4, dy: 0 }, { dx: -4, dy: 0 },
-    { dx: 0, dy: 4 }, { dx: 0, dy: -4 },
-    { dx: 6, dy: 2 }, { dx: -6, dy: 2 },
-    { dx: 6, dy: -2 }, { dx: -6, dy: -2 },
-  ];
+  const offsets = NAME_OFFSETS;
 
   const candidates = [];
 
   for (let i = 0; i < offsets.length; i++) {
     const { dx, dy } = offsets[i];
 
-    const p1 = path.join(tmpDir, `name_${ts}_o${i}_p1.png`);
-    const p2 = path.join(tmpDir, `name_${ts}_o${i}_p2.png`);
+    for (let t = 0; t < OCR_THRESHOLDS.length; t++) {
+      const thr = OCR_THRESHOLDS[t]; // null => no threshold
+      const useThreshold = thr !== null && thr !== undefined;
 
-    // pass 1
-    try {
-      console.log("🟣 [nameOcr] cropping name bar ->", { p1, dx, dy });
-      await cropAndPrepNameBar(originalPath, p1, false, dx, dy);
+      const out = path.join(tmpDir, `name_${ts}_o${i}_t${t}.png`);
 
-      if (!fs.existsSync(p1)) {
-        console.log("🔴 [nameOcr] crop did not write file (p1):", p1);
+      // crop
+      try {
+        console.log("🟣 [nameOcr] cropping name bar ->", { out, dx, dy, thr });
+        await cropAndPrepNameBar(originalPath, out, useThreshold, dx, dy, thr ?? 180);
+        if (!fs.existsSync(out)) continue;
+      } catch (e) {
+        console.log("🔴 [nameOcr] cropAndPrepNameBar failed:", e.message);
         continue;
       }
 
-      console.log("🟣 [nameOcr] crop saved ->", p1);
-    } catch (e) {
-      console.log("🔴 [nameOcr] cropAndPrepNameBar failed (p1):", e.message);
-      continue; // skip OCR for this offset
-    }
-
-    let o1;
-    try {
-      o1 = await recognizeWithTimeout(p1, 90000, tesseractOptions);
-    } catch (e) {
-      console.log("🔴 [nameOcr] Tesseract failed (p1):", e.message);
-      continue;
-    }
-
-    const name1 = cleanCardName(o1?.data?.text);
-    const conf1 = o1?.data?.confidence ?? 0;
-    if (name1) candidates.push({ name: name1, confidence: conf1 });
-
-    // pass 2 (threshold) if needed
-    if (conf1 < 70) {
+      // OCR
       try {
-        console.log("🟣 [nameOcr] cropping name bar (threshold) ->", { p2, dx, dy });
-        await cropAndPrepNameBar(originalPath, p2, true, dx, dy);
-
-        if (!fs.existsSync(p2)) {
-          console.log("🔴 [nameOcr] crop did not write file (p2):", p2);
-          continue;
-        }
-
-        console.log("🟣 [nameOcr] crop saved ->", p2);
+        const o = await recognizeWithTimeout(out, 90000, tesseractOptions);
+        const name = cleanCardName(o?.data?.text);
+        const conf = o?.data?.confidence ?? 0;
+        if (name) candidates.push({ name, confidence: conf });
+        // early win
+        if (name && conf >= 85) break;
       } catch (e) {
-        console.log("🔴 [nameOcr] cropAndPrepNameBar failed (p2):", e.message);
-        continue;
-      }
-
-      try {
-        const o2 = await recognizeWithTimeout(p2, 90000, tesseractOptions);
-        const name2 = cleanCardName(o2?.data?.text);
-        const conf2 = o2?.data?.confidence ?? 0;
-        if (name2) candidates.push({ name: name2, confidence: conf2 });
-      } catch (e) {
-        console.log("🔴 [nameOcr] Tesseract failed (p2):", e.message);
+        console.log("🔴 [nameOcr] Tesseract failed:", e.message);
       }
     }
   }
@@ -146,5 +112,5 @@ async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
 
 module.exports = {
   ocrCardNameHighAccuracy,
-  recognizeWithTimeout
+  recognizeWithTimeout,
 };

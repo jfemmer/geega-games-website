@@ -206,6 +206,17 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         const nameConf = nameRes?.confidence ?? 0;
         const nameErr = nameRes?.error || null;
 
+        let resolvedName = guessedName;
+
+        try {
+          const named = await axios.get(
+            `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+          );
+          resolvedName = named.data?.name || guessedName;
+        } catch {
+          resolvedName = guessedName;
+        }
+
         console.log("🔤 [fi8170] OCR(name bar) done", {
           reqId,
           guessedName,
@@ -284,8 +295,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         let matchCount = 999; // how many printings survived after filters (from picker meta)
 
         try {
-          const baseRes = await axios.get(
-            `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+            const baseRes = await axios.get(
+            `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(resolvedName)}`
           );
           base = baseRes.data;
 
@@ -867,8 +878,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
   let card = null;
 
   const baseRes = await axios.get(
-    `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
-  );
+  `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(resolvedName)}`
+);
   const base = baseRes.data;
 
   if (collectorNumber) {

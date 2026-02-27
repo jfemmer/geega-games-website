@@ -1,7 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 const Tesseract = require("tesseract.js");
-const { cropAndPrepNameBar } = require("./whereverThatFunctionLives");
+const { cropAndPrepNameBar } = require("./imageUtils");
 
 function cleanCardName(text) {
   return (text || "")
@@ -143,3 +143,8 @@ async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
 
   return best;
 }
+
+module.exports = {
+  ocrCardNameHighAccuracy,
+  recognizeWithTimeout
+};

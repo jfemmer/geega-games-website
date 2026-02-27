@@ -42,6 +42,7 @@ async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, d
     .extract(region)
     .grayscale()
     .normalize()
+    .blur(0.3) 
     .sharpen()
     .resize({ width: 1400, withoutEnlargement: false });
 

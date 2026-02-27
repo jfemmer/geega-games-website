@@ -3,7 +3,19 @@ const path = require("path");
 const fs = require("fs");
 const { FIXED_DIMS, CROP, DEBUG_OCR, DEBUG_DIR } = require("./constants");
 
+function ensureDir(dir) {
+  try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+}
+
+function samePath(a, b) {
+  try { return path.resolve(a) === path.resolve(b); } catch { return a === b; }
+}
+
 async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, dx = 0, dy = 0) {
+  // Ensure parent dirs exist
+  ensureDir(path.dirname(outPath));
+  if (DEBUG_OCR) ensureDir(DEBUG_DIR);
+
   const meta = await sharp(originalPath).metadata();
   const W = meta.width;
   const H = meta.height;
@@ -19,12 +31,12 @@ async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, d
         };
 
   // apply offset + clamp inside image
-  const region = {
-    left: Math.max(0, Math.min(W - 1, base.left + dx)),
-    top: Math.max(0, Math.min(H - 1, base.top + dy)),
-    width: Math.min(base.width, W - Math.max(0, base.left + dx)),
-    height: Math.min(base.height, H - Math.max(0, base.top + dy)),
-  };
+  const left = Math.max(0, Math.min(W - 2, base.left + dx));
+  const top = Math.max(0, Math.min(H - 2, base.top + dy));
+  const width = Math.max(1, Math.min(base.width, W - left));
+  const height = Math.max(1, Math.min(base.height, H - top));
+
+  const region = { left, top, width, height };
 
   let pipeline = sharp(originalPath)
     .extract(region)
@@ -39,14 +51,34 @@ async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, d
 
   if (DEBUG_OCR) {
     const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
-    await sharp(outPath).toFile(debugCopy);
-    console.log("🟣 Saved NAME crop to:", debugCopy);
+
+    // ✅ avoid "Cannot use same file for input and output"
+    if (!samePath(debugCopy, outPath)) {
+      await sharp(outPath).toFile(debugCopy);
+      console.log("🟣 Saved NAME crop to:", debugCopy);
+    } else {
+      console.log("🟣 Saved NAME crop to (no-copy):", outPath);
+    }
   }
 }
 
 async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold = false) {
+  // Ensure parent dirs exist
+  ensureDir(path.dirname(outPath));
+  if (DEBUG_OCR) ensureDir(DEBUG_DIR);
+
+  // Clamp region safely (avoid sharp extract errors if region goes out of bounds)
+  const meta = await sharp(originalPath).metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  const left = Math.max(0, Math.min(W - 2, region.left));
+  const top = Math.max(0, Math.min(H - 2, region.top));
+  const width = Math.max(1, Math.min(region.width, W - left));
+  const height = Math.max(1, Math.min(region.height, H - top));
+
   let pipeline = sharp(originalPath)
-    .extract(region)
+    .extract({ left, top, width, height })
     .grayscale()
     .normalize()
     .sharpen()
@@ -58,8 +90,14 @@ async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold
 
   if (DEBUG_OCR) {
     const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
-    await sharp(outPath).toFile(debugCopy);
-    console.log("🔵 Saved BOTTOM crop to:", debugCopy);
+
+    // ✅ avoid "Cannot use same file for input and output"
+    if (!samePath(debugCopy, outPath)) {
+      await sharp(outPath).toFile(debugCopy);
+      console.log("🔵 Saved BOTTOM crop to:", debugCopy);
+    } else {
+      console.log("🔵 Saved BOTTOM crop to (no-copy):", outPath);
+    }
   }
 }
 
@@ -78,9 +116,6 @@ async function detectWhiteBorder(filePath) {
 }
 
 function buildCollectorRegions(W, H) {
-  // If your FI-8170 scans are consistently 771x1061, you can tune these.
-  // These are *percentage-based* so they still work if resolution changes.
-  // The idea: try bottom-left in a few slightly different spots/heights.
   return [
     // Template E: older frame higher collector number
     {
@@ -89,7 +124,7 @@ function buildCollectorRegions(W, H) {
       width: Math.floor(W * 0.35),
       height: Math.floor(H * 0.028),
     },
-        // Template A: modern-ish bottom-left, tight
+    // Template A: modern-ish bottom-left, tight
     {
       left: Math.floor(W * 0.05),
       top: Math.floor(H * 0.93),
@@ -124,7 +159,6 @@ function buildCollectorRegions(W, H) {
       width: Math.floor(W * 0.36),
       height: Math.floor(H * 0.030),
     },
-
   ];
 }
 
@@ -132,5 +166,5 @@ module.exports = {
   cropAndPrepNameBar,
   cropAndPrepBottomLine,
   buildCollectorRegions,
-  detectWhiteBorder
+  detectWhiteBorder,
 };

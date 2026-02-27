@@ -31,6 +31,8 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
+const inFlightUploads = new Set();
+
 
 
 const upload = multer({
@@ -131,15 +133,25 @@ async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
 // - ocrCardNameHighAccuracy(...) helper
 // - ocrCollectorNumberHighAccuracy(...) helper (bottom-line OCR)
 // - pickPrintingByCollector(...) helper (optional but recommended)
+// Put these near the top of server.js (once)
 
+// ---------- UPDATED ROUTE ----------
 app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
   const started = Date.now();
+  const reqId = crypto.randomUUID();
+
+  console.log("🚨 [fi8170] ROUTE HIT", {
+    reqId,
+    time: new Date().toISOString(),
+    files: req.files?.length || 0
+  });
 
   try {
     const { condition, foil } = req.body;
     const files = req.files;
 
     console.log("📥 [fi8170] HIT", {
+      reqId,
       time: new Date().toISOString(),
       files: files?.length || 0,
       condition,
@@ -161,22 +173,60 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
     // Batch-level setCode (optional, best if you can provide it)
     const setCodeFromBody = (req.body.setCode || "").trim().toLowerCase();
 
-    for (const file of files) {
+    // ✅ De-dupe within the SAME request (prevents repeated OCR on same multer entry)
+    const seenInRequest = new Set();
+    const uniqueFiles = [];
+    for (const f of files) {
+      const key = f.path || `${f.originalname}__${f.size}`;
+      if (seenInRequest.has(key)) {
+        console.log("🛑 [fi8170] DUP FILE IN REQUEST - SKIP", {
+          reqId,
+          originalname: f.originalname,
+          path: f.path,
+          size: f.size
+        });
+        continue;
+      }
+      seenInRequest.add(key);
+      uniqueFiles.push(f);
+    }
+
+    for (const file of uniqueFiles) {
       const perFileStart = Date.now();
       const originalPath = file.path;
+      const uploadKey = file.path; // multer disk path
+
+      // ✅ Global in-flight guard (prevents concurrent duplicate processing)
+      if (inFlightUploads.has(uploadKey)) {
+        console.log("🛑 [fi8170] IN-FLIGHT DUPLICATE - SKIP", {
+          reqId,
+          originalname: file.originalname,
+          path: file.path
+        });
+        continue;
+      }
+      inFlightUploads.add(uploadKey);
 
       try {
         console.log("🖼️ [fi8170] file start:", {
+          reqId,
           originalname: file.originalname,
           path: file.path,
           size: file.size
         });
 
         // 1) HIGH-ACCURACY OCR: NAME BAR
-        console.log("🔤 [fi8170] OCR(name bar) start");
+        console.log("🔤 [fi8170] OCR(name bar) start", {
+          reqId,
+          file: file.originalname,
+          path: file.path
+        });
+
         const { name: guessedName, confidence: nameConf } =
           await ocrCardNameHighAccuracy(originalPath, tmpDir);
+
         console.log("🔤 [fi8170] OCR(name bar) done", {
+          reqId,
           guessedName,
           nameConf: Math.round(nameConf)
         });
@@ -191,9 +241,13 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         }
 
         // 1b) OCR: bottom line (RUN EARLY FOR DEBUG)
-        console.log("🔢 [fi8170] OCR(bottom line) start (debug)");
-        const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
+        console.log("🔢 [fi8170] OCR(bottom line) start (debug)", {
+          reqId,
+          file: file.originalname,
+          path: file.path
+        });
 
+        const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
         let collectorNumber = bottom.collectorNumber || null;
 
         // Safety gate
@@ -202,6 +256,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         }
 
         console.log("🔢 [fi8170] OCR(bottom line) done", {
+          reqId,
           bottomText: bottom.text,
           bottomConf: Math.round(bottom.confidence),
           collectorNumber
@@ -219,9 +274,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue;
         }
 
-
         // 2) SCRYFALL: pick the RIGHT set/printing
-        console.log("🧙 [fi8170] Scryfall start");
+        console.log("🧙 [fi8170] Scryfall start", { reqId, guessedName });
 
         let card = null;
 
@@ -268,17 +322,18 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           }
 
           if (!card) throw new Error("No Scryfall card selected");
-
         } catch (err) {
           results.push({
             file: file.originalname,
             error: `Scryfall lookup failed: ${guessedName}`,
+            details: err?.message || String(err),
             ms: Date.now() - perFileStart
           });
           continue;
         }
 
         console.log("🧙 [fi8170] Scryfall chosen:", {
+          reqId,
           name: card?.name,
           set: card?.set,
           set_name: card?.set_name,
@@ -299,7 +354,14 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           imageUrl: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ""
         };
 
-        console.log("💾 [fi8170] DB upsert start");
+        console.log("💾 [fi8170] DB upsert start", {
+          reqId,
+          cardName: inventoryItem.cardName,
+          set: inventoryItem.set,
+          foil: inventoryItem.foil,
+          condition: inventoryItem.condition
+        });
+
         await CardInventory.findOneAndUpdate(
           {
             cardName: inventoryItem.cardName,
@@ -313,7 +375,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           },
           { upsert: true }
         );
-        console.log("💾 [fi8170] DB upsert done");
+
+        console.log("💾 [fi8170] DB upsert done", { reqId });
 
         results.push({
           file: file.originalname,
@@ -328,24 +391,37 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         });
 
       } catch (err) {
-        console.error("❌ [fi8170] per-file error:", file?.originalname, err?.message || err);
+        console.error("❌ [fi8170] per-file error:", {
+          reqId,
+          file: file?.originalname,
+          message: err?.message || err
+        });
+
         results.push({
           file: file.originalname,
           error: err?.message || "Unknown error",
           ms: Date.now() - perFileStart
         });
       } finally {
+        // ✅ release in-flight guard
+        inFlightUploads.delete(uploadKey);
+
         // Cleanup original uploads (keep if you want debugging)
         try { if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath); } catch {}
       }
     }
 
-    console.log("✅ [fi8170] DONE ms:", Date.now() - started);
-    return res.json({ results });
+    console.log("✅ [fi8170] DONE", {
+      reqId,
+      ms: Date.now() - started,
+      processed: uniqueFiles.length
+    });
+
+    return res.json({ reqId, results });
 
   } catch (err) {
-    console.error("❌ [fi8170] route error:", err);
-    return res.status(500).json({ error: "Server error processing scans." });
+    console.error("❌ [fi8170] route error:", { reqId, err });
+    return res.status(500).json({ error: "Server error processing scans.", reqId });
   }
 });
 

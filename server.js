@@ -18,7 +18,10 @@ const fs = require('fs');
 const {
   ocrCardNameHighAccuracy,
   ocrCollectorNumberHighAccuracy,
-  pickPrintingByCollector
+  pickPrintingByCollector,
+  computeOverallScore,
+  shouldAutoIngest,
+  enqueueForReview
 } = require("./ocr");
 
 
@@ -140,7 +143,7 @@ async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
 // - pickPrintingByCollector(...) helper (optional but recommended)
 // Put these near the top of server.js (once)
 
-// ---------- UPDATED ROUTE ----------
+// ---------- UPDATED ROUTE (99% pipeline + review queue) ----------
 app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
   const started = Date.now();
   const reqId = `fi8170_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -165,8 +168,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
     const isFoil = String(foil) === "true";
     const results = [];
 
-    // temp dir for crops
-    const tmpDir = path.join(__dirname, "uploads");
+    // Use a temp dir for crops (Railway-safe if /tmp exists)
+    const tmpDir = process.env.RAILWAY_ENVIRONMENT ? "/tmp/uploads" : path.join(__dirname, "uploads");
     try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
 
     // Batch-level setCode (optional)
@@ -194,101 +197,167 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           size: file.size
         });
 
-        // OCR
+        // 1) OCR: Name
         console.log("🔤 [fi8170] OCR(name bar) start", { reqId, originalName: file.originalname, filePath: file.path });
-        const { name: guessedName, confidence: nameConf, error: nameErr } =
-          await ocrCardNameHighAccuracy(originalPath, tmpDir);
+        const nameRes = await ocrCardNameHighAccuracy(originalPath, tmpDir);
+
+        const guessedName = nameRes?.name || "";
+        const nameConf = nameRes?.confidence ?? 0;
+        const nameErr = nameRes?.error || null;
 
         console.log("🔤 [fi8170] OCR(name bar) done", {
           reqId,
           guessedName,
           nameConf: Math.round(nameConf),
-          nameErr: nameErr || null
+          nameErr
         });
 
         if (!guessedName || guessedName.length < 3) {
+          enqueueForReview?.({
+            reqId,
+            file: file.originalname,
+            reason: "name_not_detected",
+            name: nameRes
+          });
+
           results.push({
             file: file.originalname,
+            status: "review",
             error: "Could not detect card name from name bar.",
-            nameErr: nameErr || null,
+            nameErr,
             ms: Date.now() - perFileStart
           });
           continue;
         }
 
-        // Collector OCR (early for debug)
+        // 2) OCR: Collector number (strict + jitter + thresholds inside module)
         console.log("🔢 [fi8170] OCR(bottom line) start", { reqId });
         const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
 
-        let collectorNumber = bottom.collectorNumber || null;
-        if (collectorNumber && (bottom.confidence ?? 0) < 45) collectorNumber = null;
+        // IMPORTANT: do NOT null it out too aggressively here — collectorOcr.js already gates standalone parses harder.
+        let collectorNumber = bottom?.collectorNumber || null;
 
         console.log("🔢 [fi8170] OCR(bottom line) done", {
           reqId,
-          bottomText: bottom.text,
-          bottomConf: Math.round(bottom.confidence),
+          bottomText: bottom?.text || "",
+          bottomConf: Math.round(bottom?.confidence ?? 0),
           collectorNumber
         });
 
-        // Name confidence gate
+        // 3) Basic name confidence gate (early)
         if (nameConf < 45) {
+          const score = computeOverallScore?.({
+            nameConfidence: nameConf,
+            collectorConfidence: bottom?.confidence ?? 0,
+            hadCollector: !!collectorNumber,
+            matchCount: 999
+          }) ?? 0;
+
+          enqueueForReview?.({
+            reqId,
+            file: file.originalname,
+            reason: "low_name_confidence",
+            score,
+            name: nameRes,
+            collector: bottom
+          });
+
           results.push({
             file: file.originalname,
+            status: "review",
             error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,
             guessedName,
             bottomText: bottom?.text || null,
             bottomConf: Math.round(bottom?.confidence || 0),
+            score,
             ms: Date.now() - perFileStart
           });
           continue;
         }
 
-        // Scryfall pick
+        // 4) Scryfall pick
         console.log("🧙 [fi8170] Scryfall start", { reqId });
 
+        let base = null;
         let card = null;
+        let matchCount = 999; // how many printings survived after filters (from picker meta)
 
         try {
           const baseRes = await axios.get(
             `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
           );
-          const base = baseRes.data;
+          base = baseRes.data;
 
-          if (collectorNumber) {
-            if (setCodeFromBody) {
-              const exactRes = await axios.get(
-                `https://api.scryfall.com/cards/${encodeURIComponent(setCodeFromBody)}/${encodeURIComponent(collectorNumber)}`
-              );
-              card = exactRes.data;
-            } else if (base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
-              const picked = await pickPrintingByCollector(base.prints_search_uri, collectorNumber, isFoil);
-
-              if (!picked) {
-                throw new Error(
-                  `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}".`
-                );
+          // If user provided setCode + we have collector number, Scryfall has an exact endpoint:
+          if (collectorNumber && setCodeFromBody) {
+            const exactRes = await axios.get(
+              `https://api.scryfall.com/cards/${encodeURIComponent(setCodeFromBody)}/${encodeURIComponent(collectorNumber)}`
+            );
+            card = exactRes.data;
+            matchCount = 1;
+          }
+          // Otherwise: use prints_search_uri + pro picker (returns meta)
+          else if (collectorNumber && base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
+            const meta = await pickPrintingByCollector(
+              base.prints_search_uri,
+              collectorNumber,
+              isFoil,
+              false,
+              {
+                returnMeta: true,
+                // If batch setCode exists but no exact endpoint was used (eg missing collector), you can still pass it.
+                // setCode: setCodeFromBody || undefined,
               }
+            );
 
-              card = picked;
-            } else {
-              card = base;
+            card = meta?.chosen || null;
+            matchCount = meta?.matchCount ?? 999;
+
+            if (!card) {
+              throw new Error(
+                `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}".`
+              );
             }
-          } else {
-            if (setCodeFromBody) {
-              const query = `!"${guessedName}" set:${setCodeFromBody}`;
-              const s = await axios.get(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`);
-              card = s.data.data?.[0] || base;
-            } else {
-              card = base;
-            }
+          }
+          // No collector number: if setCode given, do a search constrained to set
+          else if (!collectorNumber && setCodeFromBody) {
+            const query = `!"${guessedName}" set:${setCodeFromBody}`;
+            const s = await axios.get(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`);
+            card = s.data?.data?.[0] || base;
+            matchCount = s.data?.data?.length || 999;
+          }
+          // Fallback: just use base card
+          else {
+            card = base;
+            matchCount = 999;
           }
 
           if (!card) throw new Error("No Scryfall card selected");
         } catch (err) {
+          const score = computeOverallScore?.({
+            nameConfidence: nameConf,
+            collectorConfidence: bottom?.confidence ?? 0,
+            hadCollector: !!collectorNumber,
+            matchCount
+          }) ?? 0;
+
+          enqueueForReview?.({
+            reqId,
+            file: file.originalname,
+            reason: "scryfall_lookup_failed",
+            score,
+            guessedName,
+            name: nameRes,
+            collector: bottom,
+            details: err?.message || String(err)
+          });
+
           results.push({
             file: file.originalname,
+            status: "review",
             error: `Scryfall lookup failed: ${guessedName}`,
             details: err?.message || String(err),
+            score,
             ms: Date.now() - perFileStart
           });
           continue;
@@ -299,9 +368,55 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           name: card?.name,
           set: card?.set,
           set_name: card?.set_name,
-          collector_number: card?.collector_number
+          collector_number: card?.collector_number,
+          matchCount
         });
 
+        // 5) Compute overall score + confidence gate (THIS is the 99% behavior)
+        const score = computeOverallScore?.({
+          nameConfidence: nameConf,
+          collectorConfidence: bottom?.confidence ?? 0,
+          hadCollector: !!collectorNumber,
+          matchCount,
+          // setSymbolScore: null, // later when you add symbol matching
+        }) ?? 0;
+
+        if (!shouldAutoIngest?.(score)) {
+          enqueueForReview?.({
+            reqId,
+            file: file.originalname,
+            reason: "below_confidence_threshold",
+            score,
+            matchCount,
+            guessedName,
+            chosen: {
+              name: card?.name,
+              set: card?.set,
+              set_name: card?.set_name,
+              collector_number: card?.collector_number
+            },
+            name: nameRes,
+            collector: bottom
+          });
+
+          results.push({
+            file: file.originalname,
+            status: "review",
+            score,
+            reason: "below_confidence_threshold",
+            guessedName,
+            nameConfidence: Math.round(nameConf),
+            collectorNumber: collectorNumber || null,
+            chosenSet: card?.set || null,
+            chosenSetName: card?.set_name || null,
+            chosenCollector: card?.collector_number || null,
+            matchCount,
+            ms: Date.now() - perFileStart
+          });
+          continue; // ⛔ DO NOT insert
+        }
+
+        // 6) Price + DB upsert (SAFE to ingest here)
         const price = isFoil
           ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
           : parseFloat(card?.prices?.usd || 0);
@@ -320,7 +435,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           cardName: inventoryItem.cardName,
           set: inventoryItem.set,
           foil: inventoryItem.foil,
-          condition: inventoryItem.condition
+          condition: inventoryItem.condition,
+          score
         });
 
         await CardInventory.findOneAndUpdate(
@@ -341,6 +457,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
 
         results.push({
           file: file.originalname,
+          status: "added",
           success: card.name,
           guessedName,
           nameConfidence: Math.round(nameConf),
@@ -348,6 +465,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           chosenSet: card?.set || null,
           chosenSetName: card?.set_name || null,
           chosenCollector: card?.collector_number || null,
+          matchCount,
+          score,
           ms: Date.now() - perFileStart
         });
 
@@ -358,8 +477,16 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           message: err?.message || err
         });
 
+        enqueueForReview?.({
+          reqId,
+          file: file?.originalname,
+          reason: "per_file_exception",
+          details: err?.message || String(err)
+        });
+
         results.push({
           file: file.originalname,
+          status: "review",
           error: err?.message || "Unknown error",
           ms: Date.now() - perFileStart
         });

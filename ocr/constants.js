@@ -19,5 +19,4 @@ const DEBUG_DIR = path.join(__dirname, "..", "ocr_debug");
 module.exports = {
   FIXED_DIMS,
   CROP,
-  cleanCollectorNumber
 };

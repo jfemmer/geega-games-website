@@ -6,6 +6,7 @@ const Tesseract = require("tesseract.js");
 
 const { recognizeWithTimeout } = require("./nameOcr");
 const { cropAndPrepBottomLine, buildCollectorRegions } = require("./imageUtils");
+const { OCR_THRESHOLDS, COLLECTOR_OFFSETS } = require("./constants");
 
 function cleanBottomText(text) {
   return (text || "")
@@ -25,14 +26,14 @@ function parseCollectorNumberStrict(bottomText) {
   const m1 = s.match(/(\d{1,4})\s*\/\s*(\d{1,4})/);
   if (m1) {
     const n = parseInt(m1[1], 10);
-    return Number.isFinite(n) ? String(n) : null;
+    return Number.isFinite(n) ? { value: String(n), mode: "slash" } : null;
   }
 
   // Fallback: standalone number (less safe)
   const m2 = s.match(/\b(\d{1,4})\b/);
   if (m2) {
     const n = parseInt(m2[1], 10);
-    return Number.isFinite(n) ? String(n) : null;
+    return Number.isFinite(n) ? { value: String(n), mode: "standalone" } : null;
   }
 
   return null;
@@ -63,62 +64,74 @@ async function ocrCollectorNumberHighAccuracy(originalPath, tmpDir) {
 
   const candidates = [];
 
+  // Try multiple region templates + small jitter offsets + multiple thresholds
   for (let i = 0; i < regions.length; i++) {
     const region = regions[i];
 
-    const p1 = path.join(tmpDir, `bottom_${ts}_r${i}_p1.png`);
-    const p2 = path.join(tmpDir, `bottom_${ts}_r${i}_p2.png`);
+    for (let o = 0; o < COLLECTOR_OFFSETS.length; o++) {
+      const { dx, dy } = COLLECTOR_OFFSETS[o];
 
-    try {
-      // pass 1 (normal)
-      await cropAndPrepBottomLine(originalPath, p1, region, false);
-      const o1 = await recognizeWithTimeout(p1, 90000, optsStrict);
-      const t1 = cleanBottomText(o1?.data?.text);
-      const c1 = o1?.data?.confidence ?? 0;
-      const cn1 = parseCollectorNumberStrict(t1);
+      for (let t = 0; t < OCR_THRESHOLDS.length; t++) {
+        const thr = OCR_THRESHOLDS[t];
+        const useThreshold = thr !== null && thr !== undefined;
 
-      candidates.push({ regionIndex: i, pass: 1, text: t1, conf: c1, collectorNumber: cn1 });
+        const out = path.join(tmpDir, `bottom_${ts}_r${i}_o${o}_t${t}.png`);
 
-      // Early win: clean parse + decent conf
-      if (cn1 && c1 >= 55) {
-        return { text: t1, confidence: c1, collectorNumber: cn1 };
-      }
+        try {
+          await cropAndPrepBottomLine(originalPath, out, region, useThreshold, dx, dy, thr ?? 180);
+          const ocr = await recognizeWithTimeout(out, 90000, optsStrict);
+          const text = cleanBottomText(ocr?.data?.text);
+          const conf = ocr?.data?.confidence ?? 0;
+          const parsed = parseCollectorNumberStrict(text);
 
-      // pass 2 (threshold)
-      await cropAndPrepBottomLine(originalPath, p2, region, true);
-      const o2 = await recognizeWithTimeout(p2, 90000, optsStrict);
-      const t2 = cleanBottomText(o2?.data?.text);
-      const c2 = o2?.data?.confidence ?? 0;
-      const cn2 = parseCollectorNumberStrict(t2);
+          const collectorNumber = parsed?.value ?? null;
+          const parseMode = parsed?.mode ?? null;
 
-      candidates.push({ regionIndex: i, pass: 2, text: t2, conf: c2, collectorNumber: cn2 });
+          candidates.push({
+            regionIndex: i,
+            offsetIndex: o,
+            thrIndex: t,
+            text,
+            conf,
+            collectorNumber,
+            parseMode,
+          });
 
-      if (cn2 && c2 >= 45) {
-        return { text: t2, confidence: c2, collectorNumber: cn2 };
-      }
-    } catch (e) {
-      candidates.push({
-        regionIndex: i,
-        pass: 0,
-        text: "",
-        conf: 0,
-        collectorNumber: null,
-        err: e?.message || String(e),
-      });
-    } finally {
-      // cleanup temp crops (optional; comment out if you want to inspect)
-      for (const p of [p1, p2]) {
-        try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
+          // ✅ Confidence gating:
+          // - slash parses are reliable at lower conf
+          // - standalone parses must be much higher confidence to avoid poisoning
+          const minConf = parseMode === "standalone" ? 75 : 55;
+
+          if (collectorNumber && conf >= minConf) {
+            return { text, confidence: conf, collectorNumber };
+          }
+        } catch (e) {
+          candidates.push({
+            regionIndex: i,
+            offsetIndex: o,
+            thrIndex: t,
+            text: "",
+            conf: 0,
+            collectorNumber: null,
+            parseMode: null,
+            err: e?.message || String(e),
+          });
+        } finally {
+          // cleanup temp crops (optional; comment out if you want to inspect)
+          try { if (fs.existsSync(out)) fs.unlinkSync(out); } catch {}
+        }
       }
     }
   }
 
   // Pick best candidate:
   // 1) prefer those that parsed a collector number
-  // 2) higher confidence
+  // 2) prefer slash parses over standalone
+  // 3) higher confidence
   candidates.sort(
     (a, b) =>
       (b.collectorNumber ? 1 : 0) - (a.collectorNumber ? 1 : 0) ||
+      ((b.parseMode === 'slash') ? 1 : 0) - ((a.parseMode === 'slash') ? 1 : 0) ||
       (b.conf - a.conf)
   );
 

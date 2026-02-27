@@ -19,6 +19,7 @@ const {
   ocrCardNameHighAccuracy,
   ocrCollectorNumberHighAccuracy,
   pickPrintingByCollector,
+  refineByArtworkHash,      // ✅ must exist now
   computeOverallScore,
   shouldAutoIngest,
   enqueueForReview

@@ -11,7 +11,7 @@ function samePath(a, b) {
   try { return path.resolve(a) === path.resolve(b); } catch { return a === b; }
 }
 
-async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, dx = 0, dy = 0) {
+async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, dx = 0, dy = 0, thresholdValue = 180) {
   // Ensure parent dirs exist
   ensureDir(path.dirname(outPath));
   if (DEBUG_OCR) ensureDir(DEBUG_DIR);
@@ -45,7 +45,7 @@ async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, d
     .sharpen()
     .resize({ width: 1400, withoutEnlargement: false });
 
-  if (useThreshold) pipeline = pipeline.threshold(180);
+  if (useThreshold) pipeline = pipeline.threshold(thresholdValue);
 
   await pipeline.toFile(outPath);
 
@@ -62,7 +62,7 @@ async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, d
   }
 }
 
-async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold = false) {
+async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold = false, dx = 0, dy = 0, thresholdValue = 180) {
   // Ensure parent dirs exist
   ensureDir(path.dirname(outPath));
   if (DEBUG_OCR) ensureDir(DEBUG_DIR);
@@ -72,8 +72,8 @@ async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold
   const W = meta.width;
   const H = meta.height;
 
-  const left = Math.max(0, Math.min(W - 2, region.left));
-  const top = Math.max(0, Math.min(H - 2, region.top));
+  const left = Math.max(0, Math.min(W - 2, (region.left + dx)));
+  const top = Math.max(0, Math.min(H - 2, (region.top + dy)));
   const width = Math.max(1, Math.min(region.width, W - left));
   const height = Math.max(1, Math.min(region.height, H - top));
 
@@ -84,7 +84,7 @@ async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold
     .sharpen()
     .resize({ width: 1600, withoutEnlargement: false });
 
-  if (useThreshold) pipeline = pipeline.threshold(180);
+  if (useThreshold) pipeline = pipeline.threshold(thresholdValue);
 
   await pipeline.toFile(outPath);
 

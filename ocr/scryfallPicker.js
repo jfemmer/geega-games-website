@@ -30,7 +30,7 @@ async function fetchAllScryfallPages(url, maxPages = 20) {
  * pickPrintingByCollector(prints_search_uri, collectorNumber, isFoil)
  * Returns the best matching Scryfall card object, or null.
  */
-async function pickPrintingByCollector(printsSearchUri, collectorNumber, isFoil, preferOldest = false) {
+async function pickPrintingByCollector(printsSearchUri, collectorNumber, isFoil, preferOldest = false, options = {}) {
   const target = normalizeCollector(collectorNumber);
   if (!target) return null;
 
@@ -60,6 +60,28 @@ async function pickPrintingByCollector(printsSearchUri, collectorNumber, isFoil,
     }
   }
 
+  // Optional extra disambiguators (pro-level):
+  const wantSet = (options.setCode || options.set || null);
+  const wantYear = options.year ? parseInt(options.year, 10) : null;
+
+  // If caller provides set code (e.g., from set symbol matching), filter to that set first.
+  if (wantSet) {
+    const s = String(wantSet).toLowerCase();
+    const bySet = exact.filter(c => String(c.set || "").toLowerCase() === s);
+    if (bySet.length) exact = bySet;
+  }
+
+  // If caller provides a copyright year, narrow candidates by release year window (±1).
+  if (Number.isFinite(wantYear) && wantYear > 1900 && wantYear < 2100) {
+    const byYear = exact.filter(c => {
+      const y = (c.released_at || "").slice(0, 4);
+      const yy = parseInt(y, 10);
+      if (!Number.isFinite(yy)) return true;
+      return Math.abs(yy - wantYear) <= 1;
+    });
+    if (byYear.length) exact = byYear;
+  }
+
   if (!exact.length) return null;
 
   // Prefer finish that matches what you’re ingesting
@@ -72,24 +94,29 @@ async function pickPrintingByCollector(printsSearchUri, collectorNumber, isFoil,
   // If multiple still match, prefer:
   // - English
   // - non-promo over promo
-  // - newest release date (often correct for “same # reused” edge cases)
+  // - newest/oldest release date (configurable)
   pool.sort((a, b) => {
-  const aLang = (a.lang === "en") ? 1 : 0;
-  const bLang = (b.lang === "en") ? 1 : 0;
-  if (bLang !== aLang) return bLang - aLang;
+    const aLang = (a.lang === "en") ? 1 : 0;
+    const bLang = (b.lang === "en") ? 1 : 0;
+    if (bLang !== aLang) return bLang - aLang;
 
-  const aPromo = a.promo ? 1 : 0;
-  const bPromo = b.promo ? 1 : 0;
-  if (aPromo !== bPromo) return aPromo - bPromo; // prefer non-promo
+    const aPromo = a.promo ? 1 : 0;
+    const bPromo = b.promo ? 1 : 0;
+    if (aPromo !== bPromo) return aPromo - bPromo; // prefer non-promo
 
-  const ad = Date.parse(a.released_at || "1970-01-01");
-  const bd = Date.parse(b.released_at || "1970-01-01");
+    const ad = Date.parse(a.released_at || "1970-01-01");
+    const bd = Date.parse(b.released_at || "1970-01-01");
 
-  // ✅ key change:
-  return preferOldest ? (ad - bd) : (bd - ad);
-});
+    return preferOldest ? (ad - bd) : (bd - ad);
+  });
 
-  return pool[0] || null;
+  const chosen = pool[0] || null;
+
+  if (options && options.returnMeta) {
+    return { chosen, matchCount: pool.length, pool };
+  }
+
+  return chosen;
 }
 
 module.exports = {

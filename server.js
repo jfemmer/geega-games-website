@@ -24,7 +24,6 @@ const {
   shouldAutoIngest,
   enqueueForReview
 } = require("./ocr");
-const { refineByArtworkHash } = require("./ocr/scryfallPicker");
 
 
 const uspsUserID = process.env.USPS_USER_ID;

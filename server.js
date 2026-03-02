@@ -1039,7 +1039,7 @@ app.get('/verify-email', async (req, res) => {
     await user.save();
 
     const siteUrl = process.env.PUBLIC_SITE_URL || 'https://www.geega-games.com';
-    return res.redirect(`${siteUrl}/login.html?verified=1`);
+    return res.redirect(`${siteUrl}/login.html?verified=1&email=${encodeURIComponent(normalizedEmail)}`);
   } catch (err) {
     console.error('❌ verify-email error:', err);
     return res.status(500).send('Server error verifying email.');

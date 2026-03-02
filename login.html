@@ -103,6 +103,7 @@
   </form>
 
   <p id="error-message" class="error-message"></p>
+  <p id="success-message" style="color:#1b7f3a;font-weight:bold;margin-top:10px;min-height:18px;"></p>
 
   <!-- ✅ Shown only if backend says user is not verified -->
   <div id="verify-box" style="display:none; margin-top: 10px;">
@@ -126,6 +127,7 @@
 
   const verifyBox = document.getElementById('verify-box');
   const resendBtn = document.getElementById('resend-btn');
+  const successEl = document.getElementById('success-message');
 
   // We'll cache the last attempted email so "Resend" knows where to send
   let lastEmail = "";

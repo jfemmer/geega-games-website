@@ -220,6 +220,19 @@
       resendBtn.textContent = "Resend Verification Email";
     }
   });
+
+  // ✅ Show verification success message
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const successEl = document.getElementById('success-message');
+
+  if (params.get('verified') === '1') {
+    successEl.textContent = "✅ Your email has been successfully verified! You can now log in.";
+    
+    // Optional: clean URL so it doesn’t stay there
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+})();
 </script>
 
 </body>

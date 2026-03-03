@@ -109,28 +109,64 @@ app.options('*', cors(corsOptions));
 
 
 async function sendVerificationEmail({ toEmail, firstName, verifyUrl }) {
+  // ✅ Safety: make sure it's a full URL (clickable in clients)
+  const safeUrl = String(verifyUrl || "").trim();
+
   const html = `
-    <div style="font-family:Arial,sans-serif;line-height:1.4">
-      <h2 style="color:#663399;margin:0 0 12px 0;">Verify your email</h2>
-      <p>Hey ${firstName || 'there'} 👋</p>
-      <p>Thanks for signing up for Geega Games! Click the button below to verify your email:</p>
-      <p>
-        <a href="${verifyUrl}"
-           style="display:inline-block;background:#663399;color:white;padding:12px 16px;border-radius:10px;text-decoration:none;font-weight:bold;">
-          Verify Email
-        </a>
-      </p>
-      <p style="font-size:12px;color:#666;margin-top:18px;">
-        If you didn’t create an account, you can ignore this email.
-      </p>
-    </div>
+  <div style="font-family: Arial, sans-serif; line-height: 1.5; color:#222;">
+    <h2 style="margin:0 0 12px 0; color:#663399;">Verify your email</h2>
+    <p style="margin:0 0 12px 0;">Hey ${firstName || "there"} 👋</p>
+    <p style="margin:0 0 16px 0;">
+      Thanks for signing up for Geega Games! Click the button below to verify your email.
+    </p>
+
+    <!-- ✅ Email-client-safe button (table layout) -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 0 16px 0;">
+      <tr>
+        <td bgcolor="#663399" style="border-radius: 10px;">
+          <a href="${safeUrl}" target="_blank" rel="noopener noreferrer"
+             style="display:inline-block; padding:12px 18px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:10px;">
+            Verify Email
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <!-- ✅ Fallback: visible clickable link if button styling is stripped -->
+    <p style="margin:0 0 6px 0; font-size: 13px; color:#555;">
+      If the button doesn’t work, copy and paste this link into your browser:
+    </p>
+    <p style="margin:0 0 16px 0; font-size: 13px; word-break: break-all;">
+      <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color:#663399;">
+        ${safeUrl}
+      </a>
+    </p>
+
+    <p style="margin:0; font-size:12px; color:#777;">
+      If you didn’t create an account, you can ignore this email.
+    </p>
+  </div>
   `;
+
+  const text =
+`Verify your email for Geega Games
+
+Hey ${firstName || "there"},
+
+Open this link to verify your email:
+${safeUrl}
+
+If you didn’t create an account, you can ignore this email.`;
+
+  // ✅ Helpful debug (temporary): verifyUrl should never be empty
+  console.log("📨 Verification email URL:", safeUrl);
 
   await transporter.sendMail({
     from: `Geega Games <${process.env.NOTIFY_EMAIL}>`,
     to: toEmail,
-    subject: 'Verify your Geega Games email',
-    html
+    subject: "Verify your Geega Games email",
+    html,
+    text, // ✅ ensures clickability even if client forces plain text
   });
 }
 

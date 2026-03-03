@@ -89,6 +89,54 @@
       font-weight: 600;
       font-size: 13px;
     }
+
+    .success-banner {
+  margin-top: 18px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #f3f0ff, #e6ddff);
+  border: 1px solid #cbb8ff;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: fadeSlideIn 0.4s ease forwards;
+}
+
+.success-icon {
+  width: 34px;
+  height: 34px;
+  background-color: rebeccapurple;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.success-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: #333;
+}
+
+.success-text strong {
+  font-size: 15px;
+  color: rebeccapurple;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
   </style>
 </head>
 <body>
@@ -103,7 +151,13 @@
   </form>
 
   <p id="error-message" class="error-message"></p>
-  <p id="success-message" style="color:#1b7f3a;font-weight:bold;margin-top:10px;min-height:18px;"></p>
+  <div id="success-banner" class="success-banner" style="display:none;">
+  <div class="success-icon">✓</div>
+  <div class="success-text">
+    <strong>Email Verified Successfully</strong>
+    <span>You can now log in to your Geega Games account.</span>
+  </div>
+</div>
 
   <!-- ✅ Shown only if backend says user is not verified -->
   <div id="verify-box" style="display:none; margin-top: 10px;">
@@ -224,12 +278,12 @@
   // ✅ Show verification success message
 (function () {
   const params = new URLSearchParams(window.location.search);
-  const successEl = document.getElementById('success-message');
+  const banner = document.getElementById('success-banner');
 
   if (params.get('verified') === '1') {
-    successEl.textContent = "✅ Your email has been successfully verified! You can now log in.";
-    
-    // Optional: clean URL so it doesn’t stay there
+    banner.style.display = "flex";
+
+    // Clean the URL
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 })();

@@ -346,7 +346,7 @@ async function saveAddress() {
   const input = document.getElementById('autocomplete');
 
   // ✅ Only save if a Google Places suggestion was selected
-  const full = (window.selectedFormattedAddress || "").trim();
+  const full = (selectedFormattedAddress || "").trim();
 
   if (!full) {
     alert("Please select your full address from the dropdown suggestions (don’t just type it).");

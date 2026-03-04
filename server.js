@@ -1439,6 +1439,17 @@ app.post('/signup', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // ✅ Build ONE full address string (prefers already-formatted addresses)
+    const addr = String(address || '').trim();
+    const st = String(state || '').trim();
+    const zp = String(zip || '').trim();
+
+    // If the address already looks like a formatted address (has commas), keep it as-is.
+    // Otherwise, build it from address + state + zip.
+    const addressFull = addr.includes(',')
+      ? addr
+      : [addr, st, zp].filter(Boolean).join(', ');
+
     // ✅ Create email verification token
     const { token, tokenHash, expires } = createEmailVerificationToken();
 
@@ -1449,9 +1460,14 @@ app.post('/signup', async (req, res) => {
       email: normalizedEmail,
       password: hashedPassword,
       phone,
-      address,
-      state,
-      zip,
+
+      // ✅ store ONE full string
+      address: addressFull,
+
+      // Optional: keep these for now to avoid breaking anything else,
+      // but you can remove them later once you're fully migrated.
+      state: st || undefined,
+      zip: zp || undefined,
 
       announcementNotifications: {
         enabled: announcementNotifications?.enabled ?? false,
@@ -1556,10 +1572,9 @@ app.patch('/api/users/:id', async (req, res) => {
     );
 
     if (!updated) return res.status(404).json({ message: 'User not found.' });
-
-    res.json({ message: 'Address updated.', user: updated });
+    res.json({ message: 'User updated.', user: updated });
   } catch (err) {
-    console.error('❌ Failed to update address:', err);
+    console.error('❌ Failed to update user:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });

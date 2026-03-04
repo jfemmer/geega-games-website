@@ -285,233 +285,257 @@
   </div>
 
   <script>
-    const API_BASE = 'https://geega-games-website-production.up.railway.app';
+  const API_BASE = 'https://geega-games-website-production.up.railway.app';
 
-    function logout() {
-      localStorage.clear();
-      window.location.href = "index.html";
-    }
-
-    function editAddress() {
-  const modal = document.getElementById('address-modal');
-  const input = document.getElementById('autocomplete');
-  const current = document.getElementById('account-address').textContent;
-
-  modal.style.display = 'flex';
-
-  // Pre-fill the address input
-  if (current && current !== '—') {
-    input.value = current.replace(/\n/g, ', ');
+  function logout() {
+    localStorage.clear();
+    window.location.href = "index.html";
   }
 
-  setTimeout(() => {
-    if (!window._accountAutocompleteInit) {
-      initAutocomplete();
-      window._accountAutocompleteInit = true;
-    }
-  }, 100);
-}
-
-    function closeModal() {
-      document.getElementById('address-modal').style.display = 'none';
-    }
-
-    let selectedFormattedAddress = "";
-
-function initAutocomplete() {
-  const input = document.getElementById('autocomplete');
-  const autocomplete = new google.maps.places.Autocomplete(input, {
-    types: ['address'],
-    componentRestrictions: { country: 'us' },
-    fields: ['formatted_address']
-  });
-
-  autocomplete.addListener('place_changed', () => {
-    const place = autocomplete.getPlace();
-    selectedFormattedAddress = place?.formatted_address || "";
-    if (selectedFormattedAddress) {
-      input.value = selectedFormattedAddress;
-    }
-  });
-
-  // If they manually type after selecting, invalidate the selection
-  input.addEventListener('input', () => {
-    if (input.value !== selectedFormattedAddress) {
-      selectedFormattedAddress = "";
-    }
-  });
-}
-
-async function saveAddress() {
-  const input = document.getElementById('autocomplete');
-
-  // ✅ ONLY save what Google returned (formatted_address)
-  const full = (selectedFormattedAddress || "").trim();
-
-  if (!full) {
-    alert("Please click an address from the dropdown list.");
-    input.focus();
-    return;
+  function closeModal() {
+    document.getElementById('address-modal').style.display = 'none';
   }
 
-  const userId = localStorage.getItem('userId');
-  if (!userId) return;
+  // ✅ Globals (window-scoped so everything reads the same value)
+  window.selectedFormattedAddress = "";
+  window._accountAutocomplete = null;
 
-  // Show immediately
-  document.getElementById('account-address').textContent = full.split(", ").join("\n");
+  function editAddress() {
+    const modal = document.getElementById('address-modal');
+    const input = document.getElementById('autocomplete');
+    const current = document.getElementById('account-address').textContent;
 
-  closeModal();
+    modal.style.display = 'flex';
 
-  try {
-    const res = await fetch(`${API_BASE}/api/users/${userId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: full })
-    });
+    // Pre-fill the address input
+    if (current && current !== '—') {
+      input.value = current.replace(/\n/g, ', ');
+    }
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.message || "Update failed");
-
-    // Confirm saved value
-    const saved = (data?.user?.address || "").trim();
-    document.getElementById('account-address').textContent =
-      saved ? saved.split(", ").join("\n") : "—";
-
-    console.log("✅ Address saved:", saved);
-  } catch (err) {
-    console.error("❌ Address update error:", err);
-    alert("Could not save address. Please try again.");
-  }
-}
-
-
-    async function loadAccountInfo() {
-  const userId = localStorage.getItem('userId');
-  if (!userId) return;
-
-  try {
-    const res = await fetch(`${API_BASE}/api/users/${userId}`);
-    const user = await res.json();
-    
-    // ✅ Set email and address
-    document.getElementById('account-email').textContent = user?.email || '—';
-    document.getElementById('account-address').textContent = formatShippingAddress(user);
-  } catch (err) {
-    console.error('❌ Error loading user info:', err);
+    // Wait a tick so the input is visible before attaching Autocomplete
+    setTimeout(() => initAutocomplete(true), 150);
   }
 
-  try {
-    const res = await fetch(`${API_BASE}/api/orders`);
-    const allOrders = await res.json();
-    const myOrders = allOrders.filter(o => o.userId === userId || o.userId?._id === userId || o.userId?.toString() === userId);
-    const container = document.getElementById('order-list');
+  function initAutocomplete(forceReinit = false) {
+    const input = document.getElementById('autocomplete');
 
-    if (myOrders.length === 0) {
-      container.innerHTML = '<p>No orders found.</p>';
+    // Google script not ready yet
+    if (!window.google?.maps?.places) {
+      console.warn("Google Places not loaded yet...");
       return;
     }
 
-    const orderHtmlArr = await Promise.all(myOrders.map(async (o) => {
-      const status = o.status?.toLowerCase();
-      let statusClass = '';
-      let statusText = o.status;
+    if (!input) {
+      console.warn("Autocomplete input not found.");
+      return;
+    }
 
-      if (status === 'packing') {
-        statusClass = 'status-packing';
-        if (o.packedAt) {
-          statusText = `Packing started ${new Date(o.packedAt).toLocaleString()}`;
-        }
-      } else if (status === 'dropped off') {
-        statusClass = 'status-dropped-off';
-        if (o.droppedOffAt) {
-          const trackingHtml = await getTrackingUpdate(o.trackingNumber);
-          statusText = `Dropped off on ${new Date(o.droppedOffAt).toLocaleString()}<br>${trackingHtml}`;
-        }
+    // If we already created it and not forcing reinit, do nothing
+    if (window._accountAutocomplete && !forceReinit) return;
+
+    // If forcing reinit, clear old listeners + instance
+    if (window._accountAutocomplete && forceReinit) {
+      try {
+        google.maps.event.clearInstanceListeners(input);
+      } catch (e) {}
+      window._accountAutocomplete = null;
+    }
+
+    window.selectedFormattedAddress = "";
+
+    window._accountAutocomplete = new google.maps.places.Autocomplete(input, {
+      types: ['address'],
+      componentRestrictions: { country: 'us' },
+      fields: ['formatted_address']
+    });
+
+    window._accountAutocomplete.addListener('place_changed', () => {
+      const place = window._accountAutocomplete.getPlace();
+      const formatted = (place?.formatted_address || "").trim();
+
+      window.selectedFormattedAddress = formatted;
+
+      // Ensure the input is exactly what Google returned
+      if (formatted) input.value = formatted;
+
+      console.log("✅ Place selected:", formatted);
+    });
+
+    // If they type after selecting, invalidate the selection
+    input.addEventListener('input', () => {
+      if (input.value.trim() !== window.selectedFormattedAddress) {
+        window.selectedFormattedAddress = "";
+      }
+    });
+  }
+
+  async function saveAddress() {
+    const input = document.getElementById('autocomplete');
+
+    // ✅ ONLY save what Google returned
+    const full = (window.selectedFormattedAddress || "").trim();
+
+    if (!full) {
+      alert("Please click your address from the dropdown list (selection required).");
+      input?.focus();
+      return;
+    }
+
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    // Update UI immediately
+    const addressEl = document.getElementById('account-address');
+    if (addressEl) addressEl.textContent = full.split(", ").join("\n");
+
+    closeModal();
+
+    try {
+      const res = await fetch(`${API_BASE}/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: full })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Update failed");
+
+      // Confirm saved value
+      const saved = (data?.user?.address || "").trim();
+      if (saved && addressEl) addressEl.textContent = saved.split(", ").join("\n");
+
+      console.log("✅ Saved to DB:", saved);
+    } catch (err) {
+      console.error("❌ Address update error:", err);
+      alert("Could not save address. Please try again.");
+    }
+  }
+
+  async function loadAccountInfo() {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/users/${userId}`);
+      const user = await res.json();
+
+      document.getElementById('account-email').textContent = user?.email || '—';
+      document.getElementById('account-address').textContent = formatShippingAddress(user);
+    } catch (err) {
+      console.error('❌ Error loading user info:', err);
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/orders`);
+      const allOrders = await res.json();
+      const myOrders = allOrders.filter(o =>
+        o.userId === userId ||
+        o.userId?._id === userId ||
+        o.userId?.toString() === userId
+      );
+
+      const container = document.getElementById('order-list');
+
+      if (myOrders.length === 0) {
+        container.innerHTML = '<p>No orders found.</p>';
+        return;
       }
 
-      return `
-        <div class="order-summary">
-          <span>Placed:</span><div>${new Date(o.submittedAt).toLocaleDateString()}</div><br>
-          <span>Status:</span>
-          <div class="${statusClass}">${statusText}</div><br><br>
-          <span>Total:</span><div>$${o.orderTotal.toFixed(2)}</div><br>
-          <button data-order-id="${o._id}" class="small-button view-details-btn">View Details</button>
-        </div>
-        <div class="order-details" id="details-${o._id}">
-          ${o.cards.map(c => `
-            <div class="order-item">
-              <p><strong>${c.cardName}</strong> (${c.set})</p>
-              <p>Qty: ${c.quantity} | Condition: ${c.condition}${c.foil ? ' | Foil' : ''}</p>
-              <p>Price: $${c.priceUsd?.toFixed(2) || '0.00'}</p>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    }));
+      const orderHtmlArr = await Promise.all(myOrders.map(async (o) => {
+        const status = o.status?.toLowerCase();
+        let statusClass = '';
+        let statusText = o.status;
 
-    container.innerHTML = orderHtmlArr.join('');
+        if (status === 'packing') {
+          statusClass = 'status-packing';
+          if (o.packedAt) {
+            statusText = `Packing started ${new Date(o.packedAt).toLocaleString()}`;
+          }
+        } else if (status === 'dropped off') {
+          statusClass = 'status-dropped-off';
+          if (o.droppedOffAt) {
+            const trackingHtml = await getTrackingUpdate(o.trackingNumber);
+            statusText = `Dropped off on ${new Date(o.droppedOffAt).toLocaleString()}<br>${trackingHtml}`;
+          }
+        }
 
-    document.querySelectorAll('.view-details-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-order-id');
-        toggleDetails(id);
+        return `
+          <div class="order-summary">
+            <span>Placed:</span><div>${new Date(o.submittedAt).toLocaleDateString()}</div><br>
+            <span>Status:</span>
+            <div class="${statusClass}">${statusText}</div><br><br>
+            <span>Total:</span><div>$${o.orderTotal.toFixed(2)}</div><br>
+            <button data-order-id="${o._id}" class="small-button view-details-btn">View Details</button>
+          </div>
+          <div class="order-details" id="details-${o._id}">
+            ${o.cards.map(c => `
+              <div class="order-item">
+                <p><strong>${c.cardName}</strong> (${c.set})</p>
+                <p>Qty: ${c.quantity} | Condition: ${c.condition}${c.foil ? ' | Foil' : ''}</p>
+                <p>Price: $${c.priceUsd?.toFixed(2) || '0.00'}</p>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }));
+
+      container.innerHTML = orderHtmlArr.join('');
+
+      document.querySelectorAll('.view-details-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-order-id');
+          toggleDetails(id);
+        });
       });
-    });
 
-  } catch (err) {
-    console.error('❌ Error loading orders:', err);
-  }
-
-  document.getElementById('account-email').style.display = 'block';
-  document.getElementById('account-address').style.display = 'block';
-}
-
-async function getTrackingUpdate(trackingNumber) {
-  if (!trackingNumber) return '<em>No tracking number available.</em>';
-  try {
-    const res = await fetch(`${API_BASE}/api/track-usps/${trackingNumber}`);
-    const data = await res.json();
-
-    if (data.status === 'Delivered') {
-      return `<span style="color:green; font-weight:bold;">📦 Delivered on ${data.date}</span>`;
-    } else {
-      return `<span style="color:orange;">📬 ${data.status}: ${data.date}</span>`;
-    }
-  } catch (err) {
-    console.error('❌ Failed to fetch tracking info:', err);
-    return '<em>Tracking info unavailable.</em>';
-  }
-}
-
-    function toggleDetails(index) {
-      const el = document.getElementById(`details-${index}`);
-      if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    } catch (err) {
+      console.error('❌ Error loading orders:', err);
     }
 
-    window.addEventListener('load', () => {
-      setTimeout(loadAccountInfo, 100); // small delay ensures layout + localStorage is ready
-    });
-
-    function formatShippingAddress(user) {
-  // If you ever store a single full formatted address string, show it nicely
-  const full = (user?.address || "").trim();
-
-  // If address already looks like a full formatted address (has commas), show it as lines
-  if (full.includes(",")) {
-    // "123 Main St, St Louis, MO 63101, USA" -> lines
-    return full.split(", ").join("\n");
+    document.getElementById('account-email').style.display = 'block';
+    document.getElementById('account-address').style.display = 'block';
   }
 
-  // Otherwise, build it from separate fields (address + state + zip)
-  const line1 = full || "";
-  const line2 = [user?.state, user?.zip].filter(Boolean).join(" ");
+  async function getTrackingUpdate(trackingNumber) {
+    if (!trackingNumber) return '<em>No tracking number available.</em>';
+    try {
+      const res = await fetch(`${API_BASE}/api/track-usps/${trackingNumber}`);
+      const data = await res.json();
 
-  const lines = [line1, line2].filter(s => String(s).trim().length);
-  return lines.length ? lines.join("\n") : "—";
-}
+      if (data.status === 'Delivered') {
+        return `<span style="color:green; font-weight:bold;">📦 Delivered on ${data.date}</span>`;
+      } else {
+        return `<span style="color:orange;">📬 ${data.status}: ${data.date}</span>`;
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch tracking info:', err);
+      return '<em>Tracking info unavailable.</em>';
+    }
+  }
 
+  function toggleDetails(index) {
+    const el = document.getElementById(`details-${index}`);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
 
-  </script>
+  window.addEventListener('load', () => {
+    setTimeout(loadAccountInfo, 100);
+  });
+
+  function formatShippingAddress(user) {
+    const full = (user?.address || "").trim();
+
+    if (full.includes(",")) {
+      return full.split(", ").join("\n");
+    }
+
+    const line1 = full || "";
+    const line2 = [user?.state, user?.zip].filter(Boolean).join(" ");
+
+    const lines = [line1, line2].filter(s => String(s).trim().length);
+    return lines.length ? lines.join("\n") : "—";
+  }
+</script>
 
   <script async defer
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places">

@@ -206,7 +206,7 @@
     <div class="info-row">
       <span>Shipping Address:</span>
       <div>
-        <span id="account-address">—</span><br />
+        <div id="account-address" style="white-space: pre-line;">—</div><br />
         <button onclick="editAddress()" class="small-button">Edit Address</button>
       </div>
     </div>
@@ -335,16 +335,19 @@ async function saveAddress() {
   const userId = localStorage.getItem('userId');
   if (!userId) return;
 
-  // Update UI
-  document.getElementById('account-address').textContent = full;
+  // Show address immediately on page
+  document.getElementById('account-address').textContent =
+    full.split(", ").join("\n");
+
   closeModal();
 
   try {
     await fetch(`${API_BASE}/api/users/${userId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: full }) // ✅ just save the full address string
+      body: JSON.stringify({ address: full })
     });
+
     console.log('✅ Address updated');
   } catch (err) {
     console.error('❌ Failed to update address:', err);
@@ -362,7 +365,7 @@ async function saveAddress() {
     
     // ✅ Set email and address
     document.getElementById('account-email').textContent = user?.email || '—';
-    document.getElementById('account-address').textContent = user?.address || '—';
+    document.getElementById('account-address').textContent = formatShippingAddress(user);
   } catch (err) {
     console.error('❌ Error loading user info:', err);
   }
@@ -458,6 +461,24 @@ async function getTrackingUpdate(trackingNumber) {
     window.addEventListener('load', () => {
       setTimeout(loadAccountInfo, 100); // small delay ensures layout + localStorage is ready
     });
+
+    function formatShippingAddress(user) {
+  // If you ever store a single full formatted address string, show it nicely
+  const full = (user?.address || "").trim();
+
+  // If address already looks like a full formatted address (has commas), show it as lines
+  if (full.includes(",")) {
+    // "123 Main St, St Louis, MO 63101, USA" -> lines
+    return full.split(", ").join("\n");
+  }
+
+  // Otherwise, build it from separate fields (address + state + zip)
+  const line1 = full || "";
+  const line2 = [user?.state, user?.zip].filter(Boolean).join(" ");
+
+  const lines = [line1, line2].filter(s => String(s).trim().length);
+  return lines.length ? lines.join("\n") : "—";
+}
 
 
   </script>

@@ -1422,6 +1422,7 @@ app.post('/signup', async (req, res) => {
       password,
       phone,
       address,
+      city,
       state,
       zip,
       announcementNotifications,
@@ -1434,21 +1435,26 @@ app.post('/signup', async (req, res) => {
 
     const normalizedEmail = String(email).toLowerCase().trim();
 
-    const existing = await User.findOne({ $or: [{ email: normalizedEmail }, { username }] });
-    if (existing) return res.status(409).json({ message: 'User already exists.' });
+    const existing = await User.findOne({
+      $or: [{ email: normalizedEmail }, { username }]
+    });
+
+    if (existing) {
+      return res.status(409).json({ message: 'User already exists.' });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ✅ Build ONE full address string (prefers already-formatted addresses)
-    const addr = String(address || '').trim();
-    const st = String(state || '').trim();
-    const zp = String(zip || '').trim();
-
-    // If the address already looks like a formatted address (has commas), keep it as-is.
-    // Otherwise, build it from address + state + zip.
-    const addressFull = addr.includes(',')
-      ? addr
-      : [addr, st, zp].filter(Boolean).join(', ');
+    // ✅ Build full address string
+    const fullAddress = [
+      address,
+      city,
+      state,
+      zip
+    ]
+      .filter(Boolean)
+      .join(', ')
+      .trim();
 
     // ✅ Create email verification token
     const { token, tokenHash, expires } = createEmailVerificationToken();
@@ -1461,19 +1467,18 @@ app.post('/signup', async (req, res) => {
       password: hashedPassword,
       phone,
 
-      // ✅ store ONE full string
-      address: addressFull,
+      // ✅ Save combined address
+      address: fullAddress,
 
-      // Optional: keep these for now to avoid breaking anything else,
-      // but you can remove them later once you're fully migrated.
-      state: st || undefined,
-      zip: zp || undefined,
+      state,
+      zip,
 
       announcementNotifications: {
         enabled: announcementNotifications?.enabled ?? false,
         byEmail: announcementNotifications?.byEmail ?? true,
         byText: announcementNotifications?.byText ?? false
       },
+
       shippingNotifications: {
         enabled: shippingNotifications?.enabled ?? true,
         byEmail: shippingNotifications?.byEmail ?? true,
@@ -1486,7 +1491,10 @@ app.post('/signup', async (req, res) => {
       emailVerificationExpires: expires
     }).save();
 
-    const apiBase = process.env.API_BASE_URL || 'https://geega-games-website-production.up.railway.app';
+    const apiBase =
+      process.env.API_BASE_URL ||
+      'https://geega-games-website-production.up.railway.app';
+
     const verifyUrl = `${apiBase}/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
 
     await sendVerificationEmail({
@@ -1496,8 +1504,10 @@ app.post('/signup', async (req, res) => {
     });
 
     res.status(201).json({
-      message: '🐶 Welcome to the Pack! Check your email to verify your account before logging in.'
+      message:
+        '🐶 Welcome to the Pack! Check your email to verify your account before logging in.'
     });
+
   } catch (err) {
     console.error('❌ Signup error:', err);
     res.status(500).json({ message: 'Internal server error.' });

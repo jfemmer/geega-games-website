@@ -1547,19 +1547,19 @@ app.get('/api/users/:id', async (req, res) => {
 app.patch('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { address, state, zip } = req.body;
+    const { address } = req.body;
 
     const updated = await User.findByIdAndUpdate(
       id,
-      { address, state, zip },
+      { address },
       { new: true }
     );
 
     if (!updated) return res.status(404).json({ message: 'User not found.' });
 
-    res.json({ message: 'User updated.', user: updated });
+    res.json({ message: 'Address updated.', user: updated });
   } catch (err) {
-    console.error('❌ Failed to update user:', err);
+    console.error('❌ Failed to update address:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });

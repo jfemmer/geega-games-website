@@ -307,50 +307,73 @@
       document.getElementById('address-modal').style.display = 'none';
     }
 
-    function initAutocomplete() {
-      const input = document.getElementById('autocomplete');
-      const autocomplete = new google.maps.places.Autocomplete(input, {
-        types: ['address'],
-        componentRestrictions: { country: 'us' },
-        fields: ['formatted_address']
-      });
+    let selectedFormattedAddress = "";
 
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (place.formatted_address) {
-          input.value = place.formatted_address;
-        }
-      });
+function initAutocomplete() {
+  const input = document.getElementById('autocomplete');
+  const autocomplete = new google.maps.places.Autocomplete(input, {
+    types: ['address'],
+    componentRestrictions: { country: 'us' },
+    fields: ['formatted_address']
+  });
+
+  autocomplete.addListener('place_changed', () => {
+    const place = autocomplete.getPlace();
+    selectedFormattedAddress = place?.formatted_address || "";
+    if (selectedFormattedAddress) {
+      input.value = selectedFormattedAddress;
     }
+  });
+
+  // If they manually type after selecting, invalidate the selection
+  input.addEventListener('input', () => {
+    if (input.value !== selectedFormattedAddress) {
+      selectedFormattedAddress = "";
+    }
+  });
+}
 
 async function saveAddress() {
   const input = document.getElementById('autocomplete');
-  const full = input?.value;
 
-  if (!full || full.trim().length < 5) {
-    alert('Please select a valid address.');
+  // Only allow saving if a Google suggestion was selected
+  const full = (selectedFormattedAddress || "").trim();
+
+  if (!full) {
+    alert('Please select your full address from the dropdown suggestions.');
+    input.focus();
     return;
   }
 
   const userId = localStorage.getItem('userId');
-  if (!userId) return;
+  if (!userId) {
+    console.error("User ID not found.");
+    return;
+  }
 
-  // Show address immediately on page
+  // Update address on the page immediately
   document.getElementById('account-address').textContent =
     full.split(", ").join("\n");
 
   closeModal();
 
   try {
-    await fetch(`${API_BASE}/api/users/${userId}`, {
+    const res = await fetch(`${API_BASE}/api/users/${userId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ address: full })
     });
 
-    console.log('✅ Address updated');
+    if (!res.ok) {
+      throw new Error("Failed to update address.");
+    }
+
+    console.log('✅ Address updated successfully');
   } catch (err) {
     console.error('❌ Failed to update address:', err);
+    alert("There was a problem saving your address. Please try again.");
   }
 }
 

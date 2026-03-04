@@ -293,15 +293,24 @@
     }
 
     function editAddress() {
-      document.getElementById('address-modal').style.display = 'flex';
+  const modal = document.getElementById('address-modal');
+  const input = document.getElementById('autocomplete');
+  const current = document.getElementById('account-address').textContent;
 
-      setTimeout(() => {
-        if (!window._accountAutocompleteInit) {
-          initAutocomplete();
-          window._accountAutocompleteInit = true;
-        }
-      }, 100);
+  modal.style.display = 'flex';
+
+  // Pre-fill the address input
+  if (current && current !== '—') {
+    input.value = current.replace(/\n/g, ', ');
+  }
+
+  setTimeout(() => {
+    if (!window._accountAutocompleteInit) {
+      initAutocomplete();
+      window._accountAutocompleteInit = true;
     }
+  }, 100);
+}
 
     function closeModal() {
       document.getElementById('address-modal').style.display = 'none';
@@ -336,12 +345,12 @@ function initAutocomplete() {
 async function saveAddress() {
   const input = document.getElementById('autocomplete');
 
-  // Only allow saving if a Google suggestion was selected
-  const full = (selectedFormattedAddress || "").trim();
+  // ✅ Only save if a Google Places suggestion was selected
+  const full = (window.selectedFormattedAddress || "").trim();
 
   if (!full) {
-    alert('Please select your full address from the dropdown suggestions.');
-    input.focus();
+    alert("Please select your full address from the dropdown suggestions (don’t just type it).");
+    input?.focus();
     return;
   }
 
@@ -351,28 +360,33 @@ async function saveAddress() {
     return;
   }
 
-  // Update address on the page immediately
-  document.getElementById('account-address').textContent =
-    full.split(", ").join("\n");
+  // ✅ Show nicely on the page immediately
+  const addressEl = document.getElementById('account-address');
+  if (addressEl) addressEl.textContent = full.split(", ").join("\n");
 
   closeModal();
 
   try {
     const res = await fetch(`${API_BASE}/api/users/${userId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ address: full })
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: full }) // ✅ save ONE full string
     });
 
+    const data = await res.json();
     if (!res.ok) {
-      throw new Error("Failed to update address.");
+      console.error("❌ Address update failed:", data);
+      alert(data?.message || "There was a problem saving your address.");
+      return;
     }
 
-    console.log('✅ Address updated successfully');
+    // ✅ Confirm what actually got saved in Mongo and display it
+    const saved = (data?.user?.address || "").trim();
+    if (saved && addressEl) addressEl.textContent = saved.split(", ").join("\n");
+
+    console.log("✅ Address updated:", saved);
   } catch (err) {
-    console.error('❌ Failed to update address:', err);
+    console.error("❌ Failed to update address:", err);
     alert("There was a problem saving your address. Please try again.");
   }
 }
@@ -507,7 +521,7 @@ async function getTrackingUpdate(trackingNumber) {
   </script>
 
   <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places&callback=initAutocomplete">
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCdvN6ia2BP8thqMcha3bD6-2lrfnZW6KM&libraries=places">
   </script>
 </body>
 </html>

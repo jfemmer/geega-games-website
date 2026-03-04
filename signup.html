@@ -173,14 +173,7 @@
       if (!widget || !hiddenAddressInput) return;
 
       widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
-
-      // Keep hidden input in sync while typing (helps if user doesn't click suggestion)
-      widget.addEventListener("input", () => {
-        if (!addressSelectionInProgress) {
-          hiddenAddressInput.value = (widget.value || "").trim();
-          selectedFormattedAddress = "";
-        }
-      });
+      
 
       widget.addEventListener("gmp-placeselect", async (event) => {
         addressSelectionInProgress = true;
@@ -422,10 +415,11 @@
       // Address: accept either verified formatted address OR the typed value
       const hiddenVal = document.getElementById('autocomplete').value.trim();
       const widgetVal = (document.getElementById('address-autocomplete').value || "").trim();
-      const fullAddress = hiddenVal || widgetVal;
+      // ✅ Address: REQUIRE Google selection
+      const fullAddress = (selectedFormattedAddress || "").trim();
 
       if (!fullAddress) {
-        setError("Please enter your shipping address.");
+        setError("Please select your full address from the dropdown suggestions.");
         document.getElementById("address-autocomplete").focus();
         return;
       }

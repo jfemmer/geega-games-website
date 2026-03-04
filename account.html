@@ -345,49 +345,42 @@ function initAutocomplete() {
 async function saveAddress() {
   const input = document.getElementById('autocomplete');
 
-  // ✅ Only save if a Google Places suggestion was selected
+  // ✅ ONLY save what Google returned (formatted_address)
   const full = (selectedFormattedAddress || "").trim();
 
   if (!full) {
-    alert("Please select your full address from the dropdown suggestions (don’t just type it).");
-    input?.focus();
+    alert("Please click an address from the dropdown list.");
+    input.focus();
     return;
   }
 
   const userId = localStorage.getItem('userId');
-  if (!userId) {
-    console.error("User ID not found.");
-    return;
-  }
+  if (!userId) return;
 
-  // ✅ Show nicely on the page immediately
-  const addressEl = document.getElementById('account-address');
-  if (addressEl) addressEl.textContent = full.split(", ").join("\n");
+  // Show immediately
+  document.getElementById('account-address').textContent = full.split(", ").join("\n");
 
   closeModal();
 
   try {
     const res = await fetch(`${API_BASE}/api/users/${userId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address: full }) // ✅ save ONE full string
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: full })
     });
 
     const data = await res.json();
-    if (!res.ok) {
-      console.error("❌ Address update failed:", data);
-      alert(data?.message || "There was a problem saving your address.");
-      return;
-    }
+    if (!res.ok) throw new Error(data?.message || "Update failed");
 
-    // ✅ Confirm what actually got saved in Mongo and display it
+    // Confirm saved value
     const saved = (data?.user?.address || "").trim();
-    if (saved && addressEl) addressEl.textContent = saved.split(", ").join("\n");
+    document.getElementById('account-address').textContent =
+      saved ? saved.split(", ").join("\n") : "—";
 
-    console.log("✅ Address updated:", saved);
+    console.log("✅ Address saved:", saved);
   } catch (err) {
-    console.error("❌ Failed to update address:", err);
-    alert("There was a problem saving your address. Please try again.");
+    console.error("❌ Address update error:", err);
+    alert("Could not save address. Please try again.");
   }
 }
 

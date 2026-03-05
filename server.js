@@ -1220,6 +1220,55 @@ app.post('/api/cart', async (req, res) => {
   }
 });
 
+// server.js
+app.post("/api/address/validate", async (req, res) => {
+  try {
+    const { address } = req.body; // single string from frontend
+
+    if (!address || typeof address !== "string" || address.trim().length < 8) {
+      return res.status(400).json({ ok: false, message: "Address required." });
+    }
+
+    // You can send Shippo either:
+    // - address_line_1 + postal_code (US allowed), OR
+    // - address_line_1 + city_locality + state_province, etc. :contentReference[oaicite:2]{index=2}
+    // Since you currently have a single string, we’ll send it as address_line_1
+    // and let Shippo recommend a standardized version.
+    const payload = {
+      address_line_1: address.trim()
+    };
+
+    const shippoResp = await fetch("https://api.goshippo.com/addresses/validate", {
+      method: "GET",
+      headers: {
+        "Authorization": `ShippoToken ${process.env.SHIPPO_API_TOKEN}`,
+        "Content-Type": "application/json"
+      }
+      // Shippo validate endpoint is query-based in v2 docs; easiest is to use URLSearchParams.
+    });
+
+    // ^ If you prefer the v2 “validate” operation with query params, do this instead:
+    // const url = new URL("https://api.goshippo.com/addresses/validate");
+    // Object.entries(payload).forEach(([k, v]) => url.searchParams.set(k, v));
+    // const shippoResp = await fetch(url.toString(), { headers: {...} });
+
+    const data = await shippoResp.json();
+
+    if (!shippoResp.ok) {
+      return res.status(400).json({ ok: false, message: "Address validation failed.", details: data });
+    }
+
+    // Shippo returns a recommended address along with validation results. :contentReference[oaicite:3]{index=3}
+    return res.json({
+      ok: true,
+      shippo: data
+    });
+  } catch (err) {
+    console.error("Address validate error:", err);
+    res.status(500).json({ ok: false, message: "Server error validating address." });
+  }
+});
+
 app.post('/create-payment-intent', async (req, res) => {
   try {
     const { userId, shippingMethod } = req.body;
@@ -1466,10 +1515,8 @@ app.post('/signup', async (req, res) => {
       email: normalizedEmail,
       password: hashedPassword,
       phone,
-
       // ✅ Save combined address
       address: fullAddress,
-
       state,
       zip,
 

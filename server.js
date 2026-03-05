@@ -1226,7 +1226,7 @@ app.post('/api/cart', async (req, res) => {
 
 app.post('/create-payment-intent', async (req, res) => {
   try {
-    const { userId, shippingMethod } = req.body;
+    const { userId, shippingMethod, storeCreditToApplyCents } = req.body;
 
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ error: 'Invalid userId.' });
@@ -1252,7 +1252,6 @@ app.post('/create-payment-intent', async (req, res) => {
     for (const item of items) {
       const qty = Number(item.quantity || 1);
 
-      // Match your inventory item as closely as possible
       const variantKey = (item.variantType || '').trim().toLowerCase();
 
       const inv = await CardInventory.findOne({
@@ -1263,7 +1262,7 @@ app.post('/create-payment-intent', async (req, res) => {
         variantType: variantKey
       }).lean();
 
-      // If variantType doesn’t match or older rows have blank variantType, fall back
+      // fallback if older rows have blank variantType
       const invFallback = inv || await CardInventory.findOne({
         cardName: item.cardName,
         set: item.set,
@@ -1287,15 +1286,13 @@ app.post('/create-payment-intent', async (req, res) => {
         : Number(invFallback.priceUsd ?? 0);
 
       if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-        return res.status(400).json({
-          error: `Invalid price for: ${item.cardName} (${item.set})`
-        });
+        return res.status(400).json({ error: `Invalid price for: ${item.cardName} (${item.set})` });
       }
 
       subtotal += unitPrice * qty;
     }
 
-    // 3) Shipping rules (matches your UI)
+    // 3) Shipping rules
     let shippingCost = 0;
     if (method === 'tracked') {
       shippingCost = subtotal >= 75 ? 0 : 5;
@@ -1306,23 +1303,55 @@ app.post('/create-payment-intent', async (req, res) => {
     const orderTotal = Number((subtotal + shippingCost).toFixed(2));
     const amountCents = Math.round(orderTotal * 100);
 
-    // 4) Create PaymentIntent
+    const totalCents = amountCents;
+
+    // 3.5) Optional: apply store credit (server-trusted)
+    let creditRequested = Number(storeCreditToApplyCents || 0);
+    if (!Number.isFinite(creditRequested)) creditRequested = 0;
+    creditRequested = Math.max(0, Math.floor(creditRequested));
+
+    let creditAvailable = 0;
+    try {
+      const user = await User.findById(userId).lean();
+      creditAvailable = Math.max(0, Number(user?.storeCreditCents || 0));
+    } catch {}
+
+    const storeCreditAppliedCents = Math.min(creditRequested, creditAvailable, totalCents);
+    const amountDueCents = Math.max(0, totalCents - storeCreditAppliedCents);
+
+    // If store credit covers everything, no Stripe PaymentIntent needed
+    if (amountDueCents === 0) {
+      return res.json({
+        clientSecret: null,
+        orderTotal,
+        paymentIntentId: null,
+        storeCreditAppliedCents,
+        amountDueCents
+      });
+    }
+
+    // 4) Create PaymentIntent for remaining amount
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountCents,
+      amount: amountDueCents,
       currency: 'usd',
       automatic_payment_methods: { enabled: true },
       metadata: {
         userId: String(userId),
         shippingMethod: method,
         subtotal: subtotal.toFixed(2),
-        shippingCost: shippingCost.toFixed(2)
+        shippingCost: shippingCost.toFixed(2),
+        storeCreditAppliedCents: String(storeCreditAppliedCents),
+        amountDueCents: String(amountDueCents),
+        orderTotal: orderTotal.toFixed(2)
       }
     });
 
     res.json({
       clientSecret: paymentIntent.client_secret,
       orderTotal,
-      paymentIntentId: paymentIntent.id
+      paymentIntentId: paymentIntent.id,
+      storeCreditAppliedCents,
+      amountDueCents
     });
   } catch (error) {
     console.error('❌ Stripe create-payment-intent error:', error);
@@ -1898,11 +1927,20 @@ app.post('/api/inventory/prices', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   console.log('🧾 Incoming order data:', req.body);
 
- const {
-  userId, firstName, lastName, email, address, cards,
-  shippingMethod, paymentMethod, orderTotal,
-  stripePaymentIntentId, paymentStatus
-} = req.body;
+  const {
+    userId,
+    firstName,
+    lastName,
+    email,
+    address,
+    cards,
+    shippingMethod,
+    paymentMethod,
+    orderTotal,
+    stripePaymentIntentId,
+    paymentStatus,
+    storeCreditUsedCents // 🟣 NEW
+  } = req.body;
 
   if (!userId || !firstName || !lastName || !email || !address || !Array.isArray(cards)) {
     return res.status(400).json({ message: 'Missing required fields in order.' });
@@ -1919,8 +1957,14 @@ app.post('/api/orders', async (req, res) => {
     }
   }
 
+  // 🟣 normalize store credit (cents)
+  let creditToDeduct = Number(storeCreditUsedCents || 0);
+  if (!Number.isFinite(creditToDeduct)) creditToDeduct = 0;
+  creditToDeduct = Math.max(0, Math.floor(creditToDeduct));
+
   try {
     const parsedOrderTotal = parseFloat(orderTotal);
+
     const newOrder = new Order({
       userId,
       firstName,
@@ -1935,12 +1979,16 @@ app.post('/api/orders', async (req, res) => {
       stripePaymentIntentId: stripePaymentIntentId || null,
       paymentStatus: paymentStatus || (paymentMethod === 'card' ? 'paid' : 'unpaid'),
 
+      // 🟣 NEW
+      storeCreditUsedCents: creditToDeduct,
+
       orderTotal: isNaN(parsedOrderTotal) ? 0 : parsedOrderTotal,
       status: req.body.status || 'Pending'
     });
 
     const savedOrder = await newOrder.save();
 
+    // ✅ inventory decrement
     for (const item of cards) {
       const parsedPrice = parseFloat(item.priceUsd);
       item.priceUsd = !isNaN(parsedPrice) ? parseFloat(parsedPrice.toFixed(2)) : 0;
@@ -1977,6 +2025,23 @@ app.post('/api/orders', async (req, res) => {
       }
     }
 
+    // 🟣 deduct store credit AFTER inventory decrement succeeds
+    if (creditToDeduct > 0) {
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: userId, storeCreditCents: { $gte: creditToDeduct } },
+        { $inc: { storeCreditCents: -creditToDeduct } },
+        { new: true }
+      );
+
+      if (!updatedUser) {
+        // if credit changed (or wasn't enough), don't silently succeed
+        return res.status(409).json({
+          message: 'Store credit balance changed. Please refresh and try again.'
+        });
+      }
+    }
+
+    // ✅ clear cart
     await Cart.findOneAndUpdate(
       { userId },
       { items: [], updatedAt: new Date() }

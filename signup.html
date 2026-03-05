@@ -178,66 +178,73 @@
 
     widget.requestedPlaceFields = ["formattedAddress","addressComponents","location"];
 
-    widget.addEventListener("gmp-select", async (event) => {
-      addressSelectionInProgress = true;
-      if (signupButtonEl) signupButtonEl.disabled = true;
+widget.addEventListener("gmp-select", async (event) => {
+  addressSelectionInProgress = true;
+  if (signupButtonEl) signupButtonEl.disabled = true;
 
-      try {
-        const place = event.detail?.place || event.place;
+  try {
+    const place = event.detail?.place || event.place;
 
-        if (place?.fetchFields) {
-          await place.fetchFields({ fields: widget.requestedPlaceFields });
-        }
+    if (place?.fetchFields) {
+      await place.fetchFields({ fields: widget.requestedPlaceFields });
+    }
 
-        const comps = place?.addressComponents || place?.address_components || [];
+    const comps = place?.addressComponents || place?.address_components || [];
 
-        function pickComp(type) {
-          const c = (comps || []).find(x => {
-            const types = x?.types || [];
-            const ct = x?.componentType; // ✅ GMP uses this
-            return (Array.isArray(types) && types.includes(type)) || ct === type;
-          });
-          return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
-        }
+    function pickComp(type) {
+      const c = (comps || []).find((x) => {
+        const types = x?.types || [];
+        const ct = x?.componentType; // ✅ GMP uses this
+        return (Array.isArray(types) && types.includes(type)) || ct === type;
+      });
+      return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
+    }
 
-        selectedZip = pickComp("postal_code");
-        selectedState = pickComp("administrative_area_level_1");
-        selectedCity =
-          pickComp("locality") ||
-          pickComp("postal_town") ||
-          pickComp("sublocality") ||
-          pickComp("sublocality_level_1");
+    // Extract components
+    selectedZip = pickComp("postal_code");
+    selectedState = pickComp("administrative_area_level_1"); // ex: "MO"
+    selectedCity =
+      pickComp("locality") ||
+      pickComp("postal_town") ||
+      pickComp("sublocality") ||
+      pickComp("sublocality_level_1");
 
-        selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
+    // Start with Google's formatted address (or widget value)
+    selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
 
-        // Ensure ZIP exists in address
-        if (selectedZip && !selectedFormattedAddress.includes(selectedZip)) {
-          const usaRegex = /,\s*(USA|United States)\s*$/i;
+    // ✅ Inject ZIP into the formatted address if it's missing
+    if (selectedZip && selectedFormattedAddress && !selectedFormattedAddress.includes(selectedZip)) {
+      const usaRegex = /,\s*(USA|United States)\s*$/i;
 
-          if (usaRegex.test(selectedFormattedAddress)) {
-            selectedFormattedAddress = selectedFormattedAddress.replace(
-              usaRegex,
-              ` ${selectedZip}, USA`
-            );
-          } else {
-            selectedFormattedAddress =
-              `${selectedFormattedAddress} ${selectedZip}`.trim();
-          }
-        }
-
-        hiddenAddressInput.value = selectedFormattedAddress;
-
-        console.log("✅ Address:", selectedFormattedAddress);
-        console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
-
-      } catch (e) {
-        console.error("❌ Address select failed:", e);
-        hiddenAddressInput.value = "";
-      } finally {
-        addressSelectionInProgress = false;
-        if (signupButtonEl) signupButtonEl.disabled = false;
+      if (usaRegex.test(selectedFormattedAddress)) {
+        // Insert ZIP before country
+        selectedFormattedAddress = selectedFormattedAddress.replace(
+          usaRegex,
+          ` ${selectedZip}, USA`
+        );
+      } else {
+        // Otherwise append ZIP at end
+        selectedFormattedAddress = `${selectedFormattedAddress} ${selectedZip}`.trim();
       }
-    });
+    }
+
+    // ✅ This is what your form submits (and what gets stored in MongoDB as address)
+    hiddenAddressInput.value = selectedFormattedAddress;
+
+    console.log("✅ Final address saved:", selectedFormattedAddress);
+    console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
+  } catch (e) {
+    console.error("❌ Address select failed:", e);
+    hiddenAddressInput.value = "";
+    selectedFormattedAddress = "";
+    selectedCity = "";
+    selectedState = "";
+    selectedZip = "";
+  } finally {
+    addressSelectionInProgress = false;
+    if (signupButtonEl) signupButtonEl.disabled = false;
+  }
+});
   }
 
   window.initMap = initMap;
@@ -488,11 +495,6 @@
         password: password,
         phone: formatPhoneForTwilio(document.getElementById('phone').value.trim()),
         address: fullAddress,
-
-        // ✅ ADD THESE (this is what your DB needs)
-        city: selectedCity,
-        state: selectedState,
-        zip: selectedZip,
 
         announcementNotifications: {
           enabled: document.getElementById('opt-in-announcements').checked,

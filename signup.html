@@ -161,7 +161,7 @@
   </style>
 
   <script>
-    let selectedFormattedAddress = "";
+      let selectedFormattedAddress = "";
       let addressSelectionInProgress = false;
 
       async function initMap() {
@@ -186,8 +186,29 @@
               await place.fetchFields({ fields: widget.requestedPlaceFields });
             }
 
-            const selected = (place?.formattedAddress || widget.value || "").trim();
-            hiddenAddressInput.value = selected;
+            selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
+
+            // If Google didn't include ZIP in formattedAddress, add it from addressComponents
+            if (selectedZip && selectedFormattedAddress && !selectedFormattedAddress.includes(selectedZip)) {
+              const usaRegex = /,\s*(USA|United States)\s*$/i;
+
+              if (usaRegex.test(selectedFormattedAddress)) {
+                // Insert ZIP before country
+                selectedFormattedAddress = selectedFormattedAddress.replace(
+                  usaRegex,
+                  ` ${selectedZip}, USA`
+                );
+              } else {
+                // Otherwise append ZIP
+                selectedFormattedAddress = `${selectedFormattedAddress} ${selectedZip}`.trim();
+              }
+            }
+
+            // Save final address
+            hiddenAddressInput.value = selectedFormattedAddress;
+
+            console.log("✅ Final address saved:", selectedFormattedAddress);
+            console.log("📮 ZIP:", selectedZip, "State:", selectedState, "City:", selectedCity);
 
             console.log("✅ Selected address:", selected);
           } catch (e) {

@@ -191,40 +191,41 @@ widget.addEventListener("gmp-select", async (event) => {
     function pickComp(type) {
       const c = (comps || []).find((x) => {
         const types = x?.types || [];
-        const ct = x?.componentType; // ✅ GMP uses this sometimes
+        const ct = x?.componentType; // ✅ GMP uses this
         return (Array.isArray(types) && types.includes(type)) || ct === type;
       });
       return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
     }
 
-    // Build a single address string that includes ZIP
-    const streetNumber = pickComp("street_number");
-    const route = pickComp("route");
-    const city =
+    // Extract components
+    selectedZip = pickComp("postal_code");
+    selectedState = pickComp("administrative_area_level_1"); // ex: "MO"
+    selectedCity =
       pickComp("locality") ||
       pickComp("postal_town") ||
       pickComp("sublocality") ||
       pickComp("sublocality_level_1");
-    const state = pickComp("administrative_area_level_1"); // ex: MO
-    const zip = pickComp("postal_code");
-    const country = pickComp("country") || "USA";
 
-    const line1 = [streetNumber, route].filter(Boolean).join(" ").trim();
-    const line2 = [city, state, zip].filter(Boolean).join(" ").trim();
+    // Start with Google's formatted address (or widget value)
+    selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
 
-    selectedFormattedAddress = [line1, line2, country].filter(Boolean).join(", ").trim();
+    // ✅ Inject ZIP into the formatted address if it's missing
+    if (selectedZip && selectedFormattedAddress && !selectedFormattedAddress.includes(selectedZip)) {
+      const usaRegex = /,\s*(USA|United States)\s*$/i;
 
-    // Fallback if components are missing for some reason
-    if (!selectedFormattedAddress) {
-      selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
+      if (usaRegex.test(selectedFormattedAddress)) {
+        // Insert ZIP before country
+        selectedFormattedAddress = selectedFormattedAddress.replace(
+          usaRegex,
+          ` ${selectedZip}, USA`
+        );
+      } else {
+        // Otherwise append ZIP at end
+        selectedFormattedAddress = `${selectedFormattedAddress} ${selectedZip}`.trim();
+      }
     }
 
-    // Optional: keep your globals (if you use them elsewhere)
-    selectedCity = city;
-    selectedState = state;
-    selectedZip = zip;
-
-    // ✅ This is what your form submits and what MongoDB stores as address
+    // ✅ This is what your form submits (and what gets stored in MongoDB as address)
     hiddenAddressInput.value = selectedFormattedAddress;
 
     console.log("✅ Final address saved:", selectedFormattedAddress);

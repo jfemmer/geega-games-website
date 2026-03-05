@@ -1082,6 +1082,7 @@ app.get('/verify-email', async (req, res) => {
   }
 });
 
+
 // ✅ Email verification: resend
 app.post('/api/resend-verification', async (req, res) => {
   try {
@@ -1217,100 +1218,6 @@ app.post('/api/cart', async (req, res) => {
   } catch (err) {
     console.error('❌ [POST] Add to cart error:', err.stack || err);
     res.status(500).json({ message: 'Internal server error', error: err.message });
-  }
-});
-
-// server.js
-app.post("/api/address/validate", async (req, res) => {
-  try {
-    const { address } = req.body || {};
-
-    if (!address || typeof address !== "string" || address.trim().length < 8) {
-      return res.status(400).json({ ok: false, message: "Address required." });
-    }
-
-    if (!process.env.SHIPPO_API_TOKEN) {
-      return res.status(500).json({ ok: false, message: "Missing SHIPPO_API_TOKEN in env." });
-    }
-
-    // Expecting something like:
-    // "1052 Rue La Chelle Walk, Creve Coeur, MO, USA"
-    const parts = address.split(",").map(p => p.trim()).filter(Boolean);
-
-    const address_line_1 = parts[0] || "";
-    const city_locality = parts[1] || "";
-    const state_province = (parts[2] || "").replace(/\s+/g, " ").trim(); // "MO"
-    const country_code_raw = (parts[3] || "USA").toUpperCase();
-    const country_code =
-      country_code_raw === "USA" || country_code_raw === "UNITED STATES" ? "US" : country_code_raw;
-
-    // Shippo US validation requires:
-    // state_province + city_locality + address_line_1
-    // OR address_line_1 + postal_code
-    // We'll use city/state combo since your string doesn't include postal code yet. :contentReference[oaicite:1]{index=1}
-    if (!address_line_1 || !city_locality || !state_province) {
-      return res.status(400).json({
-        ok: false,
-        message: "Address must include street, city, and state (e.g., 'street, city, state')."
-      });
-    }
-
-    const url = new URL("https://api.goshippo.com/addresses/validate");
-    url.searchParams.set("address_line_1", address_line_1);
-    url.searchParams.set("city_locality", city_locality);
-    url.searchParams.set("state_province", state_province);
-    url.searchParams.set("country_code", country_code);
-
-    const shippoResp = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Authorization: `ShippoToken ${process.env.SHIPPO_API_TOKEN}`,
-        "Content-Type": "application/json"
-      }
-    });
-
-    const data = await shippoResp.json().catch(() => ({}));
-
-    if (!shippoResp.ok) {
-      return res.status(400).json({
-        ok: false,
-        message: "Address validation failed.",
-        details: data
-      });
-    }
-
-    // Shippo returns recommended_address in the validation response. :contentReference[oaicite:2]{index=2}
-    const rec = data?.recommended_address || data?.recommendedAddress || null;
-
-    // Build a single verified string with ZIP if possible
-    let verifiedAddress = address.trim();
-    let zip = "";
-
-    if (rec && typeof rec === "object") {
-      // Field names can vary slightly across docs/versions; these cover common ones.
-      const line1 = (rec.address_line_1 || rec.street1 || rec.street_1 || "").trim();
-      const line2 = (rec.address_line_2 || rec.street2 || rec.street_2 || "").trim();
-      const city = (rec.city || rec.city_locality || "").trim();
-      const state = (rec.state || rec.state_province || "").trim();
-      zip = (rec.zip || rec.postal_code || rec.postalCode || "").trim();
-      const country = (rec.country || rec.country_code || "US").trim();
-
-      const cityStateZip = [city, state, zip].filter(Boolean).join(" ").trim();
-      verifiedAddress = [line1, line2, cityStateZip, country === "US" ? "USA" : country]
-        .filter(Boolean)
-        .join(", ")
-        .trim();
-    }
-
-    return res.json({
-      ok: true,
-      verifiedAddress,
-      zipFound: /\b\d{5}(?:-\d{4})?\b/.test(verifiedAddress),
-      shippo: data
-    });
-  } catch (err) {
-    console.error("Address validate error:", err);
-    res.status(500).json({ ok: false, message: "Server error validating address." });
   }
 });
 

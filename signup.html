@@ -162,42 +162,45 @@
 
   <script>
     let selectedFormattedAddress = "";
-  let addressSelectionInProgress = false;
+      let addressSelectionInProgress = false;
 
-  async function initMap() {
-    await google.maps.importLibrary("places");
+      async function initMap() {
+        await google.maps.importLibrary("places");
 
-    const widget = document.getElementById("address-autocomplete");
-    const hiddenAddressInput = document.getElementById("autocomplete");
-    const signupButtonEl = document.getElementById("signup-button");
+        const widget = document.getElementById("address-autocomplete");
+        const hiddenAddressInput = document.getElementById("autocomplete");
+        const signupButtonEl = document.getElementById("signup-button");
 
-    if (!widget || !hiddenAddressInput) return;
+        if (!widget || !hiddenAddressInput) return;
 
-    widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
+        widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
 
-    widget.addEventListener("gmp-select", async (event) => {
-      addressSelectionInProgress = true;
-      if (signupButtonEl) signupButtonEl.disabled = true;
+        widget.addEventListener("gmp-select", async (event) => {
+          addressSelectionInProgress = true;
+          if (signupButtonEl) signupButtonEl.disabled = true;
 
-      try {
-        const place = event.place;
-        await place.fetchFields({ fields: widget.requestedPlaceFields });
+          try {
+            const place = event.detail?.place || event.place; // ✅ FIX
 
-        const selected = (place.formattedAddress || widget.value || "").trim();
-        hiddenAddressInput.value = selected;
+            if (place?.fetchFields) {
+              await place.fetchFields({ fields: widget.requestedPlaceFields });
+            }
 
-        console.log("✅ Selected address:", selected);
-      } catch (e) {
-        console.error("❌ Address select failed:", e);
-        hiddenAddressInput.value = "";
-      } finally {
-        addressSelectionInProgress = false;
-        if (signupButtonEl) signupButtonEl.disabled = false;
+            const selected = (place?.formattedAddress || widget.value || "").trim();
+            hiddenAddressInput.value = selected;
+
+            console.log("✅ Selected address:", selected);
+          } catch (e) {
+            console.error("❌ Address select failed:", e);
+            hiddenAddressInput.value = "";
+          } finally {
+            addressSelectionInProgress = false;
+            if (signupButtonEl) signupButtonEl.disabled = false;
+          }
+        });
       }
-    });
-  }
 
-  window.initMap = initMap;
+      window.initMap = initMap;
   </script>
 </head>
 

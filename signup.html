@@ -254,7 +254,19 @@
           selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
         }
 
-        hiddenAddressInput.value = selectedFormattedAddress;
+        const candidate = (selectedFormattedAddress || "").trim();
+
+        // Only save if it looks like an actual address
+        // (has a number and at least one comma)
+        const looksLikeAddress = /\d/.test(candidate) && candidate.includes(",");
+
+        if (looksLikeAddress) {
+          hiddenAddressInput.value = candidate;
+        } else {
+          // keep previous hidden value instead of replacing with "USA"
+          console.warn("⚠️ Not saving bad address candidate:", candidate);
+        }
+
 
         console.log("✅ Final address saved:", selectedFormattedAddress);
         console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
@@ -524,25 +536,17 @@ signupForm.addEventListener('submit', async function (event) {
       return;
     }
 
-    const recommended =
-      validateJson.shippo?.recommended_address ||
-      validateJson.shippo?.address ||
-      null;
-
-    if (recommended && typeof recommended === "string") {
-      verifiedAddress = recommended;
-    } else if (recommended && typeof recommended === "object") {
-      verifiedAddress = [
-        recommended.address_line_1,
-        recommended.address_line_2,
-        [recommended.city, recommended.state, recommended.zip]
-          .filter(Boolean)
-          .join(" "),
-        recommended.country
-      ]
-        .filter(Boolean)
-        .join(", ");
+    if (!validateJson.verifiedAddress) {
+      setError("We couldn't verify that address.");
+      return;
     }
+
+    if (!validateJson.zipFound) {
+      setError("We couldn't verify a ZIP code for that address.");
+      return;
+    }
+
+verifiedAddress = validateJson.verifiedAddress;
 
     // overwrite hidden field with verified address
     document.getElementById("autocomplete").value = verifiedAddress;

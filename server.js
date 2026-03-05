@@ -1327,6 +1327,34 @@ app.post('/create-payment-intent', async (req, res) => {
   }
 });
 
+// PATCH /api/users/:id/store-credit/add
+// body: { amount: 10.00 }  // dollars
+app.patch("/api/users/:id/store-credit/add", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const amount = Number(req.body.amount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ ok: false, message: "Invalid amount." });
+    }
+
+    const addCents = Math.round(amount * 100);
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { $inc: { storeCreditCents: addCents } },
+      { new: true }
+    );
+
+    if (!user) return res.status(404).json({ ok: false, message: "User not found." });
+
+    return res.json({ ok: true, user });
+  } catch (err) {
+    console.error("store credit add error:", err);
+    res.status(500).json({ ok: false, message: "Server error." });
+  }
+});
+
 // 🗑️ POST remove item by index
 app.post('/api/cart/remove', async (req, res) => {
   const { userId, index, quantity = 1 } = req.body;

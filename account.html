@@ -192,6 +192,22 @@
     display: block;
     word-wrap: break-word;
   }
+
+  .credit-pill {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(102, 51, 153, 0.10);
+  color: rebeccapurple;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.credit-subtext {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: #666;
+}
 }
   </style>
 </head>
@@ -203,6 +219,13 @@
   <div class="account-container">
     <h2>Account Details</h2>
     <div class="info-row"><span>Email:</span><div id="account-email">—</div></div>
+    <div class="info-row">
+      <span>Store Credit:</span>
+      <div>
+      <span id="account-store-credit" class="credit-pill">$0.00</span>
+    <div class="credit-subtext" id="account-store-credit-note">Available balance</div>
+  </div>
+</div>
     <div class="info-row">
       <span>Shipping Address:</span>
       <div>
@@ -421,6 +444,10 @@
 
       document.getElementById('account-email').textContent = user?.email || '—';
       document.getElementById('account-address').textContent = formatShippingAddress(user);
+
+      // ✅ Store credit
+      const creditDollars = normalizeStoreCredit(user);
+      document.getElementById('account-store-credit').textContent = formatMoney(creditDollars);
     } catch (err) {
       console.error('❌ Error loading user info:', err);
     }
@@ -534,6 +561,34 @@
 
     const lines = [line1, line2].filter(s => String(s).trim().length);
     return lines.length ? lines.join("\n") : "—";
+  }
+
+    function formatMoney(n) {
+    const num = Number(n || 0);
+    return `$${num.toFixed(2)}`;
+  }
+
+  // Supports either:
+  // - user.storeCredit (dollars)
+  // - user.storeCreditCents (integer cents)
+  function normalizeStoreCredit(user) {
+    if (!user) return 0;
+
+    if (typeof user.storeCreditCents === 'number') {
+      return Math.max(0, user.storeCreditCents) / 100;
+    }
+
+    if (typeof user.storeCredit === 'number') {
+      return Math.max(0, user.storeCredit);
+    }
+
+    // If it comes back as a string, try to parse it
+    if (typeof user.storeCredit === 'string' && user.storeCredit.trim()) {
+      const parsed = Number(user.storeCredit);
+      return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    }
+
+    return 0;
   }
 </script>
 

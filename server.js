@@ -731,6 +731,9 @@ const userSchema = new mongoose.Schema({
   zip: String,
   createdAt: { type: Date, default: Date.now },
 
+  // 🟣 Store Credit (keep in cents to avoid floating point issues)
+  storeCreditCents: { type: Number, default: 0 },
+
   // ✅ Email verification
   isEmailVerified: { type: Boolean, default: false },
   emailVerificationTokenHash: { type: String },

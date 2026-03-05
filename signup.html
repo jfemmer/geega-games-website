@@ -160,69 +160,84 @@
     }
   </style>
 
-  <script>
-      let selectedFormattedAddress = "";
-      let addressSelectionInProgress = false;
+<script>
+  let selectedFormattedAddress = "";
+  let selectedCity = "";
+  let selectedState = "";
+  let selectedZip = "";
+  let addressSelectionInProgress = false;
 
-      async function initMap() {
-        await google.maps.importLibrary("places");
+  async function initMap() {
+    await google.maps.importLibrary("places");
 
-        const widget = document.getElementById("address-autocomplete");
-        const hiddenAddressInput = document.getElementById("autocomplete");
-        const signupButtonEl = document.getElementById("signup-button");
+    const widget = document.getElementById("address-autocomplete");
+    const hiddenAddressInput = document.getElementById("autocomplete");
+    const signupButtonEl = document.getElementById("signup-button");
 
-        if (!widget || !hiddenAddressInput) return;
+    if (!widget || !hiddenAddressInput) return;
 
-        widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
+    widget.requestedPlaceFields = ["formattedAddress","addressComponents","location"];
 
-        widget.addEventListener("gmp-select", async (event) => {
-          addressSelectionInProgress = true;
-          if (signupButtonEl) signupButtonEl.disabled = true;
+    widget.addEventListener("gmp-select", async (event) => {
+      addressSelectionInProgress = true;
+      if (signupButtonEl) signupButtonEl.disabled = true;
 
-          try {
-            const place = event.detail?.place || event.place; // ✅ FIX
+      try {
+        const place = event.detail?.place || event.place;
 
-            if (place?.fetchFields) {
-              await place.fetchFields({ fields: widget.requestedPlaceFields });
-            }
+        if (place?.fetchFields) {
+          await place.fetchFields({ fields: widget.requestedPlaceFields });
+        }
 
-            selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
+        const comps = place?.addressComponents || place?.address_components || [];
 
-            // If Google didn't include ZIP in formattedAddress, add it from addressComponents
-            if (selectedZip && selectedFormattedAddress && !selectedFormattedAddress.includes(selectedZip)) {
-              const usaRegex = /,\s*(USA|United States)\s*$/i;
+        function pickComp(type) {
+          const c = (comps || []).find(x => (x.types || []).includes(type));
+          return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
+        }
 
-              if (usaRegex.test(selectedFormattedAddress)) {
-                // Insert ZIP before country
-                selectedFormattedAddress = selectedFormattedAddress.replace(
-                  usaRegex,
-                  ` ${selectedZip}, USA`
-                );
-              } else {
-                // Otherwise append ZIP
-                selectedFormattedAddress = `${selectedFormattedAddress} ${selectedZip}`.trim();
-              }
-            }
+        selectedZip = pickComp("postal_code");
+        selectedState = pickComp("administrative_area_level_1");
+        selectedCity =
+          pickComp("locality") ||
+          pickComp("postal_town") ||
+          pickComp("sublocality") ||
+          pickComp("sublocality_level_1");
 
-            // Save final address
-            hiddenAddressInput.value = selectedFormattedAddress;
+        selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
 
-            console.log("✅ Final address saved:", selectedFormattedAddress);
-            console.log("📮 ZIP:", selectedZip, "State:", selectedState, "City:", selectedCity);
+        // Ensure ZIP exists in address
+        if (selectedZip && !selectedFormattedAddress.includes(selectedZip)) {
+          const usaRegex = /,\s*(USA|United States)\s*$/i;
 
-            console.log("✅ Selected address:", selected);
-          } catch (e) {
-            console.error("❌ Address select failed:", e);
-            hiddenAddressInput.value = "";
-          } finally {
-            addressSelectionInProgress = false;
-            if (signupButtonEl) signupButtonEl.disabled = false;
+          if (usaRegex.test(selectedFormattedAddress)) {
+            selectedFormattedAddress = selectedFormattedAddress.replace(
+              usaRegex,
+              ` ${selectedZip}, USA`
+            );
+          } else {
+            selectedFormattedAddress =
+              `${selectedFormattedAddress} ${selectedZip}`.trim();
           }
-        });
-      }
+        }
 
-      window.initMap = initMap;
-  </script>
+        hiddenAddressInput.value = selectedFormattedAddress;
+
+        console.log("✅ Address:", selectedFormattedAddress);
+        console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
+
+      } catch (e) {
+        console.error("❌ Address select failed:", e);
+        hiddenAddressInput.value = "";
+      } finally {
+        addressSelectionInProgress = false;
+        if (signupButtonEl) signupButtonEl.disabled = false;
+      }
+    });
+  }
+
+  window.initMap = initMap;
+</script>
 </head>
 
 <body>

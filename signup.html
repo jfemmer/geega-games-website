@@ -162,9 +162,6 @@
 
 <script>
   let selectedFormattedAddress = "";
-  let selectedCity = "";
-  let selectedState = "";
-  let selectedZip = "";
   let addressSelectionInProgress = false;
 
   async function initMap() {
@@ -176,75 +173,74 @@
 
     if (!widget || !hiddenAddressInput) return;
 
-    widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
+    widget.requestedPlaceFields = ["formattedAddress","addressComponents","location"];
 
-    widget.addEventListener("gmp-select", async (event) => {
-      addressSelectionInProgress = true;
-      if (signupButtonEl) signupButtonEl.disabled = true;
+widget.addEventListener("gmp-select", async (event) => {
+  addressSelectionInProgress = true;
+  if (signupButtonEl) signupButtonEl.disabled = true;
 
-      try {
-        const place = event.detail?.place || event.place;
+  try {
+    const place = event.detail?.place || event.place;
 
-        if (place?.fetchFields) {
-          await place.fetchFields({ fields: widget.requestedPlaceFields });
-        }
+    if (place?.fetchFields) {
+      await place.fetchFields({ fields: widget.requestedPlaceFields });
+    }
 
-        const comps = place?.addressComponents || place?.address_components || [];
+    const comps = place?.addressComponents || place?.address_components || [];
 
-        function pickComp(type) {
-          const c = (comps || []).find((x) => {
-            const types = x?.types || [];
-            const ct = x?.componentType; // GMP sometimes uses this
-            return (Array.isArray(types) && types.includes(type)) || ct === type;
-          });
-          return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
-        }
+    function pickComp(type) {
+      const c = (comps || []).find((x) => {
+        const types = x?.types || [];
+        const ct = x?.componentType; // ✅ GMP uses this sometimes
+        return (Array.isArray(types) && types.includes(type)) || ct === type;
+      });
+      return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
+    }
 
-        const streetNumber = pickComp("street_number");
-        const route = pickComp("route");
+    // Build a single address string that includes ZIP
+    const streetNumber = pickComp("street_number");
+    const route = pickComp("route");
+    const city =
+      pickComp("locality") ||
+      pickComp("postal_town") ||
+      pickComp("sublocality") ||
+      pickComp("sublocality_level_1");
+    const state = pickComp("administrative_area_level_1"); // ex: MO
+    const zip = pickComp("postal_code");
+    const country = pickComp("country") || "USA";
 
-        const city =
-          pickComp("locality") ||
-          pickComp("postal_town") ||
-          pickComp("sublocality") ||
-          pickComp("sublocality_level_1");
+    const line1 = [streetNumber, route].filter(Boolean).join(" ").trim();
+    const line2 = [city, state, zip].filter(Boolean).join(" ").trim();
 
-        const state = pickComp("administrative_area_level_1"); // ex: MO
-        const zip = pickComp("postal_code");
-        const country = pickComp("country") || "USA";
+    selectedFormattedAddress = [line1, line2, country].filter(Boolean).join(", ").trim();
 
-        const line1 = [streetNumber, route].filter(Boolean).join(" ").trim();
-        const line2 = [city, state, zip].filter(Boolean).join(" ").trim();
+    // Fallback if components are missing for some reason
+    if (!selectedFormattedAddress) {
+      selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
+    }
 
-        selectedFormattedAddress = [line1, line2, country].filter(Boolean).join(", ").trim();
+    // Optional: keep your globals (if you use them elsewhere)
+    selectedCity = city;
+    selectedState = state;
+    selectedZip = zip;
 
-        // Fallback if components are missing
-        if (!selectedFormattedAddress) {
-          selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
-        }
+    // ✅ This is what your form submits and what MongoDB stores as address
+    hiddenAddressInput.value = selectedFormattedAddress;
 
-        // Save globals (optional)
-        selectedCity = city;
-        selectedState = state;
-        selectedZip = zip;
-
-        // ✅ This is what gets submitted to your DB as the one-string address
-        hiddenAddressInput.value = selectedFormattedAddress;
-
-        console.log("✅ Final address saved:", selectedFormattedAddress);
-        console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
-      } catch (e) {
-        console.error("❌ Address select failed:", e);
-        hiddenAddressInput.value = "";
-        selectedFormattedAddress = "";
-        selectedCity = "";
-        selectedState = "";
-        selectedZip = "";
-      } finally {
-        addressSelectionInProgress = false;
-        if (signupButtonEl) signupButtonEl.disabled = false;
-      }
-    });
+    console.log("✅ Final address saved:", selectedFormattedAddress);
+    console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
+  } catch (e) {
+    console.error("❌ Address select failed:", e);
+    hiddenAddressInput.value = "";
+    selectedFormattedAddress = "";
+    selectedCity = "";
+    selectedState = "";
+    selectedZip = "";
+  } finally {
+    addressSelectionInProgress = false;
+    if (signupButtonEl) signupButtonEl.disabled = false;
+  }
+});
   }
 
   window.initMap = initMap;

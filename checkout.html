@@ -281,6 +281,39 @@ gmpx-placeautocomplete {
 </div>
 </div>
 
+<div class="section" id="store-credit-section">
+  <h2>Store Credit</h2>
+  <div class="summary">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div><strong>Available:</strong></div>
+      <div id="store-credit-available">$0.00</div>
+    </div>
+
+    <label style="display:block; margin-top: 12px;">
+      <input type="checkbox" id="use-store-credit" />
+      Apply store credit to this order
+    </label>
+
+    <div id="store-credit-controls" style="display:none; margin-top: 10px;">
+      <label style="display:block; font-size: 14px; margin-bottom: 6px;">Amount to apply</label>
+      <input
+        id="store-credit-amount"
+        type="number"
+        inputmode="decimal"
+        min="0"
+        step="0.01"
+        placeholder="0.00"
+        style="width: 180px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px;"
+      />
+      <div id="store-credit-max-note" style="margin-top: 6px; font-size: 12px; color: #666;"></div>
+    </div>
+
+    <div style="margin-top: 12px;">
+      <strong>Amount due after credit:</strong> <span id="amount-due">$0.00</span>
+    </div>
+  </div>
+</div>
+
    <div class="payment-methods" id="payment-methods" style="margin-bottom: 25px;">
  <div class="payment-button-wrapper">
   <div id="venmo-btn-container"></div>
@@ -307,6 +340,60 @@ gmpx-placeautocomplete {
 const API_BASE = 'https://geega-games-website-production.up.railway.app';
 let currentUser = null;
 
+/* =========================================
+   🟣 STORE CREDIT STATE + HELPERS (NEW)
+========================================= */
+let storeCreditAvailableCents = 0;
+let storeCreditToUseCents = 0;
+let lastStripePaymentIntentId = null;
+
+function formatMoneyFromCents(cents) {
+  const n = Math.max(0, Number(cents || 0)) / 100;
+  return `$${n.toFixed(2)}`;
+}
+
+function normalizeStoreCreditCents(user) {
+  if (!user) return 0;
+  if (typeof user.storeCreditCents === 'number') return Math.max(0, Math.floor(user.storeCreditCents));
+  if (typeof user.storeCredit === 'number') return Math.max(0, Math.round(user.storeCredit * 100));
+  if (typeof user.storeCredit === 'string' && user.storeCredit.trim()) {
+    const parsed = Number(user.storeCredit);
+    return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed * 100)) : 0;
+  }
+  return 0;
+}
+
+function updateStoreCreditUI() {
+  const availEl = document.getElementById('store-credit-available');
+  const maxNote = document.getElementById('store-credit-max-note');
+
+  if (availEl) availEl.textContent = formatMoneyFromCents(storeCreditAvailableCents);
+  if (maxNote) maxNote.textContent = `Max you can apply: ${formatMoneyFromCents(storeCreditAvailableCents)}`;
+}
+
+function applyStoreCreditFromUI() {
+  const checkbox = document.getElementById('use-store-credit');
+  const amountInput = document.getElementById('store-credit-amount');
+
+  if (!checkbox?.checked) {
+    storeCreditToUseCents = 0;
+    calculateAndDisplayTotal();
+    return;
+  }
+
+  const raw = Number(amountInput?.value || 0);
+  const requestedCents = Number.isFinite(raw) ? Math.max(0, Math.round(raw * 100)) : 0;
+
+  storeCreditToUseCents = Math.min(requestedCents, storeCreditAvailableCents);
+
+  if (amountInput) amountInput.value = (storeCreditToUseCents / 100).toFixed(2);
+
+  calculateAndDisplayTotal();
+}
+
+/* =========================================
+   ADDRESS AUTOCOMPLETE
+========================================= */
 function initAutocomplete() {
   const input = document.getElementById('autocomplete');
   const autocomplete = new google.maps.places.Autocomplete(input, {
@@ -323,24 +410,43 @@ function initAutocomplete() {
   });
 }
 
+/* =========================================
+   TOTAL CALC (UPDATED FOR STORE CREDIT)
+========================================= */
 function calculateAndDisplayTotal() {
   let base = parseFloat(localStorage.getItem('cartTotal'));
   if (isNaN(base)) base = 0;
 
   const shipping = document.querySelector('input[name="shippingMethod"]:checked')?.value;
-  let total = base;
+  let totalBeforeCredit = base;
 
   const qualifiesForFreeTracking = base >= 75 && shipping === 'tracked';
   console.log(`📦 Base: ${base}, Shipping: ${shipping}, Free tracking? ${qualifiesForFreeTracking}`);
 
-if (shipping === 'tracked' && !qualifiesForFreeTracking) {
-  total += 5;
-} else if (shipping === 'pwe') {
-  total += 1.25;
-}
+  if (shipping === 'tracked' && !qualifiesForFreeTracking) {
+    totalBeforeCredit += 5;
+  } else if (shipping === 'pwe') {
+    totalBeforeCredit += 1.25;
+  }
 
-  document.getElementById('summary-total').textContent = `$${total.toFixed(2)}`;
-  localStorage.setItem('cartTotalFinal', total.toFixed(2));
+  const totalBeforeCreditCents = Math.round(totalBeforeCredit * 100);
+  const creditAppliedCents = Math.min(storeCreditToUseCents, totalBeforeCreditCents);
+  const finalDueCents = Math.max(0, totalBeforeCreditCents - creditAppliedCents);
+
+  const totalBeforeCreditDollars = totalBeforeCreditCents / 100;
+  const finalDueDollars = finalDueCents / 100;
+
+  // What the customer should pay (after credit)
+  document.getElementById('summary-total').textContent = `$${finalDueDollars.toFixed(2)}`;
+
+  // If your HTML has this element, keep it updated too
+  const amountDueEl = document.getElementById('amount-due');
+  if (amountDueEl) amountDueEl.textContent = `$${finalDueDollars.toFixed(2)}`;
+
+  // Save both values:
+  localStorage.setItem('cartTotalFinal', totalBeforeCreditDollars.toFixed(2));       // BEFORE credit
+  localStorage.setItem('cartTotalDueAfterCredit', finalDueDollars.toFixed(2));      // AFTER credit
+  localStorage.setItem('storeCreditToUseCents', String(creditAppliedCents));        // actual applied
 
   const freeTrackingNote = document.getElementById('free-tracking-note');
   if (freeTrackingNote) {
@@ -348,6 +454,9 @@ if (shipping === 'tracked' && !qualifiesForFreeTracking) {
   }
 }
 
+/* =========================================
+   INITIAL LOAD: USER + CART
+========================================= */
 (async () => {
   const userId = localStorage.getItem('userId');
   if (!userId) {
@@ -367,6 +476,16 @@ if (shipping === 'tracked' && !qualifiesForFreeTracking) {
 
       const parts = [currentUser.address, currentUser.state, currentUser.zip].filter(Boolean);
       document.getElementById('shipping-address').textContent = parts.join(', ') || 'Not provided';
+
+      // 🟣 NEW: load store credit from user + update UI
+      storeCreditAvailableCents = normalizeStoreCreditCents(currentUser);
+      updateStoreCreditUI();
+
+      // Optional: prefill store credit amount input to max available
+      const amountInput = document.getElementById('store-credit-amount');
+      if (amountInput && !amountInput.value) {
+        amountInput.value = (storeCreditAvailableCents / 100).toFixed(2);
+      }
     } else {
       document.getElementById('summary-name').textContent = 'User not found';
       document.getElementById('summary-email').textContent = '—';
@@ -426,25 +545,27 @@ if (shipping === 'tracked' && !qualifiesForFreeTracking) {
       container.appendChild(card);
     }
 
- // 👇 Sum up the cart
-let subtotal = 0;
-for (const item of data.items) {
-  const price = parseFloat(item.priceUsd || 0);
-  const quantity = item.quantity || 1;
-  subtotal += price * quantity;
-}
-localStorage.setItem('cartTotal', subtotal.toFixed(2));
+    // 👇 Sum up the cart
+    let subtotal = 0;
+    for (const item of data.items) {
+      const price = parseFloat(item.priceUsd || 0);
+      const quantity = item.quantity || 1;
+      subtotal += price * quantity;
+    }
+    localStorage.setItem('cartTotal', subtotal.toFixed(2));
 
-// 👇 Force update shipping cost & display
-updatePaymentOptions();  // ✅ This now works with the real subtotal
-
-calculateAndDisplayTotal(); // 🔁 Now this uses correct subtotal
+    // 👇 Force update shipping cost & display
+    updatePaymentOptions();
+    calculateAndDisplayTotal();
   } catch (err) {
     console.error('❌ Error loading cart data:', err);
     document.getElementById('cart-cards').innerHTML = '<p>Failed to load cart items.</p>';
   }
 })();
 
+/* =========================================
+   PAYMENT OPTIONS UI
+========================================= */
 function updatePaymentOptions() {
   const shipping = document.querySelector('input[name="shippingMethod"]:checked')?.value;
   const storedTotal = localStorage.getItem('cartTotal');
@@ -476,7 +597,7 @@ function updatePaymentOptions() {
     // Render PayPal button once
     if (!window.paypalButtonRendered) {
       window.paypalButtonRendered = true;
-      const total = localStorage.getItem('cartTotalFinal') || '0.00';
+      const total = localStorage.getItem('cartTotalFinal') || '0.00'; // BEFORE credit (PayPal flow isn’t server-confirmed)
 
       paypal.Buttons({
         createOrder: function(data, actions) {
@@ -501,11 +622,13 @@ function updatePaymentOptions() {
   calculateAndDisplayTotal();
 }
 
+/* =========================================
+   ADDRESS MODAL
+========================================= */
 function editAddress() {
   const modal = document.getElementById('address-modal');
   modal.style.display = 'flex';
 
-  // Optional: Initialize autocomplete once
   setTimeout(() => {
     if (!window._addressAutocompleteInitialized) {
       initAutocomplete();
@@ -549,12 +672,20 @@ async function saveAddress() {
   }
 }
 
-
+/* =========================================
+   EXTERNAL PAYMENT REDIRECT (OPTIONAL UPDATE)
+   NOTE: This uses amount AFTER credit (if applied).
+========================================= */
 function redirectTo(method) {
   window.lastSelectedPaymentMethod = method;
 
-  const raw = localStorage.getItem('cartTotalFinal') || localStorage.getItem('cartTotal') || '0.00';
-  const amount = parseFloat(raw).toFixed(2);
+  // Pay what’s due AFTER store credit
+  const rawDue = localStorage.getItem('cartTotalDueAfterCredit')
+    || localStorage.getItem('cartTotalFinal')
+    || localStorage.getItem('cartTotal')
+    || '0.00';
+
+  const amount = parseFloat(rawDue).toFixed(2);
   const note = encodeURIComponent('MTG Order');
 
   switch (method) {
@@ -572,7 +703,10 @@ function redirectTo(method) {
   }
 }
 
-async function placeOrder() {
+/* =========================================
+   PLACE ORDER (UPDATED: store credit + overrides)
+========================================= */
+async function placeOrder(options = {}) {
   const userId = localStorage.getItem('userId');
   if (!userId || !currentUser) {
     alert('❌ Please log in before placing an order.');
@@ -580,12 +714,17 @@ async function placeOrder() {
   }
 
   const shippingMethod = document.querySelector('input[name="shippingMethod"]:checked')?.value || 'pwe';
-  const selectedPayment = window.lastSelectedPaymentMethod || 'venmo';
+  const selectedPayment = options.paymentMethodOverride || window.lastSelectedPaymentMethod || 'venmo';
 
   if (shippingMethod === 'pwe' && selectedPayment !== 'venmo') {
     alert('❌ Only Venmo (Friends & Family) is accepted for Plain White Envelope shipping.');
     return;
   }
+
+  // 🟣 how much credit the UI applied (actual applied cents is stored by calculateAndDisplayTotal)
+  let storeCreditUsedCents = Number(localStorage.getItem('storeCreditToUseCents') || '0');
+  if (!Number.isFinite(storeCreditUsedCents)) storeCreditUsedCents = 0;
+  storeCreditUsedCents = Math.max(0, Math.floor(storeCreditUsedCents));
 
   try {
     const cartRes = await fetch(`${API_BASE}/api/cart?userId=${userId}`);
@@ -617,7 +756,6 @@ async function placeOrder() {
     });
 
     const priceMap = await priceRes.json();
-
     const normalize = str => str?.toLowerCase().trim().replace(/\s+/g, ' ') || '';
 
     for (const item of cartItems) {
@@ -630,8 +768,9 @@ async function placeOrder() {
       item.priceUsd = parseFloat(price.toFixed(2));
     }
 
-    const storedTotal = localStorage.getItem('cartTotalFinal');
-    const orderTotal = parseFloat(storedTotal) || 0;
+    // IMPORTANT: orderTotal should be BEFORE credit (true order total), storeCreditUsedCents tracks discount
+    const storedTotalBeforeCredit = localStorage.getItem('cartTotalFinal');
+    const orderTotal = parseFloat(storedTotalBeforeCredit) || 0;
 
     const order = {
       userId,
@@ -642,7 +781,12 @@ async function placeOrder() {
       cards: cartItems,
       shippingMethod,
       paymentMethod: selectedPayment,
-      orderTotal
+      orderTotal,
+
+      // ✅ Stripe + store credit fields (NEW)
+      stripePaymentIntentId: options.stripePaymentIntentIdOverride || lastStripePaymentIntentId || null,
+      paymentStatus: options.paymentStatusOverride || (selectedPayment === 'card' ? 'paid' : 'unpaid'),
+      storeCreditUsedCents
     };
 
     const res = await fetch(`${API_BASE}/api/orders`, {
@@ -663,7 +807,8 @@ async function placeOrder() {
 
       window.location.href = `checkout-success.html?orderId=${orderId}`;
     } else {
-      alert('❌ Failed to place order.');
+      const errJson = await res.json().catch(() => ({}));
+      alert(errJson.message || '❌ Failed to place order.');
     }
   } catch (err) {
     console.error('❌ Order error:', err);
@@ -671,11 +816,30 @@ async function placeOrder() {
   }
 }
 
+/* =========================================
+   DOM READY: DEFAULTS + STRIPE + STORE CREDIT UI
+========================================= */
 document.addEventListener('DOMContentLoaded', () => {
   // ✅ 1. Set default shipping option
   const trackedRadio = document.querySelector('input[name="shippingMethod"][value="tracked"]');
   if (trackedRadio) trackedRadio.checked = true;
   updatePaymentOptions();
+
+  // 🟣 Store credit checkbox + input wiring (NEW)
+  const useCreditCb = document.getElementById('use-store-credit');
+  const creditControls = document.getElementById('store-credit-controls');
+  const creditAmountInput = document.getElementById('store-credit-amount');
+
+  if (useCreditCb) {
+    useCreditCb.addEventListener('change', () => {
+      if (creditControls) creditControls.style.display = useCreditCb.checked ? 'block' : 'none';
+      applyStoreCreditFromUI();
+    });
+  }
+  if (creditAmountInput) {
+    creditAmountInput.addEventListener('input', applyStoreCreditFromUI);
+    creditAmountInput.addEventListener('blur', applyStoreCreditFromUI);
+  }
 
   // ✅ 2. Initialize Stripe
   const stripe = Stripe('pk_test_51RNUixQe9DCrM8Iiw6nGv65MIpZkQkSjXHLEYFTBEC9sDUOazGatkUYAhsZpRqOP8qadX5G8GyReU4a0uUOLUa4c00Zcx1NgAX');
@@ -687,66 +851,129 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('card-errors').textContent = error ? error.message : '';
   });
 
-  // ✅ 3. Handle payment and order on submit
- document.querySelector('.submit-btn').addEventListener('click', async (e) => {
-  e.preventDefault();
+  // ✅ 3. Handle payment and order on submit (UPDATED FOR STORE CREDIT)
+  document.querySelector('.submit-btn').addEventListener('click', async (e) => {
+    e.preventDefault();
 
-  const button = e.target;
-  const overlay = document.getElementById('processing-overlay');
-  const message = document.getElementById('processing-message');
-  
-  button.disabled = true;
-  overlay.style.display = 'flex';
-  message.textContent = 'Processing payment...';
+    const userId = localStorage.getItem('userId');
+    if (!userId || !currentUser) {
+      alert('❌ Please log in before placing an order.');
+      return;
+    }
 
-  const totalAmount = localStorage.getItem('cartTotalFinal') || '0.00';
+    const shippingMethod = document.querySelector('input[name="shippingMethod"]:checked')?.value || 'tracked';
 
-  const response = await fetch(`${API_BASE}/create-payment-intent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount: totalAmount })
-  });
+    const button = e.target;
+    const overlay = document.getElementById('processing-overlay');
+    const message = document.getElementById('processing-message');
 
-  const { clientSecret, error: backendError } = await response.json();
+    button.disabled = true;
+    overlay.style.display = 'flex';
+    message.textContent = 'Processing payment...';
 
-  if (backendError) {
-    overlay.style.display = 'none';
-    alert(`Backend Error: ${backendError}`);
-    button.disabled = false;
-    return;
-  }
+    // 🟣 Ensure our totals/localStorage are current
+    applyStoreCreditFromUI(); // clamps + recalculates
+    const creditToApplyCents = Number(localStorage.getItem('storeCreditToUseCents') || '0') || 0;
 
-  const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
-    payment_method: {
-      card: card,
-      billing_details: {
-        name: `${currentUser.firstName} ${currentUser.lastName}`,
-        email: currentUser.email,
-        address: {
-          line1: currentUser.address,
-          postal_code: currentUser.zip,
-          state: currentUser.state,
-        },
-      },
+    try {
+      // Ask server to create PI for remaining due AFTER credit
+      const response = await fetch(`${API_BASE}/create-payment-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          shippingMethod,
+          storeCreditToApplyCents: creditToApplyCents
+        })
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      const {
+        clientSecret,
+        error: backendError,
+        paymentIntentId,
+        storeCreditAppliedCents,
+        amountDueCents
+      } = payload;
+
+      if (backendError) {
+        overlay.style.display = 'none';
+        alert(`Backend Error: ${backendError}`);
+        button.disabled = false;
+        return;
+      }
+
+      // Snap UI credit to what the server actually accepted
+      if (typeof storeCreditAppliedCents === 'number') {
+        storeCreditToUseCents = storeCreditAppliedCents;
+        localStorage.setItem('storeCreditToUseCents', String(storeCreditAppliedCents));
+        calculateAndDisplayTotal();
+      }
+
+      lastStripePaymentIntentId = paymentIntentId || null;
+
+      // ✅ If credit covers everything, skip Stripe and place order as PAID via store credit
+      if (clientSecret === null || amountDueCents === 0) {
+        message.textContent = '✅ Store credit applied! Placing your order...';
+        window.lastSelectedPaymentMethod = 'store_credit';
+
+        await placeOrder({
+          paymentMethodOverride: 'store_credit',
+          paymentStatusOverride: 'paid',
+          stripePaymentIntentIdOverride: null
+        });
+
+        return;
+      }
+
+      // Otherwise, confirm Stripe card payment for remaining amount
+      const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: card,
+          billing_details: {
+            name: `${currentUser.firstName} ${currentUser.lastName}`,
+            email: currentUser.email,
+            address: {
+              line1: currentUser.address,
+              postal_code: currentUser.zip,
+              state: currentUser.state
+            }
+          }
+        }
+      });
+
+      if (error) {
+        overlay.style.display = 'none';
+        document.getElementById('card-errors').textContent = error.message;
+        button.disabled = false;
+        return;
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        message.textContent = '✅ Payment successful! Placing your order...';
+        window.lastSelectedPaymentMethod = 'card';
+        lastStripePaymentIntentId = paymentIntent.id;
+
+        await placeOrder({
+          paymentMethodOverride: 'card',
+          paymentStatusOverride: 'paid',
+          stripePaymentIntentIdOverride: paymentIntent.id
+        });
+
+        return;
+      }
+
+      overlay.style.display = 'none';
+      alert('❌ Payment was not successful.');
+      button.disabled = false;
+    } catch (err) {
+      console.error('❌ Stripe/order error:', err);
+      overlay.style.display = 'none';
+      alert('Something went wrong while processing payment.');
+      button.disabled = false;
     }
   });
-
-  if (error) {
-    overlay.style.display = 'none';
-    document.getElementById('card-errors').textContent = error.message;
-    button.disabled = false;
-  } else if (paymentIntent.status === 'succeeded') {
-    message.textContent = '✅ Payment successful! Placing your order...';
-    await placeOrder();
-  } else {
-    overlay.style.display = 'none';
-    alert('❌ Payment was not successful.');
-    button.disabled = false;
-  }
 });
-});
-
-
 </script>
 
 <div id="address-modal" style="

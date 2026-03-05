@@ -182,19 +182,17 @@
         try {
           const place = event.place;
 
-          // Fetch requested fields (formattedAddress, etc.)
-          await place.fetchFields({ fields: widget.requestedPlaceFields });
+          await place.fetchFields({
+            fields: widget.requestedPlaceFields
+          });
 
-          selectedFormattedAddress = (place.formattedAddress || "").trim();
+          selectedFormattedAddress =
+            (place.formattedAddress || widget.value || "").trim();
 
-          // ✅ Always write the final formatted address into the hidden input
-          if (selectedFormattedAddress) {
-            hiddenAddressInput.value = selectedFormattedAddress;
-            console.log("✅ Selected address:", selectedFormattedAddress);
-          } else {
-            hiddenAddressInput.value = "";
-            console.warn("⚠️ No formattedAddress returned.");
-          }
+          hiddenAddressInput.value = selectedFormattedAddress;
+
+          console.log("✅ Selected address:", selectedFormattedAddress);
+
         } catch (e) {
           console.error("❌ Address select failed:", e);
           hiddenAddressInput.value = "";

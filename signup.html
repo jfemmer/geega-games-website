@@ -162,9 +162,6 @@
 
 <script>
   let selectedFormattedAddress = "";
-  let selectedCity = "";
-  let selectedState = "";
-  let selectedZip = "";
   let addressSelectionInProgress = false;
 
   async function initMap() {
@@ -176,115 +173,75 @@
 
     if (!widget || !hiddenAddressInput) return;
 
-    // ✅ IMPORTANT: include postalAddress
-    widget.requestedPlaceFields = [
-      "formattedAddress",
-      "postalAddress",
-      "addressComponents",
-      "location"
-    ];
+    widget.requestedPlaceFields = ["formattedAddress","addressComponents","location"];
 
-    widget.addEventListener("gmp-select", async (event) => {
-      addressSelectionInProgress = true;
-      if (signupButtonEl) signupButtonEl.disabled = true;
+widget.addEventListener("gmp-select", async (event) => {
+  addressSelectionInProgress = true;
+  if (signupButtonEl) signupButtonEl.disabled = true;
 
-      try {
-        const place = event.detail?.place || event.place;
+  try {
+    const place = event.detail?.place || event.place;
 
-        if (place?.fetchFields) {
-          await place.fetchFields({ fields: widget.requestedPlaceFields });
-        }
+    if (place?.fetchFields) {
+      await place.fetchFields({ fields: widget.requestedPlaceFields });
+    }
 
-        // Reset
-        selectedCity = "";
-        selectedState = "";
-        selectedZip = "";
+    const comps = place?.addressComponents || place?.address_components || [];
 
-        // ----- Primary: postalAddress (most reliable for ZIP)
-        const pa = place?.postalAddress;
+    function pickComp(type) {
+      const c = (comps || []).find((x) => {
+        const types = x?.types || [];
+        const ct = x?.componentType; // ✅ GMP uses this
+        return (Array.isArray(types) && types.includes(type)) || ct === type;
+      });
+      return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
+    }
 
-        if (pa) {
-          selectedZip = (pa.postalCode || "").trim();
-          selectedState = (pa.administrativeArea || "").trim(); // ex "MO"
-          selectedCity = (pa.locality || pa.subAdministrativeArea || "").trim();
+    // Extract components
+    selectedZip = pickComp("postal_code");
+    selectedState = pickComp("administrative_area_level_1"); // ex: "MO"
+    selectedCity =
+      pickComp("locality") ||
+      pickComp("postal_town") ||
+      pickComp("sublocality") ||
+      pickComp("sublocality_level_1");
 
-          const line1 = Array.isArray(pa.addressLines) ? (pa.addressLines[0] || "").trim() : "";
-          const country = (pa.regionCode || "US").trim();
+    // Start with Google's formatted address (or widget value)
+    selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
 
-          // Build one string including ZIP
-          const line2 = [selectedCity, selectedState, selectedZip].filter(Boolean).join(" ").trim();
+    // ✅ Inject ZIP into the formatted address if it's missing
+    if (selectedZip && selectedFormattedAddress && !selectedFormattedAddress.includes(selectedZip)) {
+      const usaRegex = /,\s*(USA|United States)\s*$/i;
 
-          selectedFormattedAddress = [line1, line2, country === "US" ? "USA" : country]
-            .filter(Boolean)
-            .join(", ")
-            .trim();
-
-        } else {
-          // ----- Fallback: addressComponents (if postalAddress missing)
-          const comps = place?.addressComponents || place?.address_components || [];
-
-          function pickComp(type) {
-            const c = (comps || []).find((x) => {
-              const types = x?.types || [];
-              const ct = x?.componentType;
-              return (Array.isArray(types) && types.includes(type)) || ct === type;
-            });
-            return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
-          }
-
-          const streetNumber = pickComp("street_number");
-          const route = pickComp("route");
-          selectedCity =
-            pickComp("locality") ||
-            pickComp("postal_town") ||
-            pickComp("sublocality") ||
-            pickComp("sublocality_level_1");
-          selectedState = pickComp("administrative_area_level_1");
-          selectedZip = pickComp("postal_code");
-          const country = pickComp("country") || "USA";
-
-          const line1 = [streetNumber, route].filter(Boolean).join(" ").trim();
-          const line2 = [selectedCity, selectedState, selectedZip].filter(Boolean).join(" ").trim();
-
-          selectedFormattedAddress = [line1, line2, country].filter(Boolean).join(", ").trim();
-        }
-
-        // Final fallback: formattedAddress (may not include ZIP)
-        if (!selectedFormattedAddress) {
-          selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
-        }
-
-        const candidate = (selectedFormattedAddress || "").trim();
-
-        // Only save if it looks like an actual address
-        // (has a number and at least one comma)
-        const looksLikeAddress = /\d/.test(candidate) && candidate.includes(",");
-
-        if (looksLikeAddress) {
-          hiddenAddressInput.value = candidate;
-        } else {
-          // keep previous hidden value instead of replacing with "USA"
-          console.warn("⚠️ Not saving bad address candidate:", candidate);
-        }
-
-
-        console.log("✅ Final address saved:", selectedFormattedAddress);
-        console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
-        console.log("🔎 place.postalAddress:", place?.postalAddress);
-        console.log("🔎 place.addressComponents:", place?.addressComponents);
-
-      } catch (e) {
-        console.error("❌ Address select failed:", e);
-        hiddenAddressInput.value = "";
-        selectedFormattedAddress = "";
-        selectedCity = "";
-        selectedState = "";
-        selectedZip = "";
-      } finally {
-        addressSelectionInProgress = false;
-        if (signupButtonEl) signupButtonEl.disabled = false;
+      if (usaRegex.test(selectedFormattedAddress)) {
+        // Insert ZIP before country
+        selectedFormattedAddress = selectedFormattedAddress.replace(
+          usaRegex,
+          ` ${selectedZip}, USA`
+        );
+      } else {
+        // Otherwise append ZIP at end
+        selectedFormattedAddress = `${selectedFormattedAddress} ${selectedZip}`.trim();
       }
-    });
+    }
+
+    // ✅ This is what your form submits (and what gets stored in MongoDB as address)
+    hiddenAddressInput.value = selectedFormattedAddress;
+
+    console.log("✅ Final address saved:", selectedFormattedAddress);
+    console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
+  } catch (e) {
+    console.error("❌ Address select failed:", e);
+    hiddenAddressInput.value = "";
+    selectedFormattedAddress = "";
+    selectedCity = "";
+    selectedState = "";
+    selectedZip = "";
+  } finally {
+    addressSelectionInProgress = false;
+    if (signupButtonEl) signupButtonEl.disabled = false;
+  }
+});
   }
 
   window.initMap = initMap;
@@ -490,128 +447,95 @@
     });
 
     // ✅ Submit
-signupForm.addEventListener('submit', async function (event) {
-  event.preventDefault();
-  setError("");
-  setSuccess("");
+    signupForm.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      setError("");
+      setSuccess("");
 
-  const password = document.getElementById('new-password').value.trim();
-  const confirmPassword = document.getElementById('confirm-password').value.trim();
+      const password = document.getElementById('new-password').value.trim();
+      const confirmPassword = document.getElementById('confirm-password').value.trim();
 
-  if (password !== confirmPassword) {
-    setError("Passwords do not match!");
-    return;
-  }
-
-  if (addressSelectionInProgress) {
-    setError("Please wait a second — finishing address selection…");
-    return;
-  }
-
-  let fullAddress = document.getElementById("autocomplete").value.trim();
-
-  if (!fullAddress) {
-    setError("Please select your full address from the dropdown suggestions.");
-    document.getElementById("address-autocomplete").focus();
-    return;
-  }
-
-  // Validate address with backend (Shippo)
-  let verifiedAddress = fullAddress;
-
-  try {
-    const validateResp = await fetch(
-      "https://geega-games-website-production.up.railway.app/api/address/validate",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: fullAddress })
+      if (password !== confirmPassword) {
+        setError("Passwords do not match!");
+        return;
       }
-    );
 
-    const validateJson = await validateResp.json().catch(() => ({}));
-
-    if (!validateResp.ok || !validateJson.ok) {
-      setError("We couldn't verify that address. Please double-check it.");
-      return;
-    }
-
-    if (!validateJson.verifiedAddress) {
-      setError("We couldn't verify that address.");
-      return;
-    }
-
-    if (!validateJson.zipFound) {
-      setError("We couldn't verify a ZIP code for that address.");
-      return;
-    }
-
-verifiedAddress = validateJson.verifiedAddress;
-
-    // overwrite hidden field with verified address
-    document.getElementById("autocomplete").value = verifiedAddress;
-
-  } catch (err) {
-    console.error("Address validation error:", err);
-    setError("Could not verify the address. Try again.");
-    return;
-  }
-
-  const newUser = {
-    firstName: document.getElementById('first-name').value.trim(),
-    lastName: document.getElementById('last-name').value.trim(),
-    username: document.getElementById('new-username').value.trim(),
-    email: document.getElementById('new-email').value.trim(),
-    password: password,
-    phone: formatPhoneForTwilio(document.getElementById('phone').value.trim()),
-    address: verifiedAddress,
-
-    announcementNotifications: {
-      enabled: document.getElementById('opt-in-announcements').checked,
-      byEmail: document.getElementById('notify-email').checked,
-      byText: document.getElementById('notify-text').checked
-    },
-
-    shippingNotifications: {
-      enabled: document.getElementById('opt-in-shipping').checked,
-      byEmail: document.getElementById('ship-email').checked,
-      byText: document.getElementById('ship-text').checked
-    }
-  };
-
-  signupButton.disabled = true;
-  signupButton.textContent = "Creating Account...";
-
-  try {
-    const response = await fetch(
-      "https://geega-games-website-production.up.railway.app/signup",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newUser)
+      // Address: accept either verified formatted address OR the typed value
+      const hiddenVal = document.getElementById('autocomplete').value.trim();
+      const widgetVal = (document.getElementById('address-autocomplete').value || "").trim();
+      // ✅ Address: REQUIRE Google selection (and wait for it to finish)
+      if (addressSelectionInProgress) {
+        setError("Please wait a second — finishing address selection…");
+        return;
       }
-    );
 
-    const result = await response.json().catch(() => ({}));
+      const fullAddress = document.getElementById("autocomplete").value.trim();
 
-    if (response.ok) {
-      setSuccess(
-        result.message ||
-          "Account created! Check your email to verify your account, then log in."
-      );
-      signupForm.reset();
-      document.getElementById('autocomplete').value = "";
-    } else {
-      setError(result.message || "Signup failed. Please check your info.");
-    }
-  } catch (error) {
-    console.error("Signup error:", error);
-    setError("Could not connect to the server. Try again later.");
-  } finally {
-    signupButton.disabled = false;
-    signupButton.textContent = "Sign Up";
-  }
-});
+      if (!fullAddress) {
+        setError("Please select your full address from the dropdown suggestions.");
+        document.getElementById("address-autocomplete").focus();
+        return;
+      }
+
+      // (Optional) extra safety so partials don't slip through
+      if (fullAddress.length < 10 || !fullAddress.includes(",")) {
+        setError("Please select a complete address from the dropdown list.");
+        document.getElementById("address-autocomplete").focus();
+        return;
+      }
+
+      const newUser = {
+        firstName: document.getElementById('first-name').value.trim(),
+        lastName: document.getElementById('last-name').value.trim(),
+        username: document.getElementById('new-username').value.trim(),
+        email: document.getElementById('new-email').value.trim(),
+        password: password,
+        phone: formatPhoneForTwilio(document.getElementById('phone').value.trim()),
+        address: fullAddress,
+
+        announcementNotifications: {
+          enabled: document.getElementById('opt-in-announcements').checked,
+          byEmail: document.getElementById('notify-email').checked,
+          byText: document.getElementById('notify-text').checked
+        },
+
+        shippingNotifications: {
+          enabled: document.getElementById('opt-in-shipping').checked,
+          byEmail: document.getElementById('ship-email').checked,
+          byText: document.getElementById('ship-text').checked
+        }
+      };
+
+      signupButton.disabled = true;
+      signupButton.textContent = "Creating Account...";
+
+      try {
+        // ✅ Your server should create user as "unverified" and send verification email
+        const response = await fetch('https://geega-games-website-production.up.railway.app/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newUser)
+        });
+
+        const result = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          // ✅ Do NOT auto-redirect to login anymore; tell them to verify email
+          setSuccess(result.message || "Account created! Check your email to verify your account, then log in.");
+          signupForm.reset();
+          document.getElementById('autocomplete').value = "";
+          // keep button enabled so they can retry if needed
+        } else {
+          setError(result.message || "Signup failed. Please check your info.");
+        }
+      } catch (error) {
+        console.error("Signup error:", error);
+        setError("Could not connect to the server. Try again later.");
+      } finally {
+        signupButton.disabled = false;
+        signupButton.textContent = "Sign Up";
+      }
+    });
 
     // Google sign-in autofill (unchanged)
     async function handleGoogleLogin(response) {

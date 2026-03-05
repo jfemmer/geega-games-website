@@ -162,6 +162,9 @@
 
 <script>
   let selectedFormattedAddress = "";
+  let selectedCity = "";
+  let selectedState = "";
+  let selectedZip = "";
   let addressSelectionInProgress = false;
 
   async function initMap() {
@@ -173,75 +176,103 @@
 
     if (!widget || !hiddenAddressInput) return;
 
-    widget.requestedPlaceFields = ["formattedAddress","addressComponents","location"];
+    // ✅ IMPORTANT: include postalAddress
+    widget.requestedPlaceFields = [
+      "formattedAddress",
+      "postalAddress",
+      "addressComponents",
+      "location"
+    ];
 
-widget.addEventListener("gmp-select", async (event) => {
-  addressSelectionInProgress = true;
-  if (signupButtonEl) signupButtonEl.disabled = true;
+    widget.addEventListener("gmp-select", async (event) => {
+      addressSelectionInProgress = true;
+      if (signupButtonEl) signupButtonEl.disabled = true;
 
-  try {
-    const place = event.detail?.place || event.place;
+      try {
+        const place = event.detail?.place || event.place;
 
-    if (place?.fetchFields) {
-      await place.fetchFields({ fields: widget.requestedPlaceFields });
-    }
+        if (place?.fetchFields) {
+          await place.fetchFields({ fields: widget.requestedPlaceFields });
+        }
 
-    const comps = place?.addressComponents || place?.address_components || [];
+        // Reset
+        selectedCity = "";
+        selectedState = "";
+        selectedZip = "";
 
-    function pickComp(type) {
-      const c = (comps || []).find((x) => {
-        const types = x?.types || [];
-        const ct = x?.componentType; // ✅ GMP uses this
-        return (Array.isArray(types) && types.includes(type)) || ct === type;
-      });
-      return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
-    }
+        // ----- Primary: postalAddress (most reliable for ZIP)
+        const pa = place?.postalAddress;
 
-    // Extract components
-    selectedZip = pickComp("postal_code");
-    selectedState = pickComp("administrative_area_level_1"); // ex: "MO"
-    selectedCity =
-      pickComp("locality") ||
-      pickComp("postal_town") ||
-      pickComp("sublocality") ||
-      pickComp("sublocality_level_1");
+        if (pa) {
+          selectedZip = (pa.postalCode || "").trim();
+          selectedState = (pa.administrativeArea || "").trim(); // ex "MO"
+          selectedCity = (pa.locality || pa.subAdministrativeArea || "").trim();
 
-    // Start with Google's formatted address (or widget value)
-    selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
+          const line1 = Array.isArray(pa.addressLines) ? (pa.addressLines[0] || "").trim() : "";
+          const country = (pa.regionCode || "US").trim();
 
-    // ✅ Inject ZIP into the formatted address if it's missing
-    if (selectedZip && selectedFormattedAddress && !selectedFormattedAddress.includes(selectedZip)) {
-      const usaRegex = /,\s*(USA|United States)\s*$/i;
+          // Build one string including ZIP
+          const line2 = [selectedCity, selectedState, selectedZip].filter(Boolean).join(" ").trim();
 
-      if (usaRegex.test(selectedFormattedAddress)) {
-        // Insert ZIP before country
-        selectedFormattedAddress = selectedFormattedAddress.replace(
-          usaRegex,
-          ` ${selectedZip}, USA`
-        );
-      } else {
-        // Otherwise append ZIP at end
-        selectedFormattedAddress = `${selectedFormattedAddress} ${selectedZip}`.trim();
+          selectedFormattedAddress = [line1, line2, country === "US" ? "USA" : country]
+            .filter(Boolean)
+            .join(", ")
+            .trim();
+
+        } else {
+          // ----- Fallback: addressComponents (if postalAddress missing)
+          const comps = place?.addressComponents || place?.address_components || [];
+
+          function pickComp(type) {
+            const c = (comps || []).find((x) => {
+              const types = x?.types || [];
+              const ct = x?.componentType;
+              return (Array.isArray(types) && types.includes(type)) || ct === type;
+            });
+            return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
+          }
+
+          const streetNumber = pickComp("street_number");
+          const route = pickComp("route");
+          selectedCity =
+            pickComp("locality") ||
+            pickComp("postal_town") ||
+            pickComp("sublocality") ||
+            pickComp("sublocality_level_1");
+          selectedState = pickComp("administrative_area_level_1");
+          selectedZip = pickComp("postal_code");
+          const country = pickComp("country") || "USA";
+
+          const line1 = [streetNumber, route].filter(Boolean).join(" ").trim();
+          const line2 = [selectedCity, selectedState, selectedZip].filter(Boolean).join(" ").trim();
+
+          selectedFormattedAddress = [line1, line2, country].filter(Boolean).join(", ").trim();
+        }
+
+        // Final fallback: formattedAddress (may not include ZIP)
+        if (!selectedFormattedAddress) {
+          selectedFormattedAddress = (place?.formattedAddress || widget.value || "").trim();
+        }
+
+        hiddenAddressInput.value = selectedFormattedAddress;
+
+        console.log("✅ Final address saved:", selectedFormattedAddress);
+        console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
+        console.log("🔎 place.postalAddress:", place?.postalAddress);
+        console.log("🔎 place.addressComponents:", place?.addressComponents);
+
+      } catch (e) {
+        console.error("❌ Address select failed:", e);
+        hiddenAddressInput.value = "";
+        selectedFormattedAddress = "";
+        selectedCity = "";
+        selectedState = "";
+        selectedZip = "";
+      } finally {
+        addressSelectionInProgress = false;
+        if (signupButtonEl) signupButtonEl.disabled = false;
       }
-    }
-
-    // ✅ This is what your form submits (and what gets stored in MongoDB as address)
-    hiddenAddressInput.value = selectedFormattedAddress;
-
-    console.log("✅ Final address saved:", selectedFormattedAddress);
-    console.log("📮 City:", selectedCity, "State:", selectedState, "ZIP:", selectedZip);
-  } catch (e) {
-    console.error("❌ Address select failed:", e);
-    hiddenAddressInput.value = "";
-    selectedFormattedAddress = "";
-    selectedCity = "";
-    selectedState = "";
-    selectedZip = "";
-  } finally {
-    addressSelectionInProgress = false;
-    if (signupButtonEl) signupButtonEl.disabled = false;
-  }
-});
+    });
   }
 
   window.initMap = initMap;

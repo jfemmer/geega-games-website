@@ -485,6 +485,11 @@
         phone: formatPhoneForTwilio(document.getElementById('phone').value.trim()),
         address: fullAddress,
 
+        // ✅ ADD THESE (this is what your DB needs)
+        city: selectedCity,
+        state: selectedState,
+        zip: selectedZip,
+
         announcementNotifications: {
           enabled: document.getElementById('opt-in-announcements').checked,
           byEmail: document.getElementById('notify-email').checked,

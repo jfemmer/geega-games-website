@@ -192,7 +192,11 @@
         const comps = place?.addressComponents || place?.address_components || [];
 
         function pickComp(type) {
-          const c = (comps || []).find(x => (x.types || []).includes(type));
+          const c = (comps || []).find(x => {
+            const types = x?.types || [];
+            const ct = x?.componentType; // ✅ GMP uses this
+            return (Array.isArray(types) && types.includes(type)) || ct === type;
+          });
           return (c?.shortText || c?.short_name || c?.longText || c?.long_name || "").trim();
         }
 

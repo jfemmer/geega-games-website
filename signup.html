@@ -162,49 +162,42 @@
 
   <script>
     let selectedFormattedAddress = "";
-    let addressSelectionInProgress = false;
+  let addressSelectionInProgress = false;
 
-    async function initMap() {
-      await google.maps.importLibrary("places");
+  async function initMap() {
+    await google.maps.importLibrary("places");
 
-      const widget = document.getElementById("address-autocomplete");
-      const hiddenAddressInput = document.getElementById("autocomplete");
+    const widget = document.getElementById("address-autocomplete");
+    const hiddenAddressInput = document.getElementById("autocomplete");
+    const signupButtonEl = document.getElementById("signup-button");
 
-      if (!widget || !hiddenAddressInput) return;
+    if (!widget || !hiddenAddressInput) return;
 
-      widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
-      
+    widget.requestedPlaceFields = ["formattedAddress", "addressComponents", "location"];
 
-     widget.addEventListener("gmp-select", async (event) => {
-        addressSelectionInProgress = true;
-        signupButton.disabled = true;
+    widget.addEventListener("gmp-select", async (event) => {
+      addressSelectionInProgress = true;
+      if (signupButtonEl) signupButtonEl.disabled = true;
 
-        try {
-          const place = event.place;
+      try {
+        const place = event.place;
+        await place.fetchFields({ fields: widget.requestedPlaceFields });
 
-          await place.fetchFields({
-            fields: widget.requestedPlaceFields
-          });
+        const selected = (place.formattedAddress || widget.value || "").trim();
+        hiddenAddressInput.value = selected;
 
-          selectedFormattedAddress =
-            (place.formattedAddress || widget.value || "").trim();
+        console.log("✅ Selected address:", selected);
+      } catch (e) {
+        console.error("❌ Address select failed:", e);
+        hiddenAddressInput.value = "";
+      } finally {
+        addressSelectionInProgress = false;
+        if (signupButtonEl) signupButtonEl.disabled = false;
+      }
+    });
+  }
 
-          hiddenAddressInput.value = selectedFormattedAddress;
-
-          console.log("✅ Selected address:", selectedFormattedAddress);
-
-        } catch (e) {
-          console.error("❌ Address select failed:", e);
-          hiddenAddressInput.value = "";
-          selectedFormattedAddress = "";
-        } finally {
-          addressSelectionInProgress = false;
-          signupButton.disabled = false;
-        }
-      });
-    }
-
-    window.initMap = initMap;
+  window.initMap = initMap;
   </script>
 </head>
 

@@ -132,6 +132,11 @@ function preserveReviewImage(srcPath, originalName = "scan.png") {
     const filename = `${Date.now()}_${safeBase}${ext}`;
     const dest = path.join(REVIEW_IMAGE_DIR, filename);
 
+    console.log("🖼️ Preserving review image:", {
+      srcPath,
+      originalName
+    });
+
     fs.copyFileSync(srcPath, dest);
 
     return {
@@ -375,6 +380,14 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         if (!guessedName || guessedName.length < 3) {
         const preserved = preserveReviewImage(originalPath, file.originalname);
 
+        console.log("🚨 REVIEW ITEM CREATED", {
+          file: file.originalname,
+          reason: "below_confidence_threshold",
+          score,
+          guessedName,
+          preserved
+        });
+
         queueReviewRecord({
           reqId,
           file: file.originalname,
@@ -582,6 +595,13 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           matchCount,
           // setSymbolScore: null, // later when you add symbol matching
         }) ?? 0;
+
+        console.log("✅ AUTO INGEST", {
+          file: file.originalname,
+          score,
+          guessedName,
+          nameConfidence: nameConf
+        });
 
         if (!shouldAutoIngest?.(score)) {
   const preserved = preserveReviewImage(originalPath, file.originalname);
@@ -3195,6 +3215,16 @@ app.delete("/api/inventory-review/:id", (req, res) => {
   } catch (err) {
     console.error("❌ Failed deleting review item:", err);
     res.status(500).json({ message: "Failed deleting review item." });
+  }
+});
+
+app.get("/api/watch-folder-debug", (req, res) => {
+  try {
+    const WATCH_DIR = path.join(__dirname, "watch_folder");
+    const files = fs.existsSync(WATCH_DIR) ? fs.readdirSync(WATCH_DIR) : [];
+    res.json({ watchDir: WATCH_DIR, files });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

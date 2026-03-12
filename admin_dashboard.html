@@ -998,20 +998,23 @@
 <script>
 
   const API_BASE = "https://geega-games-website-production.up.railway.app";
-  
+
   // ===== SIDEBAR / SECTION SWITCHING =====
   function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('collapsed');
   }
 
-  async function loadInventoryReview() {
+async function loadInventoryReview() {
   const wrap = document.getElementById("inventory-review-list");
-  if (!wrap) return;
+  if (!wrap) {
+    console.error("❌ Missing #inventory-review-list in the DOM");
+    return;
+  }
 
   wrap.innerHTML = "<p>Loading review items...</p>";
 
   try {
-    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory-review");
+    const res = await fetch(`${API_BASE}/api/inventory-review`);
     if (!res.ok) throw new Error(`Failed with ${res.status}`);
 
     const items = await res.json();

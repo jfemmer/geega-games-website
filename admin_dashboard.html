@@ -585,6 +585,16 @@
   gap: 10px;
   margin-top: 10px;
 }
+
+.inventory-tab-btn {
+  width: auto !important;
+  padding: 10px 18px !important;
+  border-radius: 8px;
+}
+
+.inventory-inner-tab {
+  margin-top: 10px;
+}
   </style>
   
 <!-- 🔐 Login Logic (commented out)
@@ -2246,6 +2256,33 @@ async function rejectReview(id) {
 
   loadInventoryReview();
 }
+
+
+function showInventoryTab(tabId, btnEl) {
+  // hide all inventory inner tabs
+  document.querySelectorAll('#inventory-section .inventory-inner-tab').forEach(tab => {
+    tab.style.display = 'none';
+  });
+
+  // show selected tab
+  const target = document.getElementById(tabId);
+  if (target) target.style.display = 'block';
+
+  // reset button styles
+  document.querySelectorAll('#inventory-section .inventory-tab-btn').forEach(btn => {
+    btn.style.backgroundColor = 'rebeccapurple';
+    btn.style.color = 'white';
+    btn.classList.remove('active-inventory-tab');
+  });
+
+  // highlight active button
+  if (btnEl) {
+    btnEl.style.backgroundColor = '#5a2d85';
+    btnEl.style.color = 'white';
+    btnEl.classList.add('active-inventory-tab');
+  }
+}
+
 </script>
   
 </body>

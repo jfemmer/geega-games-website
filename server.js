@@ -52,6 +52,118 @@ const upload = multer({
   }
 });
 
+// -------------------- Inventory Review Queue Helpers --------------------
+const REVIEW_QUEUE_PATH =
+  process.env.REVIEW_QUEUE_PATH ||
+  path.join(__dirname, "review_queue", "inventory-review.jsonl");
+
+const REVIEW_IMAGE_DIR = path.join(__dirname, "review_uploads");
+
+if (!fs.existsSync(REVIEW_IMAGE_DIR)) {
+  fs.mkdirSync(REVIEW_IMAGE_DIR, { recursive: true });
+}
+
+app.use("/review_uploads", express.static(REVIEW_IMAGE_DIR));
+
+function ensureDirSafe(dir) {
+  try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+}
+
+function safeJsonParse(line) {
+  try { return JSON.parse(line); } catch { return null; }
+}
+
+function makeReviewItemId(item, index) {
+  const raw = [
+    item?.ts || "",
+    item?.file || "",
+    item?.reason || "",
+    item?.originalImagePath || "",
+    item?.guessedName || "",
+    String(index)
+  ].join("|");
+
+  return crypto.createHash("sha1").update(raw).digest("hex");
+}
+
+function readReviewQueue(queuePath = REVIEW_QUEUE_PATH) {
+  try {
+    if (!fs.existsSync(queuePath)) return [];
+    const raw = fs.readFileSync(queuePath, "utf8");
+    return raw
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(safeJsonParse)
+      .filter(Boolean)
+      .map((item, index) => ({
+        ...item,
+        _id: makeReviewItemId(item, index)
+      }));
+  } catch (err) {
+    console.error("❌ Failed reading review queue:", err.message);
+    return [];
+  }
+}
+
+function writeReviewQueue(items, queuePath = REVIEW_QUEUE_PATH) {
+  try {
+    ensureDirSafe(path.dirname(queuePath));
+    const lines = items.map(({ _id, ...rest }) => JSON.stringify(rest)).join("\n");
+    fs.writeFileSync(queuePath, lines ? `${lines}\n` : "", "utf8");
+    return true;
+  } catch (err) {
+    console.error("❌ Failed writing review queue:", err.message);
+    return false;
+  }
+}
+
+function preserveReviewImage(srcPath, originalName = "scan.png") {
+  try {
+    if (!srcPath || !fs.existsSync(srcPath)) {
+      return { absPath: "", publicUrl: "", filename: "" };
+    }
+
+    ensureDirSafe(REVIEW_IMAGE_DIR);
+
+    const ext = path.extname(originalName || srcPath) || path.extname(srcPath) || ".png";
+    const base = path.basename(originalName || "scan", path.extname(originalName || "scan"));
+    const safeBase = String(base).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filename = `${Date.now()}_${safeBase}${ext}`;
+    const dest = path.join(REVIEW_IMAGE_DIR, filename);
+
+    fs.copyFileSync(srcPath, dest);
+
+    return {
+      absPath: dest,
+      publicUrl: `/review_uploads/${filename}`,
+      filename
+    };
+  } catch (err) {
+    console.error("❌ Failed preserving review image:", err.message);
+    return { absPath: "", publicUrl: "", filename: "" };
+  }
+}
+
+function queueReviewRecord(record) {
+  return enqueueForReview(record, REVIEW_QUEUE_PATH);
+}
+
+function removeReviewItemById(id, queuePath = REVIEW_QUEUE_PATH) {
+  const items = readReviewQueue(queuePath);
+  const idx = items.findIndex(item => item._id === id);
+  if (idx === -1) return null;
+
+  const [removed] = items.splice(idx, 1);
+  const ok = writeReviewQueue(items, queuePath);
+  return ok ? removed : null;
+}
+
+function findReviewItemById(id, queuePath = REVIEW_QUEUE_PATH) {
+  const items = readReviewQueue(queuePath);
+  return items.find(item => item._id === id) || null;
+}
+
 // Email + Twilio
 const nodemailer = require('nodemailer');
 const twilio = require('twilio');
@@ -261,22 +373,35 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         });
 
         if (!guessedName || guessedName.length < 3) {
-          enqueueForReview?.({
-            reqId,
-            file: file.originalname,
-            reason: "name_not_detected",
-            name: nameRes
-          });
+        const preserved = preserveReviewImage(originalPath, file.originalname);
 
-          results.push({
-            file: file.originalname,
-            status: "review",
-            error: "Could not detect card name from name bar.",
-            nameErr,
-            ms: Date.now() - perFileStart
-          });
-          continue;
-        }
+        queueReviewRecord({
+          reqId,
+          file: file.originalname,
+          reason: "name_not_detected",
+
+          originalImagePath: preserved.absPath,
+          scanImageUrl: preserved.publicUrl,
+          reviewImageName: preserved.filename,
+
+          condition,
+          foil: isFoil,
+
+          guessedName: guessedName || "",
+          name: nameRes,
+          collector: null,
+          chosen: null
+        });
+
+        results.push({
+          file: file.originalname,
+          status: "review",
+          error: "Could not detect card name from name bar.",
+          nameErr,
+          ms: Date.now() - perFileStart
+        });
+        continue;
+      }
 
         // 2) OCR: Collector number (strict + jitter + thresholds inside module)
         console.log("🔢 [fi8170] OCR(bottom line) start", { reqId });
@@ -301,14 +426,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             matchCount: 999
           }) ?? 0;
 
-          enqueueForReview?.({
-            reqId,
-            file: file.originalname,
-            reason: "low_name_confidence",
-            score,
-            name: nameRes,
-            collector: bottom
-          });
+          
 
           results.push({
             file: file.originalname,
@@ -407,14 +525,32 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             matchCount
           }) ?? 0;
 
-          enqueueForReview?.({
+          const preserved = preserveReviewImage(originalPath, file.originalname);
+
+          queueReviewRecord({
             reqId,
             file: file.originalname,
             reason: "scryfall_lookup_failed",
+
+            // ⭐ preserve scan image for review UI
+            originalImagePath: preserved.absPath,
+            scanImageUrl: preserved.publicUrl,
+            reviewImageName: preserved.filename,
+
+            // ⭐ metadata
+            condition,
+            foil: isFoil,
+
+            // ⭐ OCR + scoring info
             score,
             guessedName,
             name: nameRes,
             collector: bottom,
+
+            // ⭐ we don’t have a chosen card here because lookup failed
+            chosen: null,
+
+            // ⭐ error details
             details: err?.message || String(err)
           });
 
@@ -448,22 +584,41 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         }) ?? 0;
 
         if (!shouldAutoIngest?.(score)) {
-          enqueueForReview?.({
-            reqId,
-            file: file.originalname,
-            reason: "below_confidence_threshold",
-            score,
-            matchCount,
-            guessedName,
-            chosen: {
-              name: card?.name,
-              set: card?.set,
-              set_name: card?.set_name,
-              collector_number: card?.collector_number
-            },
-            name: nameRes,
-            collector: bottom
-          });
+  const preserved = preserveReviewImage(originalPath, file.originalname);
+
+  queueReviewRecord({
+    reqId,
+    file: file.originalname,
+    reason: "below_confidence_threshold",
+
+    // keep a review-safe copy of the scan image
+    originalImagePath: preserved.absPath,
+    scanImageUrl: preserved.publicUrl,
+    reviewImageName: preserved.filename,
+
+    // scan metadata
+    condition,
+    foil: isFoil,
+
+    // scoring / OCR details
+    score,
+    matchCount,
+    guessedName,
+    name: nameRes,
+    collector: bottom,
+
+    // matched card candidate for side-by-side comparison
+    chosen: {
+      name: card?.name,
+      set: card?.set,
+      set_name: card?.set_name,
+      collector_number: card?.collector_number,
+      imageUrl:
+        card?.image_uris?.normal ||
+        card?.card_faces?.[0]?.image_uris?.normal ||
+        ""
+    }
+  });
 
           results.push({
             file: file.originalname,
@@ -543,11 +698,32 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           message: err?.message || err
         });
 
-        enqueueForReview?.({
+        const preserved = preserveReviewImage(originalPath, file?.originalname);
+
+        queueReviewRecord({
           reqId,
           file: file?.originalname,
           reason: "per_file_exception",
-          details: err?.message || String(err)
+
+          // keep the scan image for the review UI
+          originalImagePath: preserved.absPath,
+          scanImageUrl: preserved.publicUrl,
+          reviewImageName: preserved.filename,
+
+          // basic metadata
+          condition,
+          foil: isFoil,
+
+          // error details
+          details: err?.message || String(err),
+
+          // we may not have OCR data in this case
+          guessedName: guessedName || "",
+          name: nameRes || null,
+          collector: bottom || null,
+
+          // no chosen card
+          chosen: null
         });
 
         results.push({
@@ -871,26 +1047,60 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
   const setCodeFromBody = (setCode || "").trim().toLowerCase();
   const safeCondition = (condition || "NM").trim();
 
+  let preservedReview = null;
+  const ensureReviewImage = () => {
+    if (preservedReview) return preservedReview;
+    preservedReview = preserveReviewImage(filePath, originalName || "scan.png");
+    return preservedReview;
+  };
+
   // 1) OCR: name bar
   console.log("🔤 [scan-ingest] OCR(name bar) start", { originalName, filePath });
-  const { name: guessedName, confidence: nameConf } = await ocrCardNameHighAccuracy(filePath, tmpDir);
+  const nameRes = await ocrCardNameHighAccuracy(filePath, tmpDir);
+  const guessedName = nameRes?.name || "";
+  const nameConf = nameRes?.confidence ?? 0;
+  const nameErr = nameRes?.error || null;
+
   console.log("🔤 [scan-ingest] OCR(name bar) done", {
     guessedName,
-    nameConf: Math.round(nameConf)
+    nameConf: Math.round(nameConf),
+    nameErr
   });
 
   if (!guessedName || guessedName.length < 3) {
-    throw new Error("Could not detect card name from name bar.");
+    const preserved = ensureReviewImage();
+
+    queueReviewRecord({
+      file: originalName || path.basename(filePath),
+      reason: "name_not_detected",
+      originalImagePath: preserved.absPath,
+      scanImageUrl: preserved.publicUrl,
+      reviewImageName: preserved.filename,
+      condition: safeCondition,
+      foil: isFoil,
+      name: nameRes
+    });
+
+    throw new Error("Could not detect card name from name bar. Sent to review.");
   }
 
-  // 1b) OCR: bottom line (RUN EVEN IF NAME CONF IS LOW)
+  // 1b) Resolve name through Scryfall fuzzy
+  let resolvedName = guessedName;
+  try {
+    const named = await axios.get(
+      `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
+    );
+    resolvedName = named.data?.name || guessedName;
+  } catch {
+    resolvedName = guessedName;
+  }
+
+  // 2) OCR: bottom line
   console.log("🔢 [scan-ingest] OCR(bottom line) start");
   const bottom = await ocrCollectorNumberHighAccuracy(filePath, tmpDir);
 
-  let collectorNumber = bottom.collectorNumber || null;
-
-  // ✅ Safety gate — ignore low-confidence collector numbers
-  if (collectorNumber && (bottom.confidence ?? 0) < 45) {
+  let collectorNumber = bottom?.collectorNumber || null;
+  if (collectorNumber && (bottom?.confidence ?? 0) < 45) {
     collectorNumber = null;
   }
 
@@ -900,72 +1110,153 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
     collectorNumber
   });
 
-  // Decide whether to allow low-confidence names through
-  const needsReview = nameConf < 45;
-  if (needsReview) {
-    console.log("⚠️ [scan-ingest] Low name OCR confidence, continuing anyway", {
-      nameConf: Math.round(nameConf),
-      guessedName,
-      collectorNumber
-    });
-    // If you still want to hard-stop low-confidence jobs, swap the next line in:
-    // throw new Error(`Low OCR confidence (${Math.round(nameConf)}). Needs review.`);
-  }
+  // 3) Scryfall select printing
+  console.log("🧙 [scan-ingest] Scryfall start", {
+    guessedName,
+    resolvedName,
+    setCodeFromBody,
+    collectorNumber,
+    isFoil
+  });
 
-  // 2) Scryfall select printing
-  console.log("🧙 [scan-ingest] Scryfall start", { guessedName, setCodeFromBody, collectorNumber, isFoil });
+  let base = null;
   let card = null;
+  let matchCount = 999;
 
-  const baseRes = await axios.get(
-  `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(resolvedName)}`
-);
-  const base = baseRes.data;
+  try {
+    const baseRes = await axios.get(
+      `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(resolvedName)}`
+    );
+    base = baseRes.data;
 
-  if (collectorNumber) {
-    if (setCodeFromBody) {
+    if (collectorNumber && setCodeFromBody) {
       const exactRes = await axios.get(
         `https://api.scryfall.com/cards/${encodeURIComponent(setCodeFromBody)}/${encodeURIComponent(collectorNumber)}`
       );
       card = exactRes.data;
-    } else if (base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
-      const picked = await pickPrintingByCollector(base.prints_search_uri, collectorNumber, isFoil);
+      matchCount = 1;
+    } else if (collectorNumber && base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
+      const meta = await pickPrintingByCollector(
+        base.prints_search_uri,
+        collectorNumber,
+        isFoil,
+        false,
+        { returnMeta: true }
+      );
 
-      if (!picked) {
-        // IMPORTANT: if we have a collector number and it didn't match, do NOT fall back to base.
-        // That is how you silently add the wrong card.
+      let chosen = meta?.chosen || null;
+      matchCount = meta?.matchCount ?? 999;
+      const pool = meta?.pool || [];
+
+      if (pool.length > 1 && typeof refineByArtworkHash === "function") {
+        const hashResult = await refineByArtworkHash(filePath, pool, { maxDist: 8 });
+        if (hashResult?.chosen) {
+          chosen = hashResult.chosen;
+          matchCount = 1;
+        }
+      }
+
+      if (!chosen) {
         throw new Error(
-          `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}". Needs review.`
+          `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}".`
         );
       }
 
-    card = picked;
-        } else {
-          card = base;
-        }
-      } else {
-        if (setCodeFromBody) {
-          const query = `!"${guessedName}" set:${setCodeFromBody}`;
-          const s = await axios.get(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`);
-          card = s.data.data?.[0] || base;
-        } else {
-          card = base;
-        }
-      }
+      card = chosen;
+    } else if (!collectorNumber && setCodeFromBody) {
+      const query = `!"${resolvedName}" set:${setCodeFromBody}`;
+      const s = await axios.get(
+        `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`
+      );
+      card = s.data?.data?.[0] || base;
+      matchCount = s.data?.data?.length || 999;
+    } else {
+      card = base;
+      matchCount = 999;
+    }
 
-  if (!card) throw new Error("No Scryfall card selected");
+    if (!card) throw new Error("No Scryfall card selected");
+  } catch (err) {
+    const preserved = ensureReviewImage();
+
+    queueReviewRecord({
+      file: originalName || path.basename(filePath),
+      reason: "scryfall_lookup_failed",
+      originalImagePath: preserved.absPath,
+      scanImageUrl: preserved.publicUrl,
+      reviewImageName: preserved.filename,
+      condition: safeCondition,
+      foil: isFoil,
+      guessedName,
+      score: computeOverallScore({
+        nameConfidence: nameConf,
+        collectorConfidence: bottom?.confidence ?? 0,
+        hadCollector: !!collectorNumber,
+        matchCount
+      }),
+      name: nameRes,
+      collector: bottom,
+      chosen: base ? {
+        name: base?.name,
+        set: base?.set,
+        set_name: base?.set_name,
+        collector_number: base?.collector_number,
+        imageUrl: base?.image_uris?.normal || base?.card_faces?.[0]?.image_uris?.normal || ""
+      } : null,
+      details: err?.message || String(err)
+    });
+
+    throw new Error(`Sent to review: ${err?.message || "Scryfall lookup failed"}`);
+  }
 
   console.log("🧙 [scan-ingest] Scryfall chosen", {
     name: card?.name,
     set: card?.set,
     set_name: card?.set_name,
-    collector_number: card?.collector_number
+    collector_number: card?.collector_number,
+    matchCount
   });
 
+  // 4) Confidence gate
+  const score = computeOverallScore({
+    nameConfidence: nameConf,
+    collectorConfidence: bottom?.confidence ?? 0,
+    hadCollector: !!collectorNumber,
+    matchCount
+  });
+
+  if (!shouldAutoIngest(score)) {
+    const preserved = ensureReviewImage();
+
+    queueReviewRecord({
+      file: originalName || path.basename(filePath),
+      reason: "below_confidence_threshold",
+      originalImagePath: preserved.absPath,
+      scanImageUrl: preserved.publicUrl,
+      reviewImageName: preserved.filename,
+      condition: safeCondition,
+      foil: isFoil,
+      guessedName,
+      score,
+      name: nameRes,
+      collector: bottom,
+      chosen: {
+        name: card?.name,
+        set: card?.set,
+        set_name: card?.set_name,
+        collector_number: card?.collector_number,
+        imageUrl: card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || ""
+      }
+    });
+
+    throw new Error(`Sent to review: score ${score.toFixed(3)} below threshold`);
+  }
+
+  // 5) Save to inventory
   const price = isFoil
     ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
     : parseFloat(card?.prices?.usd || 0);
 
-  // 3) Save to inventory
   const inventoryItem = {
     cardName: card.name,
     set: card.set_name,
@@ -1002,12 +1293,11 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
     ms: Date.now() - perFileStart,
     guessedName,
     nameConfidence: Math.round(nameConf),
-    needsReview,
     collectorNumber,
     chosenSet: card?.set || null,
     chosenSetName: card?.set_name || null,
     chosenCollector: card?.collector_number || null,
-    ocrTextName: null, // optional: store raw Tesseract output if you want
+    ocrTextName: null,
     ocrTextBottom: bottom?.text || null
   };
 }
@@ -2736,6 +3026,175 @@ app.get("/api/scan-jobs", async (req, res) => {
     res.json({ jobs });
   } catch (e) {
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// -------------------- Inventory Review API --------------------
+
+// Get all review items
+app.get("/api/review/inventory", (req, res) => {
+  try {
+    const items = readReviewQueue();
+    res.json({ items });
+  } catch (err) {
+    console.error("❌ review queue fetch failed:", err);
+    res.status(500).json({ error: "Failed to read review queue" });
+  }
+});
+
+// Remove a review item
+app.delete("/api/review/inventory/:id", (req, res) => {
+  try {
+    const removed = removeReviewItemById(req.params.id);
+
+    if (!removed) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("❌ review delete failed:", err);
+    res.status(500).json({ error: "Failed to delete review item" });
+  }
+});
+
+// Approve a review item (adds to inventory)
+app.post("/api/review/inventory/:id/approve", async (req, res) => {
+  try {
+    const item = findReviewItemById(req.params.id);
+    if (!item) {
+      return res.status(404).json({ error: "Review item not found" });
+    }
+
+    const chosen = item.chosen;
+
+    if (!chosen) {
+      return res.status(400).json({ error: "No chosen card to approve" });
+    }
+
+    const price = parseFloat(req.body.price || 0);
+
+    const inventoryItem = {
+      cardName: chosen.name,
+      set: chosen.set_name,
+      condition: item.condition || "NM",
+      foil: !!item.foil,
+      priceUsd: price,
+      imageUrl: chosen.imageUrl || ""
+    };
+
+    await CardInventory.findOneAndUpdate(
+      {
+        cardName: inventoryItem.cardName,
+        set: inventoryItem.set,
+        foil: inventoryItem.foil,
+        condition: inventoryItem.condition
+      },
+      {
+        $inc: { quantity: 1 },
+        $setOnInsert: inventoryItem
+      },
+      { upsert: true }
+    );
+
+    removeReviewItemById(req.params.id);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ review approve failed:", err);
+    res.status(500).json({ error: "Approval failed" });
+  }
+});
+
+// -------------------- INVENTORY REVIEW API --------------------
+
+// Get review queue
+app.get("/api/inventory-review", (req, res) => {
+  try {
+    const items = readReviewQueue();
+    res.json(items);
+  } catch (err) {
+    console.error("❌ Failed loading review queue:", err);
+    res.status(500).json({ message: "Failed to load review queue." });
+  }
+});
+
+
+// Approve review item and add to inventory
+app.post("/api/inventory-review/:id/approve", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const item = findReviewItemById(id);
+
+    if (!item) {
+      return res.status(404).json({ message: "Review item not found." });
+    }
+
+    const {
+      cardName,
+      setName,
+      collectorNumber,
+      condition
+    } = req.body;
+
+    const finalName = cardName || item?.chosen?.name;
+    const finalSet = setName || item?.chosen?.set_name;
+    const finalCondition = condition || item.condition;
+
+    const imageUrl =
+      item?.chosen?.imageUrl ||
+      item?.chosen?.image_uris?.normal ||
+      "";
+
+    await CardInventory.findOneAndUpdate(
+      {
+        cardName: finalName,
+        set: finalSet,
+        foil: item.foil,
+        condition: finalCondition
+      },
+      {
+        $inc: { quantity: 1 },
+        $setOnInsert: {
+          cardName: finalName,
+          set: finalSet,
+          foil: item.foil,
+          condition: finalCondition,
+          imageUrl,
+          priceUsd: 0
+        }
+      },
+      { upsert: true }
+    );
+
+    removeReviewItemById(id);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ Approve review item error:", err);
+    res.status(500).json({ message: "Failed to approve item." });
+  }
+});
+
+
+// Reject / delete review item
+app.delete("/api/inventory-review/:id", (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const removed = removeReviewItemById(id);
+
+    if (!removed) {
+      return res.status(404).json({ message: "Item not found." });
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ Failed deleting review item:", err);
+    res.status(500).json({ message: "Failed deleting review item." });
   }
 });
 

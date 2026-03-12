@@ -517,6 +517,74 @@
 .credit-btn:hover {
   background: #146c43;
 }
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.review-card {
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+  border: 1px solid #e5e5e5;
+}
+
+.review-images {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.review-images img {
+  width: 100%;
+  border-radius: 10px;
+  background: #f5f5f5;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.08);
+}
+
+.review-meta {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.review-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.review-actions button {
+  flex: 1;
+  min-width: 120px;
+}
+
+.review-approve {
+  background: seagreen;
+}
+
+.review-approve:hover {
+  background: #146c43;
+}
+
+.review-reject {
+  background: crimson;
+}
+
+.review-reject:hover {
+  background: #a30000;
+}
+
+.review-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
   </style>
   
 <!-- 🔐 Login Logic (commented out)
@@ -675,55 +743,34 @@
       </div>
     </div>
 
-    <!-- Inventory Section -->
-  <div class="section" id="inventory-section">
+<!-- Inventory Section -->
+<div class="section" id="inventory-section">
   <div id="inventory-summary" style="padding: 20px; background-color: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center;">
     <h3 style="color: rebeccapurple;">Inventory Summary</h3>
     <p><strong>Total Cards:</strong> <span id="total-card-count">Loading...</span></p>
     <p><strong>Total Inventory Value:</strong> $<span id="total-inventory-value">Loading...</span></p>
   </div>
 
-  <h2>Add Inventory</h2>
-  <h3>Scan fi-8170 → Auto Add</h3>
+  <h2>Inventory</h2>
 
-<input type="file" id="fi8170Upload" multiple accept="image/*" />
+  <!-- Inventory Inner Tabs -->
+  <div style="display:flex; gap:10px; margin: 20px 0; flex-wrap:wrap;">
+    <button type="button" onclick="showInventoryTab('inventory-add-tab', this)" class="inventory-tab-btn active-inventory-tab" style="width:auto; padding:10px 18px;">
+      Add Inventory
+    </button>
+    <button type="button" onclick="showInventoryTab('inventory-review-tab', this); loadInventoryReview && loadInventoryReview();" class="inventory-tab-btn" style="width:auto; padding:10px 18px;">
+      Inventory Review
+    </button>
+  </div>
 
-<label>Condition</label>
-<select id="fi8170Condition">
-  <option value="NM">Near Mint</option>
-  <option value="LP">Lightly Played</option>
-  <option value="MP">Moderately Played</option>
-  <option value="HP">Heavily Played</option>
-  <option value="DMG">Damaged</option>
-</select>
+  <!-- ADD INVENTORY TAB -->
+  <div id="inventory-add-tab" class="inventory-inner-tab" style="display:block;">
+    <h3>Scan fi-8170 → Auto Add</h3>
 
-<label>
-  <input type="checkbox" id="fi8170Foil" />
-  Foil
-</label>
+    <input type="file" id="fi8170Upload" multiple accept="image/*" />
 
-<button onclick="uploadFi8170()">Scan & Add to Inventory</button>
-
-<div id="fi8170Results"></div>
-
-  <h3>Search Magic Card</h3>
-  <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
-  <div id="search-results" style="margin-top: 10px;"></div>
-  <hr style="margin: 20px 0;">
-
-  <form id="update-card-form">
-    <label for="cardName">Card Name</label>
-    <input type="text" id="cardName" name="cardName" required>
-
-    <label for="quantity">Quantity</label>
-    <input type="number" id="quantity" name="quantity" min="0" required>
-
-    <label for="set">Set</label>
-    <input type="text" id="set" name="set" required>
-
-    <label for="condition">Condition</label>
-    <select id="condition" name="condition" required>
-      <option value="">Select Condition</option>
+    <label>Condition</label>
+    <select id="fi8170Condition">
       <option value="NM">Near Mint</option>
       <option value="LP">Lightly Played</option>
       <option value="MP">Moderately Played</option>
@@ -731,73 +778,119 @@
       <option value="DMG">Damaged</option>
     </select>
 
-    <label for="price">Price (USD)</label>
-    <input type="number" id="price" name="price" min="0" step="0.01" required>
+    <label>
+      <input type="checkbox" id="fi8170Foil" />
+      Foil
+    </label>
 
-    <label for="variantType">Variant Type</label>
-    <input type="text" id="variantType" name="variantType" placeholder="e.g. Borderless, Extended Art" />
+    <button onclick="uploadFi8170()">Scan & Add to Inventory</button>
 
-    <input type="hidden" id="imageUrl" name="imageUrl">
-    <input type="hidden" id="rarity" name="rarity">
+    <div id="fi8170Results"></div>
 
-    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
-      <input type="checkbox" id="foil" name="foil" style="width: 20px; height: 20px;">
-      <label for="foil" class="shimmer" style="margin: 0; font-size: 1.1rem;">Foil</label>
+    <h3>Search Magic Card</h3>
+    <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />
+    <div id="search-results" style="margin-top: 10px;"></div>
+    <hr style="margin: 20px 0;">
+
+    <form id="update-card-form">
+      <label for="cardName">Card Name</label>
+      <input type="text" id="cardName" name="cardName" required>
+
+      <label for="quantity">Quantity</label>
+      <input type="number" id="quantity" name="quantity" min="0" required>
+
+      <label for="set">Set</label>
+      <input type="text" id="set" name="set" required>
+
+      <label for="condition">Condition</label>
+      <select id="condition" name="condition" required>
+        <option value="">Select Condition</option>
+        <option value="NM">Near Mint</option>
+        <option value="LP">Lightly Played</option>
+        <option value="MP">Moderately Played</option>
+        <option value="HP">Heavily Played</option>
+        <option value="DMG">Damaged</option>
+      </select>
+
+      <label for="price">Price (USD)</label>
+      <input type="number" id="price" name="price" min="0" step="0.01" required>
+
+      <label for="variantType">Variant Type</label>
+      <input type="text" id="variantType" name="variantType" placeholder="e.g. Borderless, Extended Art" />
+
+      <input type="hidden" id="imageUrl" name="imageUrl">
+      <input type="hidden" id="rarity" name="rarity">
+
+      <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+        <input type="checkbox" id="foil" name="foil" style="width: 20px; height: 20px;">
+        <label for="foil" class="shimmer" style="margin: 0; font-size: 1.1rem;">Foil</label>
+      </div>
+
+      <button type="submit">Add / Update Card</button>
+    </form>
+
+    <h3>Update Card Price</h3>
+    <h3>Search Inventory to Update Price</h3>
+    <input type="text" id="price-search-input" placeholder="Search inventory by name or set..." autocomplete="off" />
+    <div id="price-search-results" style="margin-top: 10px;"></div>
+
+    <form id="price-update-form">
+      <label for="priceCardName">Card Name</label>
+      <input type="hidden" id="priceCardName" required>
+
+      <label for="priceSet">Set</label>
+      <input type="hidden" id="priceSet" required>
+
+      <label for="priceFoil">Foil?</label>
+      <input type="hidden" id="priceFoil" required>
+
+      <input type="hidden" id="priceVariantType" required>
+
+      <label for="newPrice">New Price (USD)</label>
+      <input type="number" id="newPrice" min="0" step="0.01" required>
+
+      <button type="submit">Update Price</button>
+    </form>
+
+    <hr style="margin: 30px 0;">
+
+    <h3>Delete Card from Inventory</h3>
+    <form id="delete-card-form">
+      <label for="delete-search-input">Card Name</label>
+      <input type="text" id="delete-search-input" placeholder="Search inventory..." autocomplete="off" />
+      <div id="delete-search-results" style="margin-top: 10px;"></div>
+      <input type="hidden" id="deleteCardName" name="deleteCardName" required>
+      <input type="hidden" id="deleteSet" name="deleteSet" required>
+      <input type="hidden" id="deleteFoil" name="deleteFoil" required>
+      <input type="hidden" id="deleteVariantType" name="deleteVariantType">
+      <input type="hidden" id="deleteColors" name="deleteColors">
+      <input type="hidden" id="deleteCardType" name="deleteCardType">
+      <input type="hidden" id="deleteCreatureTypes" name="deleteCreatureTypes">
+      <button type="submit" style="background-color: crimson;">Delete Card</button>
+    </form>
+
+    <!-- 🚨 DANGER ZONE: CLEAR ENTIRE INVENTORY -->
+    <div style="margin-top: 16px; padding: 14px; border: 2px dashed crimson; border-radius: 12px; background: #fff5f5;">
+      <h3 style="margin: 0 0 10px; color: crimson;">Danger Zone</h3>
+      <button id="clearInventoryBtn" type="button" style="background: crimson;">
+        Clear ENTIRE Inventory
+      </button>
+      <p style="margin: 10px 0 0; font-size: 0.9rem; color: #555;">
+        This permanently deletes all inventory items in the database.
+      </p>
     </div>
+  </div>
 
-    <button type="submit">Add / Update Card</button>
-  </form>
-
-  <h3>Update Card Price</h3>
-  <h3>Search Inventory to Update Price</h3>
-  <input type="text" id="price-search-input" placeholder="Search inventory by name or set..." autocomplete="off" />
-  <div id="price-search-results" style="margin-top: 10px;"></div>
-
-  <form id="price-update-form">
-    <label for="priceCardName">Card Name</label>
-    <input type="hidden" id="priceCardName" required>
-
-
-    <label for="priceSet">Set</label>
-    <input type="hidden" id="priceSet" required>
-
-    <label for="priceFoil">Foil?</label>
-    <input type="hidden" id="priceFoil" required>
-
-    <input type="hidden" id="priceVariantType" required>
-
-    <label for="newPrice">New Price (USD)</label>
-    <input type="number" id="newPrice" min="0" step="0.01" required>
-
-    <button type="submit">Update Price</button>
-  </form>
-
-  <hr style="margin: 30px 0;">
-
-  <h3>Delete Card from Inventory</h3>
-  <form id="delete-card-form">
-    <label for="delete-search-input">Card Name</label>
-    <input type="text" id="delete-search-input" placeholder="Search inventory..." autocomplete="off" />
-    <div id="delete-search-results" style="margin-top: 10px;"></div>
-    <input type="hidden" id="deleteCardName" name="deleteCardName" required>
-    <input type="hidden" id="deleteSet" name="deleteSet" required>
-    <input type="hidden" id="deleteFoil" name="deleteFoil" required>
-    <input type="hidden" id="deleteVariantType" name="deleteVariantType">
-    <input type="hidden" id="deleteColors" name="deleteColors">
-    <input type="hidden" id="deleteCardType" name="deleteCardType">
-    <input type="hidden" id="deleteCreatureTypes" name="deleteCreatureTypes">
-    <button type="submit" style="background-color: crimson;">Delete Card</button>
-  </form>
-
-   <!-- 🚨 DANGER ZONE: CLEAR ENTIRE INVENTORY -->
-  <div style="margin-top: 16px; padding: 14px; border: 2px dashed crimson; border-radius: 12px; background: #fff5f5;">
-    <h3 style="margin: 0 0 10px; color: crimson;">Danger Zone</h3>
-    <button id="clearInventoryBtn" type="button" style="background: crimson;">
-      Clear ENTIRE Inventory
-    </button>
-    <p style="margin: 10px 0 0; font-size: 0.9rem; color: #555;">
-      This permanently deletes all inventory items in the database.
+  <!-- INVENTORY REVIEW TAB -->
+  <div id="inventory-review-tab" class="inventory-inner-tab" style="display:none;">
+    <h3>Inventory Review Queue</h3>
+    <p style="margin-top:-4px; color:#666;">
+      Review scanned images and compare them to the matched inventory card before approving.
     </p>
+
+    <div id="inventory-review-list">
+      <p>No review items loaded yet.</p>
+    </div>
   </div>
 </div>
 
@@ -897,6 +990,143 @@
   function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('collapsed');
   }
+
+  async function loadInventoryReview() {
+  const wrap = document.getElementById("inventory-review-list");
+  if (!wrap) return;
+
+  wrap.innerHTML = "<p>Loading review items...</p>";
+
+  try {
+    const res = await fetch("https://geega-games-website-production.up.railway.app/api/inventory-review");
+    if (!res.ok) throw new Error(`Failed with ${res.status}`);
+
+    const items = await res.json();
+
+    if (!Array.isArray(items) || items.length === 0) {
+      wrap.innerHTML = "<p>No review items waiting.</p>";
+      return;
+    }
+
+    wrap.innerHTML = `
+      <div class="review-grid">
+        ${items.map(item => {
+          const chosenName = item?.chosen?.name || item?.cardName || item?.guessedName || "Unknown";
+          const chosenSetName = item?.chosen?.set_name || item?.set || item?.chosenSetName || "Unknown Set";
+          const chosenCollector = item?.chosen?.collector_number || item?.chosenCollector || "";
+          const scryfallImage =
+            item?.chosen?.imageUrl ||
+            item?.chosen?.image_uris?.normal ||
+            item?.chosenImageUrl ||
+            "";
+          const scannedImage = item?.scanImageUrl || item?.originalImageUrl || item?.filePath || "";
+          const score = item?.score ?? "—";
+
+          return `
+            <div class="review-card">
+              <div class="review-images">
+                <div>
+                  <strong>Scanned Image</strong>
+                  <img src="${scannedImage}" alt="Scanned image" />
+                </div>
+                <div>
+                  <strong>Matched Card</strong>
+                  <img src="${scryfallImage}" alt="Matched card image" />
+                </div>
+              </div>
+
+              <div class="review-meta">
+                <div><strong>Reason:</strong> ${item.reason || "Needs review"}</div>
+                <div><strong>OCR Name:</strong> ${item.guessedName || item?.name?.name || "—"}</div>
+                <div><strong>Name Confidence:</strong> ${item?.name?.confidence ?? item?.nameConfidence ?? "—"}</div>
+                <div><strong>Collector OCR:</strong> ${item?.collector?.collectorNumber || item?.collectorNumber || "—"}</div>
+                <div><strong>Bottom Text:</strong> ${item?.collector?.text || item?.ocrTextBottom || "—"}</div>
+                <div><strong>Proposed Card:</strong> ${chosenName}</div>
+                <div><strong>Set:</strong> ${chosenSetName}</div>
+                <div><strong>Collector #:</strong> ${chosenCollector || "—"}</div>
+                <div><strong>Score:</strong> ${score}</div>
+              </div>
+
+              <div class="review-fields">
+                <input type="text" id="review-name-${item._id}" value="${escapeHtml(chosenName)}" placeholder="Card Name" />
+                <input type="text" id="review-set-${item._id}" value="${escapeHtml(chosenSetName)}" placeholder="Set Name" />
+                <input type="text" id="review-collector-${item._id}" value="${escapeHtml(chosenCollector)}" placeholder="Collector #" />
+                <select id="review-condition-${item._id}">
+                  <option value="NM" ${item.condition === "NM" ? "selected" : ""}>Near Mint</option>
+                  <option value="LP" ${item.condition === "LP" ? "selected" : ""}>Lightly Played</option>
+                  <option value="MP" ${item.condition === "MP" ? "selected" : ""}>Moderately Played</option>
+                  <option value="HP" ${item.condition === "HP" ? "selected" : ""}>Heavily Played</option>
+                  <option value="DMG" ${item.condition === "DMG" ? "selected" : ""}>Damaged</option>
+                </select>
+              </div>
+
+              <div class="review-actions">
+                <button class="review-approve" onclick="approveReviewItem('${item._id}')">Approve & Add</button>
+                <button class="review-reject" onclick="rejectReviewItem('${item._id}')">Reject</button>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  } catch (err) {
+    console.error("❌ loadInventoryReview error:", err);
+    wrap.innerHTML = "<p>❌ Failed to load review items.</p>";
+  }
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+async function approveReviewItem(id) {
+  const cardName = document.getElementById(`review-name-${id}`)?.value?.trim() || "";
+  const setName = document.getElementById(`review-set-${id}`)?.value?.trim() || "";
+  const collectorNumber = document.getElementById(`review-collector-${id}`)?.value?.trim() || "";
+  const condition = document.getElementById(`review-condition-${id}`)?.value || "NM";
+
+  try {
+    const res = await fetch(`https://geega-games-website-production.up.railway.app/api/inventory-review/${id}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardName, setName, collectorNumber, condition })
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message || `Approve failed: ${res.status}`);
+
+    alert("✅ Review item approved and added to inventory.");
+    loadInventoryReview();
+    loadInventorySummary();
+  } catch (err) {
+    console.error("❌ approveReviewItem error:", err);
+    alert(`❌ ${err.message}`);
+  }
+}
+
+async function rejectReviewItem(id) {
+  const ok = confirm("Reject this review item?");
+  if (!ok) return;
+
+  try {
+    const res = await fetch(`https://geega-games-website-production.up.railway.app/api/inventory-review/${id}`, {
+      method: "DELETE"
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message || `Reject failed: ${res.status}`);
+
+    alert("🗑️ Review item removed.");
+    loadInventoryReview();
+  } catch (err) {
+    console.error("❌ rejectReviewItem error:", err);
+    alert(`❌ ${err.message}`);
+  }
+}
 
   function showSection(sectionId) {
     document.querySelectorAll('.main .section').forEach(section => {
@@ -1942,6 +2172,79 @@ async function addStoreCredit(userId) {
     console.error("❌ addStoreCredit error:", err);
     alert(err.message || "❌ Failed to update store credit.");
   }
+}
+
+async function loadInventoryReview() {
+  const res = await fetch(`${API_BASE}/api/review/inventory`);
+  const data = await res.json();
+
+  const container = document.getElementById("inventoryReviewContainer");
+  container.innerHTML = "";
+
+  if (!data.items.length) {
+    container.innerHTML = "<p>No items needing review 🎉</p>";
+    return;
+  }
+
+  data.items.forEach(item => {
+
+    const div = document.createElement("div");
+    div.className = "reviewCard";
+
+    div.innerHTML = `
+      <div style="display:flex; gap:20px; align-items:center; margin-bottom:20px;">
+
+        <div>
+          <h4>Scanned Card</h4>
+          <img src="${API_BASE}${item.scanImageUrl}" width="200">
+        </div>
+
+        <div>
+          <h4>Matched Card</h4>
+          ${item.chosen?.imageUrl
+            ? `<img src="${item.chosen.imageUrl}" width="200">`
+            : `<p>No match</p>`}
+        </div>
+
+        <div>
+          <p><b>OCR Name:</b> ${item.guessedName || "Unknown"}</p>
+          <p><b>Score:</b> ${item.score?.toFixed(2) || "N/A"}</p>
+          <p><b>Reason:</b> ${item.reason}</p>
+
+          <button onclick="approveReview('${item._id}')">
+            Approve
+          </button>
+
+          <button onclick="rejectReview('${item._id}')">
+            Delete
+          </button>
+        </div>
+
+      </div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+async function approveReview(id) {
+
+  await fetch(`${API_BASE}/api/review/inventory/${id}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ price: 0 })
+  });
+
+  loadInventoryReview();
+}
+
+async function rejectReview(id) {
+
+  await fetch(`${API_BASE}/api/review/inventory/${id}`, {
+    method: "DELETE"
+  });
+
+  loadInventoryReview();
 }
 </script>
   

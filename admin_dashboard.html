@@ -2190,59 +2190,6 @@ async function addStoreCredit(userId) {
   }
 }
 
-async function loadInventoryReview() {
-  const res = await fetch(`${API_BASE}/api/review/inventory`);
-  const data = await res.json();
-
-  const container = document.getElementById("inventoryReviewContainer");
-  container.innerHTML = "";
-
-  if (!data.items.length) {
-    container.innerHTML = "<p>No items needing review 🎉</p>";
-    return;
-  }
-
-  data.items.forEach(item => {
-
-    const div = document.createElement("div");
-    div.className = "reviewCard";
-
-    div.innerHTML = `
-      <div style="display:flex; gap:20px; align-items:center; margin-bottom:20px;">
-
-        <div>
-          <h4>Scanned Card</h4>
-          <img src="${API_BASE}${item.scanImageUrl}" width="200">
-        </div>
-
-        <div>
-          <h4>Matched Card</h4>
-          ${item.chosen?.imageUrl
-            ? `<img src="${item.chosen.imageUrl}" width="200">`
-            : `<p>No match</p>`}
-        </div>
-
-        <div>
-          <p><b>OCR Name:</b> ${item.guessedName || "Unknown"}</p>
-          <p><b>Score:</b> ${item.score?.toFixed(2) || "N/A"}</p>
-          <p><b>Reason:</b> ${item.reason}</p>
-
-          <button onclick="approveReview('${item._id}')">
-            Approve
-          </button>
-
-          <button onclick="rejectReview('${item._id}')">
-            Delete
-          </button>
-        </div>
-
-      </div>
-    `;
-
-    container.appendChild(div);
-  });
-}
-
 async function approveReview(id) {
 
   await fetch(`${API_BASE}/api/review/inventory/${id}/approve`, {

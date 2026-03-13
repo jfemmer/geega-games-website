@@ -1338,11 +1338,33 @@ app.post("/api/scan-ingest", requireIngestKey, upload.single("image"), async (re
     const condition = (req.body.condition || "NM").trim();
     const foil = String(req.body.foil) === "true";
     const setCode = (req.body.setCode || "").trim().toLowerCase();
+    const originalName = (req.body.originalName || req.file.originalname || "").trim();
+
+    const recentCutoff = new Date(Date.now() - 15000);
+
+    const existing = await ScanJob.findOne({
+      originalName,
+      createdAt: { $gte: recentCutoff },
+      status: { $in: ["queued", "processing", "done"] }
+    }).sort({ createdAt: -1 });
+
+    if (existing) {
+      console.log("⛔ Duplicate scan-ingest prevented:", {
+        originalName,
+        existingJobId: String(existing._id)
+      });
+
+      return res.json({
+        jobId: String(existing._id),
+        status: existing.status,
+        deduped: true
+      });
+    }
 
     const job = await ScanJob.create({
       status: "queued",
       filePath: req.file.path,
-      originalName: req.body.originalName || req.file.originalname || "",
+      originalName,
       condition,
       foil,
       setCode

@@ -767,27 +767,11 @@
 
   <!-- ADD INVENTORY TAB -->
   <div id="inventory-add-tab" class="inventory-inner-tab" style="display:block;">
-    <h3>Scan fi-8170 → Auto Add</h3>
-
-    <input type="file" id="fi8170Upload" multiple accept="image/*" />
-
-    <label>Condition</label>
-    <select id="fi8170Condition">
-      <option value="NM">Near Mint</option>
-      <option value="LP">Lightly Played</option>
-      <option value="MP">Moderately Played</option>
-      <option value="HP">Heavily Played</option>
-      <option value="DMG">Damaged</option>
-    </select>
-
-    <label>
-      <input type="checkbox" id="fi8170Foil" />
-      Foil
-    </label>
-
-    <button onclick="uploadFi8170()">Scan & Add to Inventory</button>
-
-    <div id="fi8170Results"></div>
+    <h3>Scanner Intake</h3>
+<p>
+  Scans are now imported automatically from the fi-8170 watch folder through watcher.js.
+  Use the Inventory Review tab below to approve anything that could not be matched confidently.
+</p>
 
     <h3>Search Magic Card</h3>
     <input type="text" id="search-input" placeholder="Type card name..." autocomplete="off" />

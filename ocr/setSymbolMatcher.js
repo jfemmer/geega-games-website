@@ -107,6 +107,11 @@ async function detectSetSymbol(imagePath, opts = {}) {
     ? entries.filter(e => allowedSetCodes.has(e.setCode))
     : entries;
 
+    console.log("🧩 [symbol] cache status", {
+        entries: entries.length,
+        pool: pool.length
+    });
+
   if (!pool.length) {
     return {
       setCode: null,
@@ -123,10 +128,15 @@ async function detectSetSymbol(imagePath, opts = {}) {
   for (const { dx, dy } of SYMBOL_OFFSETS) {
     let scanHash = null;
 
-    try {
-      scanHash = await hashScanSetSymbol(imagePath, dx, dy);
-    } catch {
-      continue;
+   try {
+    scanHash = await hashScanSetSymbol(imagePath, dx, dy);
+    } catch (err) {
+    console.log("🧩 [symbol] hashScanSetSymbol failed", {
+        dx,
+        dy,
+        error: err?.message || String(err)
+    });
+    continue;
     }
 
     for (const entry of pool) {

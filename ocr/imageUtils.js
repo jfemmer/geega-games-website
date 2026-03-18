@@ -118,47 +118,28 @@ async function detectWhiteBorder(filePath) {
 
 function buildCollectorRegions(W, H) {
   return [
-    // Template E: older frame higher collector number
+    // Red area 1: bottom-left
     {
-      left: Math.floor(W * 0.05),
-      top: Math.floor(H * 0.885),
-      width: Math.floor(W * 0.35),
-      height: Math.floor(H * 0.028),
-    },
-    // Template A: modern-ish bottom-left, tight
-    {
-      left: Math.floor(W * 0.05),
-      top: Math.floor(H * 0.93),
-      width: Math.floor(W * 0.28),
-      height: Math.floor(H * 0.020),
-    },
-    // Template B: slightly higher (some layouts shift up)
-    {
-      left: Math.floor(W * 0.05),
+      left: Math.floor(W * 0.04),
       top: Math.floor(H * 0.915),
-      width: Math.floor(W * 0.30),
-      height: Math.floor(H * 0.024),
+      width: Math.floor(W * 0.18),
+      height: Math.floor(H * 0.035),
     },
-    // Template C: a bit more to the right (different left margin)
+
+    // Red area 2: bottom-middle
     {
-      left: Math.floor(W * 0.10),
-      top: Math.floor(H * 0.93),
-      width: Math.floor(W * 0.30),
-      height: Math.floor(H * 0.020),
+      left: Math.floor(W * 0.43),
+      top: Math.floor(H * 0.922),
+      width: Math.floor(W * 0.19),
+      height: Math.floor(H * 0.040),
     },
-    // Template D: slightly wider (if slash/denominator is being clipped)
+
+    // Red area 3: bottom-right
     {
-      left: Math.floor(W * 0.05),
-      top: Math.floor(H * 0.93),
-      width: Math.floor(W * 0.36),
-      height: Math.floor(H * 0.022),
-    },
-    // Template F: taller height to capture clipped text
-    {
-      left: Math.floor(W * 0.05),
-      top: Math.floor(H * 0.925),
-      width: Math.floor(W * 0.36),
-      height: Math.floor(H * 0.030),
+      left: Math.floor(W * 0.61),
+      top: Math.floor(H * 0.922),
+      width: Math.floor(W * 0.21),
+      height: Math.floor(H * 0.040),
     },
   ];
 }

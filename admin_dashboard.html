@@ -520,8 +520,10 @@
 
 .review-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 280px));
   gap: 16px;
+  justify-content: start;
+  align-items: start;
 }
 
 .review-card {
@@ -530,7 +532,8 @@
   padding: 14px;
   box-shadow: 0 4px 10px rgba(0,0,0,0.06);
   border: 1px solid #e5e5e5;
-  max-width: 320px;
+  width: 280px;
+  max-width: 280px;
 }
 
 .review-images {
@@ -994,15 +997,16 @@ async function loadInventoryReview() {
     if (!res.ok) throw new Error(`Failed with ${res.status}`);
 
     const items = await res.json();
+    const orderedItems = Array.isArray(items) ? [...items].reverse() : [];
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(orderedItems) || orderedItems.length === 0) {
       wrap.innerHTML = "<p>No review items waiting.</p>";
       return;
     }
 
     wrap.innerHTML = `
       <div class="review-grid">
-        ${items.map(item => {
+        ${orderedItems.map(item => {
           const chosenName = item?.chosen?.name || item?.cardName || item?.guessedName || "Unknown";
           const chosenSetName = item?.chosen?.set_name || item?.set || item?.chosenSetName || "Unknown Set";
           const chosenCollector = item?.chosen?.collector_number || item?.chosenCollector || "";

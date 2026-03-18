@@ -4,13 +4,23 @@ const FIXED_DIMS = { w: 771, h: 1061 };
 // Tuned crop boxes for the FI-8170 format
 const CROP = {
   // Top name bar strip
-  nameBar: { left: 80, top: 32, width: 520, height: 85 },
+  nameBar: {
+    left: 58,
+    top: 34,
+    width: 565,
+    height: 62,
+  },
 
   // Bottom collector strip
   bottomLine: { left: 154, top: 923, width: 462, height: 127 },
 
   // Upper-right set symbol crop (starting point; tune with debug logs if needed)
-  setSymbol: { left: 540, top: 145, width: 95, height: 95 },
+   setSymbol: {
+    left: 640,
+    top: 595,
+    width: 92,
+    height: 78,
+  },
 };
 
 const DEBUG_OCR = true;
@@ -29,10 +39,8 @@ const NAME_OFFSETS = [
 
 const COLLECTOR_OFFSETS = [
   { dx: 0, dy: 0 },
-  { dx: 4, dy: 0 }, { dx: -4, dy: 0 },
-  { dx: 8, dy: 0 }, { dx: -8, dy: 0 },
+  { dx: 3, dy: 0 }, { dx: -3, dy: 0 },
   { dx: 0, dy: 2 }, { dx: 0, dy: -2 },
-  { dx: 0, dy: 4 }, { dx: 0, dy: -4 },
 ];
 
 const SYMBOL_OFFSETS = [

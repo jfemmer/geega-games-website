@@ -1,6 +1,16 @@
 // ocr/imageHash.js
 const sharp = require("sharp");
 const axios = require("axios");
+const { CROP } = require("./constants");
+
+function clampRegion(region, W, H) {
+  const out = { ...region };
+  out.left = Math.max(0, Math.min(W - 2, out.left));
+  out.top = Math.max(0, Math.min(H - 2, out.top));
+  out.width = Math.max(1, Math.min(out.width, W - out.left));
+  out.height = Math.max(1, Math.min(out.height, H - out.top));
+  return out;
+}
 
 // --------- Artwork crop (percent-based, works across resolutions) ----------
 async function cropArtworkBuffer(imagePathOrBuffer) {
@@ -9,20 +19,12 @@ async function cropArtworkBuffer(imagePathOrBuffer) {
   const W = meta.width;
   const H = meta.height;
 
-  // MTG artwork region (typical modern-ish frames)
-  // Tune later if needed; this is a strong starting point.
-  const region = {
+  const region = clampRegion({
     left: Math.floor(W * 0.11),
     top: Math.floor(H * 0.17),
     width: Math.floor(W * 0.78),
     height: Math.floor(H * 0.40),
-  };
-
-  // Clamp
-  region.left = Math.max(0, Math.min(W - 2, region.left));
-  region.top = Math.max(0, Math.min(H - 2, region.top));
-  region.width = Math.max(1, Math.min(region.width, W - region.left));
-  region.height = Math.max(1, Math.min(region.height, H - region.top));
+  }, W, H);
 
   return await img
     .extract(region)
@@ -31,15 +33,42 @@ async function cropArtworkBuffer(imagePathOrBuffer) {
     .toBuffer();
 }
 
+// --------- Set symbol crop ----------
+async function cropSetSymbolBuffer(imagePathOrBuffer, dx = 0, dy = 0) {
+  const img = sharp(imagePathOrBuffer);
+  const meta = await img.metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  const base = CROP.setSymbol;
+  if (!base) throw new Error("CROP.setSymbol missing in constants.js");
+
+  const sx = W / 771;
+  const sy = H / 1061;
+
+  const region = clampRegion({
+    left: Math.round(base.left * sx + dx),
+    top: Math.round(base.top * sy + dy),
+    width: Math.round(base.width * sx),
+    height: Math.round(base.height * sy),
+  }, W, H);
+
+  return await img
+    .extract(region)
+    .grayscale()
+    .normalize()
+    .resize(64, 64, { fit: "fill" })
+    .threshold(180)
+    .toBuffer();
+}
+
 // --------- dHash (64-bit, returned as hex string) ----------
 async function dhash64FromBuffer(buf) {
-  // dHash: resize to 9x8, compare adjacent pixels across rows
-  const { data, info } = await sharp(buf)
+  const { data } = await sharp(buf)
     .resize(9, 8, { fit: "fill" })
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  // data is 9*8 grayscale bytes
   let bits = 0n;
   let bitIndex = 0n;
 
@@ -53,7 +82,6 @@ async function dhash64FromBuffer(buf) {
     }
   }
 
-  // 64 bits -> 16 hex chars
   return bits.toString(16).padStart(16, "0");
 }
 
@@ -63,7 +91,6 @@ function hammingHex64(aHex, bHex) {
   const b = BigInt("0x" + bHex);
   let x = a ^ b;
 
-  // popcount
   let count = 0;
   while (x) {
     x &= (x - 1n);
@@ -72,7 +99,7 @@ function hammingHex64(aHex, bHex) {
   return count;
 }
 
-// --------- High-level helpers ----------
+// --------- Existing artwork helpers ----------
 async function hashScanArtwork(imagePath) {
   const artBuf = await cropArtworkBuffer(imagePath);
   return await dhash64FromBuffer(artBuf);
@@ -97,8 +124,28 @@ async function hashScryfallArtwork(card) {
   return await dhash64FromBuffer(artBuf);
 }
 
+// --------- Symbol helpers ----------
+async function hashScanSetSymbol(imagePath, dx = 0, dy = 0) {
+  const buf = await cropSetSymbolBuffer(imagePath, dx, dy);
+  return await dhash64FromBuffer(buf);
+}
+
+async function hashReferenceSymbolBuffer(imagePathOrBuffer) {
+  const buf = await sharp(imagePathOrBuffer)
+    .grayscale()
+    .normalize()
+    .resize(64, 64, { fit: "fill" })
+    .threshold(180)
+    .png()
+    .toBuffer();
+
+  return await dhash64FromBuffer(buf);
+}
+
 module.exports = {
   hashScanArtwork,
   hashScryfallArtwork,
+  hashScanSetSymbol,
+  hashReferenceSymbolBuffer,
   hammingHex64,
 };

@@ -42,7 +42,6 @@ async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, d
     .extract(region)
     .grayscale()
     .normalize()
-    .blur(0.3) 
     .sharpen()
     .resize({ width: 1400, withoutEnlargement: false });
 
@@ -118,28 +117,28 @@ async function detectWhiteBorder(filePath) {
 
 function buildCollectorRegions(W, H) {
   return [
-    // Red area 1: bottom-left
+    // 🔴 LEFT (set code / rarity area)
     {
       left: Math.floor(W * 0.04),
-      top: Math.floor(H * 0.915),
-      width: Math.floor(W * 0.18),
+      top: Math.floor(H * 0.92),
+      width: Math.floor(W * 0.20),
       height: Math.floor(H * 0.035),
     },
 
-    // Red area 2: bottom-middle
+    // 🔴 MIDDLE (collector number sometimes appears here)
     {
-      left: Math.floor(W * 0.43),
-      top: Math.floor(H * 0.922),
-      width: Math.floor(W * 0.19),
-      height: Math.floor(H * 0.040),
+      left: Math.floor(W * 0.40),
+      top: Math.floor(H * 0.92),
+      width: Math.floor(W * 0.22),
+      height: Math.floor(H * 0.04),
     },
 
-    // Red area 3: bottom-right
+    // 🔴 RIGHT (most common collector number position)
     {
-      left: Math.floor(W * 0.61),
-      top: Math.floor(H * 0.922),
-      width: Math.floor(W * 0.21),
-      height: Math.floor(H * 0.040),
+      left: Math.floor(W * 0.60),
+      top: Math.floor(H * 0.92),
+      width: Math.floor(W * 0.26),
+      height: Math.floor(H * 0.04),
     },
   ];
 }

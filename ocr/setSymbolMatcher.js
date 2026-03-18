@@ -1,0 +1,168 @@
+// ocr/setSymbolMatcher.js
+const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
+const { SYMBOL_OFFSETS } = require("./constants");
+const {
+  hashScanSetSymbol,
+  hashReferenceSymbolBuffer,
+  hammingHex64
+} = require("./imageHash");
+
+const CACHE_PATH = process.env.RAILWAY_ENVIRONMENT
+  ? "/tmp/scryfall_set_symbol_hash_cache.json"
+  : path.join(__dirname, "..", "scryfall_set_symbol_hash_cache.json");
+
+let cache = null;
+
+function readCache() {
+  try {
+    if (fs.existsSync(CACHE_PATH)) {
+      const parsed = JSON.parse(fs.readFileSync(CACHE_PATH, "utf8"));
+      if (parsed && typeof parsed === "object") return parsed;
+    }
+  } catch {}
+  return null;
+}
+
+function writeCache(obj) {
+  try {
+    fs.writeFileSync(CACHE_PATH, JSON.stringify(obj, null, 2), "utf8");
+  } catch {}
+}
+
+async function fetchAllSets() {
+  const res = await axios.get("https://api.scryfall.com/sets");
+  return Array.isArray(res?.data?.data) ? res.data.data : [];
+}
+
+async function ensureSetSymbolCache(forceRefresh = false) {
+  if (cache && !forceRefresh) return cache;
+
+  if (!forceRefresh) {
+    const existing = readCache();
+    if (existing?.generatedAt && Array.isArray(existing?.entries) && existing.entries.length) {
+      cache = existing;
+      return cache;
+    }
+  }
+
+  const sets = await fetchAllSets();
+  const entries = [];
+
+  for (const set of sets) {
+    const setCode = String(set?.code || "").trim().toLowerCase();
+    const iconSvgUri = String(set?.icon_svg_uri || "").trim();
+    if (!setCode || !iconSvgUri) continue;
+
+    try {
+      const iconRes = await axios.get(iconSvgUri, { responseType: "arraybuffer" });
+      const hash = await hashReferenceSymbolBuffer(Buffer.from(iconRes.data));
+      entries.push({
+        setCode,
+        setName: set?.name || "",
+        setType: set?.set_type || "",
+        releasedAt: set?.released_at || "",
+        hash
+      });
+    } catch (err) {
+      // keep going; one bad icon should not stop the cache build
+    }
+  }
+
+  cache = {
+    generatedAt: new Date().toISOString(),
+    entries
+  };
+
+  writeCache(cache);
+  return cache;
+}
+
+function distanceToScore(dist) {
+  if (!Number.isFinite(dist)) return 0;
+  if (dist <= 4) return 1.0;
+  if (dist <= 6) return 0.92;
+  if (dist <= 8) return 0.82;
+  if (dist <= 10) return 0.68;
+  if (dist <= 12) return 0.52;
+  return 0.25;
+}
+
+async function detectSetSymbol(imagePath, opts = {}) {
+  const data = await ensureSetSymbolCache(Boolean(opts.forceRefresh));
+  const entries = Array.isArray(data?.entries) ? data.entries : [];
+  const allowedSetCodes = Array.isArray(opts.allowedSetCodes)
+    ? new Set(opts.allowedSetCodes.map(x => String(x || "").trim().toLowerCase()).filter(Boolean))
+    : null;
+
+  const pool = allowedSetCodes
+    ? entries.filter(e => allowedSetCodes.has(e.setCode))
+    : entries;
+
+  if (!pool.length) {
+    return {
+      setCode: null,
+      score: 0,
+      bestDist: 9999,
+      scanHash: null,
+      top: []
+    };
+  }
+
+  let best = null;
+  const scored = [];
+
+  for (const { dx, dy } of SYMBOL_OFFSETS) {
+    let scanHash = null;
+
+    try {
+      scanHash = await hashScanSetSymbol(imagePath, dx, dy);
+    } catch {
+      continue;
+    }
+
+    for (const entry of pool) {
+      const dist = hammingHex64(scanHash, entry.hash);
+      const row = {
+        setCode: entry.setCode,
+        setName: entry.setName,
+        setType: entry.setType,
+        releasedAt: entry.releasedAt,
+        dx,
+        dy,
+        dist
+      };
+      scored.push(row);
+
+      if (!best || dist < best.dist) {
+        best = { ...row, scanHash };
+      }
+    }
+  }
+
+  if (!best) {
+    return {
+      setCode: null,
+      score: 0,
+      bestDist: 9999,
+      scanHash: null,
+      top: []
+    };
+  }
+
+  scored.sort((a, b) => a.dist - b.dist);
+
+  return {
+    setCode: best.setCode,
+    score: distanceToScore(best.dist),
+    bestDist: best.dist,
+    scanHash: best.scanHash,
+    top: scored.slice(0, 5)
+  };
+}
+
+module.exports = {
+  ensureSetSymbolCache,
+  detectSetSymbol
+};

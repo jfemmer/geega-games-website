@@ -5,7 +5,7 @@ const sharp = require("sharp");
 const Tesseract = require("tesseract.js");
 
 const { recognizeWithTimeout } = require("./nameOcr");
-const { cropAndPrepBottomLine, buildCollectorRegions } = require("./imageUtils");
+const { cropAndPrepCollectorRegion, buildCollectorRegions } = require("./imageUtils");
 const { OCR_THRESHOLDS, COLLECTOR_OFFSETS } = require("./constants");
 
 function cleanBottomText(text) {
@@ -78,13 +78,17 @@ async function ocrCollectorNumberHighAccuracy(originalPath, tmpDir) {
         const out = path.join(tmpDir, `bottom_${ts}_r${i}_o${o}_t${t}.png`);
 
         try {
-          await cropAndPrepBottomLine(originalPath, out, region, useThreshold, dx, dy, thr ?? 180);
+          await cropAndPrepCollectorRegion(originalPath, out, region, useThreshold, dx, dy, thr ?? 180);
           const ocr = await recognizeWithTimeout(out, 90000, optsStrict);
           const text = cleanBottomText(ocr?.data?.text);
           const conf = ocr?.data?.confidence ?? 0;
           const parsed = parseCollectorNumberStrict(text);
 
           const collectorNumber = parsed?.value ?? null;
+          // Reject obviously bad numbers
+          if (collectorNumber && collectorNumber.length > 4) {
+            continue;
+          }
           const parseMode = parsed?.mode ?? null;
 
           candidates.push({
@@ -100,7 +104,7 @@ async function ocrCollectorNumberHighAccuracy(originalPath, tmpDir) {
           // ✅ Confidence gating:
           // - slash parses are reliable at lower conf
           // - standalone parses must be much higher confidence to avoid poisoning
-          const minConf = parseMode === "standalone" ? 75 : 55;
+          const minConf = parseMode === "standalone" ? 85 : 55;
 
           if (collectorNumber && conf >= minConf) {
             return { text, confidence: conf, collectorNumber };
@@ -131,11 +135,15 @@ async function ocrCollectorNumberHighAccuracy(originalPath, tmpDir) {
   candidates.sort(
     (a, b) =>
       (b.collectorNumber ? 1 : 0) - (a.collectorNumber ? 1 : 0) ||
-      ((b.parseMode === 'slash') ? 1 : 0) - ((a.parseMode === 'slash') ? 1 : 0) ||
+      ((b.parseMode === 'slash') ? 2 : 0) - ((a.parseMode === 'slash') ? 2 : 0)
       (b.conf - a.conf)
   );
 
   const best = candidates[0] || { text: "", conf: 0, collectorNumber: null };
+
+  if (!best.collectorNumber) {
+  console.log("⚠️ No valid collector number found for:", originalPath);
+}
 
   return {
     text: best.text || "",

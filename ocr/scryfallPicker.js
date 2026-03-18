@@ -1,4 +1,6 @@
 const axios = require("axios");
+const { hashScanArtwork, hashScryfallArtwork, hammingHex64 } = require("./imageHash");
+const { getHash, setHash } = require("./hashCache");
 
 function normalizeCollector(str) {
   return String(str || "")
@@ -119,6 +121,49 @@ async function pickPrintingByCollector(printsSearchUri, collectorNumber, isFoil,
   return chosen;
 }
 
+async function refineByArtworkHash(scanImagePath, candidates, opts = {}) {
+  if (!scanImagePath || !Array.isArray(candidates) || candidates.length === 0) return null;
+
+  const scanHash = await hashScanArtwork(scanImagePath);
+
+  let best = null;
+  let bestDist = 9999;
+  const scored = [];
+
+  for (const c of candidates) {
+    const key = c?.id;
+    if (!key) continue;
+
+    let h = getHash(key);
+    if (!h) {
+      try {
+        h = await hashScryfallArtwork(c);
+        setHash(key, h);
+      } catch {
+        continue;
+      }
+    }
+
+    const d = hammingHex64(scanHash, h);
+    scored.push({ id: key, set: c.set, collector: c.collector_number, dist: d });
+
+    if (d < bestDist) {
+      bestDist = d;
+      best = c;
+    }
+  }
+
+  // Confidence gating for hash match:
+  // 0–6 = very strong; 7–10 = decent; >10 = risky
+  const maxDist = opts.maxDist ?? 8;
+  if (!best || bestDist > maxDist) {
+    return { chosen: null, bestDist, scanHash, scored };
+  }
+
+  return { chosen: best, bestDist, scanHash, scored };
+}
+
 module.exports = {
-  pickPrintingByCollector
+  pickPrintingByCollector,
+  refineByArtworkHash
 };

@@ -11,19 +11,76 @@ function samePath(a, b) {
   try { return path.resolve(a) === path.resolve(b); } catch { return a === b; }
 }
 
-
-async function cropAndPrepCollectorRegion(originalPath, outPath, region, useThreshold = false, dx = 0, dy = 0, thresholdValue = 180) {
-  // Ensure parent dirs exist
+async function cropAndPrepNameBar(
+  originalPath,
+  outPath,
+  useThreshold = false,
+  dx = 0,
+  dy = 0,
+  thresholdValue = 180
+) {
   ensureDir(path.dirname(outPath));
   if (DEBUG_OCR) ensureDir(DEBUG_DIR);
 
-  // Clamp region safely (avoid sharp extract errors if region goes out of bounds)
   const meta = await sharp(originalPath).metadata();
   const W = meta.width;
   const H = meta.height;
 
-  const left = Math.max(0, Math.min(W - 2, (region.left + dx)));
-  const top = Math.max(0, Math.min(H - 2, (region.top + dy)));
+  const base =
+    W === FIXED_DIMS.w && H === FIXED_DIMS.h
+      ? CROP.nameBar
+      : {
+          left: Math.floor(W * 0.075),
+          top: Math.floor(H * 0.032),
+          width: Math.floor(W * 0.73),
+          height: Math.floor(H * 0.06),
+        };
+
+  const left = Math.max(0, Math.min(W - 2, base.left + dx));
+  const top = Math.max(0, Math.min(H - 2, base.top + dy));
+  const width = Math.max(1, Math.min(base.width, W - left));
+  const height = Math.max(1, Math.min(base.height, H - top));
+
+  let pipeline = sharp(originalPath)
+    .extract({ left, top, width, height })
+    .grayscale()
+    .normalize()
+    .sharpen()
+    .resize({ width: 1400, withoutEnlargement: false });
+
+  if (useThreshold) pipeline = pipeline.threshold(thresholdValue);
+
+  await pipeline.toFile(outPath);
+
+  if (DEBUG_OCR) {
+    const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
+    if (!samePath(debugCopy, outPath)) {
+      await sharp(outPath).toFile(debugCopy);
+      console.log("🟣 Saved NAME crop to:", debugCopy);
+    } else {
+      console.log("🟣 Saved NAME crop to (no-copy):", outPath);
+    }
+  }
+}
+
+async function cropAndPrepCollectorRegion(
+  originalPath,
+  outPath,
+  region,
+  useThreshold = false,
+  dx = 0,
+  dy = 0,
+  thresholdValue = 180
+) {
+  ensureDir(path.dirname(outPath));
+  if (DEBUG_OCR) ensureDir(DEBUG_DIR);
+
+  const meta = await sharp(originalPath).metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  const left = Math.max(0, Math.min(W - 2, region.left + dx));
+  const top = Math.max(0, Math.min(H - 2, region.top + dy));
   const width = Math.max(1, Math.min(region.width, W - left));
   const height = Math.max(1, Math.min(region.height, H - top));
 
@@ -32,7 +89,7 @@ async function cropAndPrepCollectorRegion(originalPath, outPath, region, useThre
     .grayscale()
     .normalize()
     .sharpen()
-    .resize({ width: 1800, withoutEnlargement: false })
+    .resize({ width: 1800, withoutEnlargement: false });
 
   if (useThreshold) pipeline = pipeline.threshold(thresholdValue);
 
@@ -40,13 +97,11 @@ async function cropAndPrepCollectorRegion(originalPath, outPath, region, useThre
 
   if (DEBUG_OCR) {
     const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
-
-    // ✅ avoid "Cannot use same file for input and output"
     if (!samePath(debugCopy, outPath)) {
       await sharp(outPath).toFile(debugCopy);
-      console.log("🔵 Saved BOTTOM crop to:", debugCopy);
+      console.log("🔵 Saved COLLECTOR crop to:", debugCopy);
     } else {
-      console.log("🔵 Saved BOTTOM crop to (no-copy):", outPath);
+      console.log("🔵 Saved COLLECTOR crop to (no-copy):", outPath);
     }
   }
 }
@@ -67,26 +122,21 @@ async function detectWhiteBorder(filePath) {
 
 function buildCollectorRegions(W, H) {
   return [
-    // 🔴 LEFT (set code / rarity area)
     {
       left: Math.floor(W * 0.04),
       top: Math.floor(H * 0.915),
       width: Math.floor(W * 0.18),
-      height: Math.floor(H * 0.035),
+      height: Math.floor(H * 0.04),
     },
-
-    // 🔴 MIDDLE (collector number sometimes appears here)
     {
-      left: Math.floor(W * 0.40),
-      top: Math.floor(H * 0.92),
+      left: Math.floor(W * 0.42),
+      top: Math.floor(H * 0.915),
       width: Math.floor(W * 0.20),
       height: Math.floor(H * 0.04),
     },
-
-    // 🔴 RIGHT (most common collector number position)
     {
-      left: Math.floor(W * 0.60),
-      top: Math.floor(H * 0.92),
+      left: Math.floor(W * 0.62),
+      top: Math.floor(H * 0.915),
       width: Math.floor(W * 0.22),
       height: Math.floor(H * 0.04),
     },
@@ -95,6 +145,7 @@ function buildCollectorRegions(W, H) {
 
 module.exports = {
   cropAndPrepNameBar,
+  cropAndPrepCollectorRegion,
   buildCollectorRegions,
   detectWhiteBorder,
 };

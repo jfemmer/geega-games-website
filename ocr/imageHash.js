@@ -59,7 +59,6 @@ async function cropSetSymbolBuffer(imagePathOrBuffer, dx = 0, dy = 0) {
     .normalize()
     .sharpen()
     .resize(96, 96, { fit: "fill" })
-    .blur(0.2)
     .threshold(160)
     .toBuffer();
 }

@@ -11,58 +11,8 @@ function samePath(a, b) {
   try { return path.resolve(a) === path.resolve(b); } catch { return a === b; }
 }
 
-async function cropAndPrepNameBar(originalPath, outPath, useThreshold = false, dx = 0, dy = 0, thresholdValue = 180) {
-  // Ensure parent dirs exist
-  ensureDir(path.dirname(outPath));
-  if (DEBUG_OCR) ensureDir(DEBUG_DIR);
 
-  const meta = await sharp(originalPath).metadata();
-  const W = meta.width;
-  const H = meta.height;
-
-  const base =
-    W === FIXED_DIMS.w && H === FIXED_DIMS.h
-      ? CROP.nameBar
-      : {
-          left: Math.floor(W * 0.08),
-          top: Math.floor(H * 0.055),
-          width: Math.floor(W * 0.78),
-          height: Math.floor(H * 0.055),
-        };
-
-  // apply offset + clamp inside image
-  const left = Math.max(0, Math.min(W - 2, base.left + dx));
-  const top = Math.max(0, Math.min(H - 2, base.top + dy));
-  const width = Math.max(1, Math.min(base.width, W - left));
-  const height = Math.max(1, Math.min(base.height, H - top));
-
-  const region = { left, top, width, height };
-
-  let pipeline = sharp(originalPath)
-    .extract(region)
-    .grayscale()
-    .normalize()
-    .sharpen()
-    .resize({ width: 1400, withoutEnlargement: false });
-
-  if (useThreshold) pipeline = pipeline.threshold(thresholdValue);
-
-  await pipeline.toFile(outPath);
-
-  if (DEBUG_OCR) {
-    const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
-
-    // ✅ avoid "Cannot use same file for input and output"
-    if (!samePath(debugCopy, outPath)) {
-      await sharp(outPath).toFile(debugCopy);
-      console.log("🟣 Saved NAME crop to:", debugCopy);
-    } else {
-      console.log("🟣 Saved NAME crop to (no-copy):", outPath);
-    }
-  }
-}
-
-async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold = false, dx = 0, dy = 0, thresholdValue = 180) {
+async function cropAndPrepCollectorRegion(originalPath, outPath, region, useThreshold = false, dx = 0, dy = 0, thresholdValue = 180) {
   // Ensure parent dirs exist
   ensureDir(path.dirname(outPath));
   if (DEBUG_OCR) ensureDir(DEBUG_DIR);
@@ -82,7 +32,7 @@ async function cropAndPrepBottomLine(originalPath, outPath, region, useThreshold
     .grayscale()
     .normalize()
     .sharpen()
-    .resize({ width: 1600, withoutEnlargement: false });
+    .resize({ width: 1800, withoutEnlargement: false })
 
   if (useThreshold) pipeline = pipeline.threshold(thresholdValue);
 
@@ -120,8 +70,8 @@ function buildCollectorRegions(W, H) {
     // 🔴 LEFT (set code / rarity area)
     {
       left: Math.floor(W * 0.04),
-      top: Math.floor(H * 0.92),
-      width: Math.floor(W * 0.20),
+      top: Math.floor(H * 0.915),
+      width: Math.floor(W * 0.18),
       height: Math.floor(H * 0.035),
     },
 
@@ -129,7 +79,7 @@ function buildCollectorRegions(W, H) {
     {
       left: Math.floor(W * 0.40),
       top: Math.floor(H * 0.92),
-      width: Math.floor(W * 0.22),
+      width: Math.floor(W * 0.20),
       height: Math.floor(H * 0.04),
     },
 
@@ -137,7 +87,7 @@ function buildCollectorRegions(W, H) {
     {
       left: Math.floor(W * 0.60),
       top: Math.floor(H * 0.92),
-      width: Math.floor(W * 0.26),
+      width: Math.floor(W * 0.22),
       height: Math.floor(H * 0.04),
     },
   ];
@@ -145,7 +95,6 @@ function buildCollectorRegions(W, H) {
 
 module.exports = {
   cropAndPrepNameBar,
-  cropAndPrepBottomLine,
   buildCollectorRegions,
   detectWhiteBorder,
 };

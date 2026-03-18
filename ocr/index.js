@@ -3,6 +3,7 @@ const { ocrCollectorNumberHighAccuracy } = require("./collectorOcr");
 const { pickPrintingByCollector, refineByArtworkHash } = require("./scryfallPicker");
 const { computeOverallScore, shouldAutoIngest } = require("./confidenceGate");
 const { enqueueForReview } = require("./reviewQueue");
+const { detectSetSymbol, ensureSetSymbolCache } = require("./setSymbolMatcher");
 
 module.exports = {
   ocrCardNameHighAccuracy,
@@ -11,5 +12,7 @@ module.exports = {
   refineByArtworkHash,
   computeOverallScore,
   shouldAutoIngest,
-  enqueueForReview
+  enqueueForReview,
+  detectSetSymbol,
+  ensureSetSymbolCache
 };

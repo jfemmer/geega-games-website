@@ -15,6 +15,23 @@ function enqueueForReview(record, queuePath = DEFAULT_REVIEW_QUEUE_PATH) {
   try {
     const dir = path.dirname(queuePath);
     ensureDir(dir);
+
+    const incomingHash = String(record?.reviewHash || "").trim();
+
+    if (incomingHash && fs.existsSync(queuePath)) {
+      const raw = fs.readFileSync(queuePath, "utf8");
+      const lines = raw.split("\n").map(x => x.trim()).filter(Boolean);
+
+      for (const line of lines) {
+        try {
+          const item = JSON.parse(line);
+          if (String(item?.reviewHash || "").trim() === incomingHash) {
+            return false; // duplicate review item
+          }
+        } catch {}
+      }
+    }
+
     const line = JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n";
     fs.appendFileSync(queuePath, line, "utf8");
     return true;

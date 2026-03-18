@@ -22,7 +22,9 @@ const {
   refineByArtworkHash,      // ✅ must exist now
   computeOverallScore,
   shouldAutoIngest,
-  enqueueForReview
+  enqueueForReview,
+  detectSetSymbol,
+  ensureSetSymbolCache
 } = require("./ocr");
 
 
@@ -42,7 +44,11 @@ if (!fs.existsSync(OCR_DEBUG_DIR)) {
 
 const inFlightUploads = new Set();
 
-
+ensureSetSymbolCache().then((data) => {
+  console.log("🧩 Set symbol cache ready", { count: data?.entries?.length || 0 });
+}).catch((err) => {
+  console.log("⚠️ Set symbol cache warmup failed:", err.message);
+});
 
 const upload = multer({
   dest: UPLOAD_DIR,
@@ -51,21 +57,6 @@ const upload = multer({
     files: 5   // good idea to limit
   }
 });
-
-async function sha256File(filePath) {
-  const hash = crypto.createHash("sha256");
-  const stream = fs.createReadStream(filePath);
-
-  return await new Promise((resolve, reject) => {
-    stream.on("data", chunk => hash.update(chunk));
-    stream.on("end", () => resolve(hash.digest("hex")));
-    stream.on("error", reject);
-  });
-}
-
-function sha256Text(text) {
-  return crypto.createHash("sha256").update(String(text || ""), "utf8").digest("hex");
-}
 
 // -------------------- Inventory Review Queue Helpers --------------------
 const REVIEW_QUEUE_PATH =
@@ -483,9 +474,9 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           base = baseRes.data;
 
           // If user provided setCode + we have collector number, Scryfall has an exact endpoint:
-          if (collectorNumber && setCodeFromBody) {
+          if (collectorNumber && effectiveSetCode) {
             const exactRes = await axios.get(
-              `https://api.scryfall.com/cards/${encodeURIComponent(setCodeFromBody)}/${encodeURIComponent(collectorNumber)}`
+              `https://api.scryfall.com/cards/${encodeURIComponent(effectiveSetCode)}/${encodeURIComponent(collectorNumber)}`
             );
             card = exactRes.data;
             matchCount = 1;
@@ -496,7 +487,10 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
               collectorNumber,
               isFoil,
               false,
-              { returnMeta: true }
+              {
+        returnMeta: true,
+        setCode: effectiveSetCode || null
+      }
             );
 
             let chosen = meta?.chosen || null;
@@ -903,11 +897,6 @@ const scanJobSchema = new mongoose.Schema(
     filePath: { type: String, required: true },
     originalName: { type: String, default: "" },
 
-    // NEW: hashing / dedupe
-    fileSha256: { type: String, index: true, default: "" },
-    artworkHash: { type: String, index: true, default: "" },
-    ocrIdentityHash: { type: String, index: true, default: "" },
-
     // Batch inputs
     condition: { type: String, default: "NM" },
     foil: { type: Boolean, default: false },
@@ -922,6 +911,9 @@ const scanJobSchema = new mongoose.Schema(
     chosenCollector: String,
     ocrTextName: String,
     ocrTextBottom: String,
+    detectedSetCode: String,
+    setSymbolScore: Number,
+    setSymbolBestDist: Number,
 
     // Ops
     attempts: { type: Number, default: 0 },
@@ -1110,14 +1102,6 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
   if (!guessedName || guessedName.length < 3) {
     const preserved = ensureReviewImage();
 
-    const reviewHash = sha256Text([
-    guessedName || "",
-    collectorNumber || "",
-    safeCondition,
-    isFoil ? "foil" : "nonfoil",
-    "name_not_detected"
-  ].join("|"));
-
     queueReviewRecord({
       file: originalName || path.basename(filePath),
       reason: "name_not_detected",
@@ -1158,11 +1142,44 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
     collectorNumber
   });
 
+  // 2b) Hash-based set symbol detection (Scryfall-backed)
+  console.log("🧩 [scan-ingest] Set symbol detection start");
+
+  let symbolResult = {
+    setCode: null,
+    score: 0,
+    bestDist: 9999,
+    top: []
+  };
+
+  try {
+    if (typeof detectSetSymbol === "function") {
+      symbolResult = await detectSetSymbol(filePath);
+    }
+  } catch (err) {
+    console.log("⚠️ [scan-ingest] Set symbol detection failed:", err.message);
+  }
+
+  const detectedSetCode = (symbolResult?.setCode || "").trim().toLowerCase();
+  const symbolTrusted = (symbolResult?.score ?? 0) >= 0.68;
+  const effectiveSetCode = setCodeFromBody || (symbolTrusted ? detectedSetCode : "");
+
+  console.log("🧩 [scan-ingest] Set symbol detection done", {
+    detectedSetCode,
+    symbolTrusted,
+    effectiveSetCode,
+    symbolScore: symbolResult?.score ?? 0,
+    bestDist: symbolResult?.bestDist ?? null,
+    top: symbolResult?.top?.slice(0, 3) || []
+  });
+
   // 3) Scryfall select printing
   console.log("🧙 [scan-ingest] Scryfall start", {
     guessedName,
     resolvedName,
     setCodeFromBody,
+    detectedSetCode,
+    effectiveSetCode,
     collectorNumber,
     isFoil
   });
@@ -1177,9 +1194,9 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
     );
     base = baseRes.data;
 
-    if (collectorNumber && setCodeFromBody) {
+    if (collectorNumber && effectiveSetCode) {
       const exactRes = await axios.get(
-        `https://api.scryfall.com/cards/${encodeURIComponent(setCodeFromBody)}/${encodeURIComponent(collectorNumber)}`
+        `https://api.scryfall.com/cards/${encodeURIComponent(effectiveSetCode)}/${encodeURIComponent(collectorNumber)}`
       );
       card = exactRes.data;
       matchCount = 1;
@@ -1189,7 +1206,10 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
         collectorNumber,
         isFoil,
         false,
-        { returnMeta: true }
+        {
+        returnMeta: true,
+        setCode: effectiveSetCode || null
+      }
       );
 
       let chosen = meta?.chosen || null;
@@ -1211,8 +1231,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
       }
 
       card = chosen;
-    } else if (!collectorNumber && setCodeFromBody) {
-      const query = `!"${resolvedName}" set:${setCodeFromBody}`;
+    } else if (!collectorNumber && effectiveSetCode) {
+      const query = `!"${resolvedName}" set:${effectiveSetCode}`;
       const s = await axios.get(
         `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`
       );
@@ -1240,7 +1260,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
         nameConfidence: nameConf,
         collectorConfidence: bottom?.confidence ?? 0,
         hadCollector: !!collectorNumber,
-        matchCount
+        matchCount,
+        setSymbolScore: symbolResult?.score ?? null
       }),
       name: nameRes,
       collector: bottom,
@@ -1251,6 +1272,10 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
         collector_number: base?.collector_number,
         imageUrl: base?.image_uris?.normal || base?.card_faces?.[0]?.image_uris?.normal || ""
       } : null,
+      detectedSetCode: detectedSetCode || null,
+      setSymbolScore: symbolResult?.score ?? null,
+      setSymbolBestDist: symbolResult?.bestDist ?? null,
+      setSymbolTop: symbolResult?.top || [],
       details: err?.message || String(err)
     });
 
@@ -1265,23 +1290,13 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
     matchCount
   });
 
-  // NEW: OCR identity hash
-const identityBase = [
-  card?.name || guessedName || "",
-  collectorNumber || "",
-  card?.set || setCodeFromBody || "",
-  isFoil ? "foil" : "nonfoil",
-  safeCondition
-].join("|");
-
-const ocrIdentityHash = sha256Text(identityBase);
-
   // 4) Confidence gate
   const score = computeOverallScore({
     nameConfidence: nameConf,
     collectorConfidence: bottom?.confidence ?? 0,
     hadCollector: !!collectorNumber,
-    matchCount
+    matchCount,
+    setSymbolScore: symbolResult?.score ?? null
   });
 
   if (!shouldAutoIngest(score)) {
@@ -1305,7 +1320,11 @@ const ocrIdentityHash = sha256Text(identityBase);
         set_name: card?.set_name,
         collector_number: card?.collector_number,
         imageUrl: card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || ""
-      }
+      },
+      detectedSetCode: detectedSetCode || null,
+      setSymbolScore: symbolResult?.score ?? null,
+      setSymbolBestDist: symbolResult?.bestDist ?? null,
+      setSymbolTop: symbolResult?.top || []
     });
 
     throw new Error(`Sent to review: score ${score.toFixed(3)} below threshold`);
@@ -1357,7 +1376,10 @@ const ocrIdentityHash = sha256Text(identityBase);
     chosenSetName: card?.set_name || null,
     chosenCollector: card?.collector_number || null,
     ocrTextName: null,
-    ocrTextBottom: bottom?.text || null
+    ocrTextBottom: bottom?.text || null,
+    detectedSetCode: detectedSetCode || null,
+    setSymbolScore: symbolResult?.score ?? null,
+    setSymbolBestDist: symbolResult?.bestDist ?? null
   };
 }
 
@@ -1379,39 +1401,24 @@ app.post("/api/scan-ingest", requireIngestKey, upload.single("image"), async (re
     const setCode = (req.body.setCode || "").trim().toLowerCase();
     const originalName = (req.body.originalName || req.file.originalname || "").trim();
 
-    // NEW: compute exact file hash
-    const fileSha256 = await sha256File(req.file.path);
+    const recentCutoff = new Date(Date.now() - 15000);
 
-    // Prefer hash from actual file, optionally compare header too
-    const clientHash = String(req.headers["x-file-sha256"] || "").trim().toLowerCase();
-
-    if (clientHash && clientHash !== fileSha256) {
-      console.warn("⚠️ Client/server hash mismatch", {
-        originalName,
-        clientHash,
-        fileSha256
-      });
-    }
-
-    const existingByHash = await ScanJob.findOne({
-      fileSha256,
+    const existing = await ScanJob.findOne({
+      originalName,
+      createdAt: { $gte: recentCutoff },
       status: { $in: ["queued", "processing", "done"] }
     }).sort({ createdAt: -1 });
 
-    if (existingByHash) {
-      console.log("⛔ Duplicate scan-ingest prevented by hash:", {
+    if (existing) {
+      console.log("⛔ Duplicate scan-ingest prevented:", {
         originalName,
-        fileSha256,
-        existingJobId: String(existingByHash._id)
+        existingJobId: String(existing._id)
       });
 
-      try { if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); } catch {}
-
       return res.json({
-        jobId: String(existingByHash._id),
-        status: existingByHash.status,
-        deduped: true,
-        dedupeReason: "fileSha256"
+        jobId: String(existing._id),
+        status: existing.status,
+        deduped: true
       });
     }
 
@@ -1419,20 +1426,15 @@ app.post("/api/scan-ingest", requireIngestKey, upload.single("image"), async (re
       status: "queued",
       filePath: req.file.path,
       originalName,
-      fileSha256,
       condition,
       foil,
       setCode
     });
 
-    return res.json({
-      jobId: String(job._id),
-      status: job.status,
-      deduped: false
-    });
+    res.json({ jobId: String(job._id), status: job.status });
   } catch (e) {
     console.error("❌ scan-ingest error:", e);
-    return res.status(500).json({ message: "Failed to ingest scan." });
+    res.status(500).json({ message: "Failed to ingest scan." });
   }
 });
 
@@ -3055,6 +3057,9 @@ async function runOneJob(job) {
         chosenCollector: result.chosenCollector,
         ocrTextName: result.ocrTextName,
         ocrTextBottom: result.ocrTextBottom,
+        detectedSetCode: result.detectedSetCode,
+        setSymbolScore: result.setSymbolScore,
+        setSymbolBestDist: result.setSymbolBestDist,
         lastError: ""
       }
     });

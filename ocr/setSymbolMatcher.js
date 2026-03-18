@@ -65,7 +65,7 @@ async function ensureSetSymbolCache(forceRefresh = false) {
         releasedAt: set?.released_at || "",
         hash
       });
-    } catch (err) {
+    } catch {
       // keep going; one bad icon should not stop the cache build
     }
   }
@@ -81,19 +81,26 @@ async function ensureSetSymbolCache(forceRefresh = false) {
 
 function distanceToScore(dist) {
   if (!Number.isFinite(dist)) return 0;
+
   if (dist <= 4) return 1.0;
-  if (dist <= 6) return 0.92;
-  if (dist <= 8) return 0.82;
-  if (dist <= 10) return 0.68;
-  if (dist <= 12) return 0.52;
-  return 0.25;
+  if (dist <= 6) return 0.93;
+  if (dist <= 8) return 0.80;
+  if (dist <= 10) return 0.60;
+  if (dist <= 12) return 0.40;
+
+  return 0.20;
 }
 
 async function detectSetSymbol(imagePath, opts = {}) {
   const data = await ensureSetSymbolCache(Boolean(opts.forceRefresh));
   const entries = Array.isArray(data?.entries) ? data.entries : [];
+
   const allowedSetCodes = Array.isArray(opts.allowedSetCodes)
-    ? new Set(opts.allowedSetCodes.map(x => String(x || "").trim().toLowerCase()).filter(Boolean))
+    ? new Set(
+        opts.allowedSetCodes
+          .map(x => String(x || "").trim().toLowerCase())
+          .filter(Boolean)
+      )
     : null;
 
   const pool = allowedSetCodes
@@ -124,6 +131,9 @@ async function detectSetSymbol(imagePath, opts = {}) {
 
     for (const entry of pool) {
       const dist = hammingHex64(scanHash, entry.hash);
+      const weight = (dx === 0 && dy === 0) ? 0 : 0.5;
+      const weightedDist = dist + weight;
+
       const row = {
         setCode: entry.setCode,
         setName: entry.setName,
@@ -131,11 +141,13 @@ async function detectSetSymbol(imagePath, opts = {}) {
         releasedAt: entry.releasedAt,
         dx,
         dy,
-        dist
+        dist,
+        weightedDist
       };
+
       scored.push(row);
 
-      if (!best || dist < best.dist) {
+      if (!best || weightedDist < best.weightedDist) {
         best = { ...row, scanHash };
       }
     }
@@ -151,7 +163,37 @@ async function detectSetSymbol(imagePath, opts = {}) {
     };
   }
 
-  scored.sort((a, b) => a.dist - b.dist);
+  scored.sort((a, b) => a.weightedDist - b.weightedDist || a.dist - b.dist);
+
+  if (best.dist > 12) {
+    return {
+      setCode: null,
+      score: 0,
+      bestDist: best.dist,
+      scanHash: best.scanHash,
+      top: scored.slice(0, 5)
+    };
+  }
+
+  const second = scored[1];
+  if (second && Math.abs(second.dist - best.dist) <= 1) {
+    return {
+      setCode: null,
+      score: 0.4,
+      bestDist: best.dist,
+      scanHash: best.scanHash,
+      top: scored.slice(0, 5)
+    };
+  }
+
+  if (process.env.DEBUG_SYMBOL === "true") {
+    console.log("🧩 Symbol Match:", {
+      best: best.setCode,
+      dist: best.dist,
+      weightedDist: best.weightedDist,
+      top: scored.slice(0, 3)
+    });
+  }
 
   return {
     setCode: best.setCode,

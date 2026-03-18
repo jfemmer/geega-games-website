@@ -11,8 +11,6 @@ const CROP = {
     height: 62,
   },
 
-  // Bottom collector strip
-  bottomLine: { left: 154, top: 923, width: 462, height: 127 },
 
   // Upper-right set symbol crop (starting point; tune with debug logs if needed)
    setSymbol: {
@@ -26,15 +24,13 @@ const CROP = {
 const DEBUG_OCR = true;
 
 // Try multiple thresholds for robustness (glare/contrast variance)
-const OCR_THRESHOLDS = [null, 165, 180, 195];
+const OCR_THRESHOLDS = [null, 140, 160, 180];
 
 // Small crop jitter offsets (pixels) to tolerate scan drift
 const NAME_OFFSETS = [
   { dx: 0, dy: 0 },
-  { dx: 4, dy: 0 }, { dx: -4, dy: 0 },
-  { dx: 0, dy: 4 }, { dx: 0, dy: -4 },
-  { dx: 6, dy: 2 }, { dx: -6, dy: 2 },
-  { dx: 6, dy: -2 }, { dx: -6, dy: -2 },
+  { dx: 3, dy: 0 }, { dx: -3, dy: 0 },
+  { dx: 0, dy: 2 }, { dx: 0, dy: -2 },
 ];
 
 const COLLECTOR_OFFSETS = [
@@ -45,10 +41,8 @@ const COLLECTOR_OFFSETS = [
 
 const SYMBOL_OFFSETS = [
   { dx: 0, dy: 0 },
-  { dx: 3, dy: 0 }, { dx: -3, dy: 0 },
-  { dx: 0, dy: 3 }, { dx: 0, dy: -3 },
-  { dx: 5, dy: 2 }, { dx: -5, dy: 2 },
-  { dx: 5, dy: -2 }, { dx: -5, dy: -2 },
+  { dx: 2, dy: 0 }, { dx: -2, dy: 0 },
+  { dx: 0, dy: 2 }, { dx: 0, dy: -2 },
 ];
 
 // Confidence gating defaults (tune later with logs)

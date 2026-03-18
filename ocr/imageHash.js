@@ -57,8 +57,10 @@ async function cropSetSymbolBuffer(imagePathOrBuffer, dx = 0, dy = 0) {
     .extract(region)
     .grayscale()
     .normalize()
-    .resize(64, 64, { fit: "fill" })
-    .threshold(180)
+    .sharpen()
+    .resize(96, 96, { fit: "fill" })
+    .blur(0.2)
+    .threshold(160)
     .toBuffer();
 }
 
@@ -134,8 +136,9 @@ async function hashReferenceSymbolBuffer(imagePathOrBuffer) {
   const buf = await sharp(imagePathOrBuffer)
     .grayscale()
     .normalize()
-    .resize(64, 64, { fit: "fill" })
-    .threshold(180)
+    .resize(96, 96, { fit: "fill" })
+    .sharpen()
+    .threshold(160)
     .png()
     .toBuffer();
 

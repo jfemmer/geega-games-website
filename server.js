@@ -1071,6 +1071,7 @@ const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
 
 
 async function processSingleScanToInventory({ filePath, originalName, condition, foil, setCode }) {
+  const scanId = `${Date.now()}_${path.basename(originalName || filePath)}`;
   const perFileStart = Date.now();
   const tmpDir = OCR_DEBUG_DIR;
   try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
@@ -1143,7 +1144,7 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
   });
 
   // 2b) Hash-based set symbol detection (Scryfall-backed)
-  console.log("🧩 [scan-ingest] Set symbol detection start");
+  console.log("🧩 [scan-ingest]", scanId, "Set symbol detection start");
 
   let symbolResult = {
     setCode: null,
@@ -1246,6 +1247,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
     if (!card) throw new Error("No Scryfall card selected");
   } catch (err) {
     const preserved = ensureReviewImage();
+
+    console.log("🚨 [scan-ingest]", scanId, "Queueing review after symbol + Scryfall failure");
 
     queueReviewRecord({
       file: originalName || path.basename(filePath),
@@ -2966,46 +2969,6 @@ async function scanWorkerTick() {
     })();
   }
 }
-
-const WATCH_DIR = path.join(__dirname, "watch_folder");
-
-if (!fs.existsSync(WATCH_DIR)) {
-  fs.mkdirSync(WATCH_DIR, { recursive: true });
-}
-
-console.log("👀 Watching folder:", WATCH_DIR);
-
-fs.watch(WATCH_DIR, async (eventType, filename) => {
-  if (!filename) return;
-
-  const filePath = path.join(WATCH_DIR, filename);
-
-  // Only process images
-  if (!filename.match(/\.(jpg|jpeg|png|tif|tiff)$/i)) return;
-
-  console.log("📥 New file detected:", filename);
-
-  // Small delay so file finishes writing
-  setTimeout(async () => {
-    try {
-      await processSingleScanToInventory({
-        filePath,
-        originalName: filename,
-        condition: "NM",
-        foil: false,
-        setCode: ""
-      });
-
-      console.log("✅ Processed:", filename);
-
-      // Optional: delete file after processing
-      fs.unlinkSync(filePath);
-
-    } catch (err) {
-      console.error("❌ Failed processing:", filename, err.message);
-    }
-  }, 1000);
-});
 
 // Start worker loop
 setInterval(() => {

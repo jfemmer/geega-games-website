@@ -38,10 +38,12 @@ const {
   ensureSetSymbolCache
 } = require("./ocr");
 
-const {
-  findBestNameMatches,
-  findExactPrinting
-} = require("./localCardIndex");
+let findBestNameMatches = null;
+let findExactPrinting = null;
+
+if (process.env.USE_LOCAL === "true") {
+  ({ findBestNameMatches, findExactPrinting } = require("./ocr/localCardIndex"));
+}
 
 
 const uspsUserID = process.env.USPS_USER_ID;
@@ -65,11 +67,13 @@ if (!fs.existsSync(OCR_DEBUG_DIR)) {
 
 const inFlightUploads = new Set();
 
-ensureSetSymbolCache().then((data) => {
-  console.log("🧩 Set symbol cache ready", { count: data?.entries?.length || 0 });
-}).catch((err) => {
-  console.log("⚠️ Set symbol cache warmup failed:", err.message);
-});
+if (process.env.USE_LOCAL === "true") {
+  ensureSetSymbolCache().then((data) => {
+    console.log("🧩 Set symbol cache ready", { count: data?.entries?.length || 0 });
+  }).catch((err) => {
+    console.log("⚠️ Set symbol cache warmup failed:", err.message);
+  });
+}
 
 const upload = multer({
   dest: UPLOAD_DIR,
@@ -326,6 +330,10 @@ If you didn’t create an account, you can ignore this email.`;
 
 // ---------- UPDATED ROUTE (99% pipeline + review queue) ----------
 app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
+  if (process.env.USE_LOCAL !== "true") {
+    return res.status(503).json({ error: "Local scan pipeline is disabled on this environment." });
+  }
+
   const started = Date.now();
   const reqId = `fi8170_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
@@ -388,7 +396,11 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
 
         let resolvedName = guessedName;
 
-        const localNameMatches = findBestNameMatches(guessedName, 10);
+        const localNameMatches =
+          (process.env.USE_LOCAL === "true" && typeof findBestNameMatches === "function")
+            ? findBestNameMatches(guessedName, 10)
+            : [];
+
         if (localNameMatches.length > 0) {
           resolvedName = localNameMatches[0].name || guessedName;
         }
@@ -525,13 +537,26 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         let matchCount = 999;
 
         try {
-          const baseMatches = findBestNameMatches(resolvedName, 25);
+          const baseMatches =
+            (process.env.USE_LOCAL === "true" && typeof findBestNameMatches === "function")
+              ? findBestNameMatches(resolvedName, 25)
+              : [];
+
           base = baseMatches[0] || null;
 
-          if (collectorNumber && effectiveSetCode) {
+          if (
+            process.env.USE_LOCAL === "true" &&
+            collectorNumber &&
+            effectiveSetCode &&
+            typeof findExactPrinting === "function"
+          ) {
             card = findExactPrinting(effectiveSetCode, collectorNumber);
             matchCount = card ? 1 : 0;
-          } else if (collectorNumber && typeof pickPrintingByCollectorLocal === "function") {
+          } else if (
+            process.env.USE_LOCAL === "true" &&
+            collectorNumber &&
+            typeof pickPrintingByCollectorLocal === "function"
+          ) {
             const meta = pickPrintingByCollectorLocal(
               resolvedName,
               collectorNumber,

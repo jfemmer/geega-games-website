@@ -5,10 +5,21 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 const crypto = require('crypto'); // ✅ NEW (email verification)
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 console.log("Stripe key exists?", !!process.env.STRIPE_SECRET_KEY);
+console.log("MONGODB_URI:", process.env.MONGODB_URI);
+console.log("INVENTORY_DB_URI:", process.env.INVENTORY_DB_URI);
+console.log("EMPLOYEE_DB_URI:", process.env.EMPLOYEE_DB_URI);
+console.log("TRADEIN_DB_URI:", process.env.TRADEIN_DB_URI);
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? require('stripe')(process.env.STRIPE_SECRET_KEY)
+  : null;
+
+if (!stripe) {
+  console.warn("⚠️ Stripe disabled locally: STRIPE_SECRET_KEY is missing");
+}
+
 const app = express();
 
 // 🆕 NEW: Multer + Tesseract
@@ -18,8 +29,8 @@ const fs = require('fs');
 const {
   ocrCardNameHighAccuracy,
   ocrCollectorNumberHighAccuracy,
-  pickPrintingByCollector,
-  refineByArtworkHash,      // ✅ must exist now
+  pickPrintingByCollectorLocal,
+  refineByArtworkHashLocal,
   computeOverallScore,
   shouldAutoIngest,
   enqueueForReview,
@@ -27,11 +38,21 @@ const {
   ensureSetSymbolCache
 } = require("./ocr");
 
+const {
+  findBestNameMatches,
+  findExactPrinting
+} = require("./localCardIndex");
+
 
 const uspsUserID = process.env.USPS_USER_ID;
 const getShippo = require('./shippo-wrapper');
 
 const UPLOAD_DIR = path.join(__dirname, "uploads");
+
+const LOCAL_IMAGE_DIR =
+  process.env.LOCAL_IMAGE_DIR || "D:/MTG_DATA/images/normal";
+
+app.use("/local_card_images", express.static(LOCAL_IMAGE_DIR));
 
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -367,13 +388,9 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
 
         let resolvedName = guessedName;
 
-        try {
-          const named = await axios.get(
-            `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(guessedName)}`
-          );
-          resolvedName = named.data?.name || guessedName;
-        } catch {
-          resolvedName = guessedName;
+        const localNameMatches = findBestNameMatches(guessedName, 10);
+        if (localNameMatches.length > 0) {
+          resolvedName = localNameMatches[0].name || guessedName;
         }
 
         console.log("🔤 [fi8170] OCR(name bar) done", {
@@ -384,43 +401,48 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         });
 
         if (!guessedName || guessedName.length < 3) {
-        const preserved = preserveReviewImage(originalPath, file.originalname);
+          const preserved = preserveReviewImage(originalPath, file.originalname);
+          const earlyScore = computeOverallScore?.({
+            nameConfidence: nameConf,
+            collectorConfidence: 0,
+            hadCollector: false,
+            matchCount: 999
+          }) ?? 0;
 
-        console.log("🚨 REVIEW ITEM CREATED", {
-          file: file.originalname,
-          reason: "below_confidence_threshold",
-          score,
-          guessedName,
-          preserved
-        });
+          console.log("🚨 REVIEW ITEM CREATED", {
+            file: file.originalname,
+            reason: "name_not_detected",
+            score: earlyScore,
+            guessedName,
+            preserved
+          });
 
-        queueReviewRecord({
-          reqId,
-          file: file.originalname,
-          reason: "name_not_detected",
+          queueReviewRecord({
+            reqId,
+            file: file.originalname,
+            reason: "name_not_detected",
+            originalImagePath: preserved.absPath,
+            scanImageUrl: preserved.publicUrl,
+            reviewImageName: preserved.filename,
+            condition,
+            foil: isFoil,
+            guessedName: guessedName || "",
+            score: earlyScore,
+            name: nameRes,
+            collector: null,
+            chosen: null
+          });
 
-          originalImagePath: preserved.absPath,
-          scanImageUrl: preserved.publicUrl,
-          reviewImageName: preserved.filename,
-
-          condition,
-          foil: isFoil,
-
-          guessedName: guessedName || "",
-          name: nameRes,
-          collector: null,
-          chosen: null
-        });
-
-        results.push({
-          file: file.originalname,
-          status: "review",
-          error: "Could not detect card name from name bar.",
-          nameErr,
-          ms: Date.now() - perFileStart
-        });
-        continue;
-      }
+          results.push({
+            file: file.originalname,
+            status: "review",
+            error: "Could not detect card name from name bar.",
+            nameErr,
+            score: earlyScore,
+            ms: Date.now() - perFileStart
+          });
+          continue;
+        }
 
         // 2) OCR: Collector number (strict + jitter + thresholds inside module)
         console.log("🔢 [fi8170] OCR(bottom line) start", { reqId });
@@ -429,6 +451,26 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         // IMPORTANT: do NOT null it out too aggressively here — collectorOcr.js already gates standalone parses harder.
         let collectorNumber = bottom?.collectorNumber || null;
 
+        const symbolResult = await detectSetSymbol(originalPath, {
+          allowedSetCodes: localNameMatches.map(c => c.set).filter(Boolean)
+        });
+
+        const detectedSetCode = symbolResult?.setCode || "";
+        const symbolTrusted = !!detectedSetCode && (symbolResult?.score ?? 0) >= 0.8;
+
+        const effectiveSetCode =
+          setCodeFromBody ||
+          (symbolTrusted ? detectedSetCode : "");
+
+        console.log("🧩 [fi8170] Set symbol detection done", {
+          detectedSetCode,
+          symbolTrusted,
+          effectiveSetCode,
+          symbolScore: symbolResult?.score ?? 0,
+          bestDist: symbolResult?.bestDist ?? null,
+          top: symbolResult?.top?.slice(0, 3) || []
+        });
+
         console.log("🔢 [fi8170] OCR(bottom line) done", {
           reqId,
           bottomText: bottom?.text || "",
@@ -436,71 +478,74 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           collectorNumber
         });
 
-        // 3) Basic name confidence gate (early)
         if (nameConf < 45) {
-          const score = computeOverallScore?.({
-            nameConfidence: nameConf,
-            collectorConfidence: bottom?.confidence ?? 0,
-            hadCollector: !!collectorNumber,
-            matchCount: 999
-          }) ?? 0;
+        const score = computeOverallScore?.({
+          nameConfidence: nameConf,
+          collectorConfidence: bottom?.confidence ?? 0,
+          hadCollector: !!collectorNumber,
+          matchCount: 999
+        }) ?? 0;
 
-          
+        const preserved = preserveReviewImage(originalPath, file.originalname);
 
-          results.push({
-            file: file.originalname,
-            status: "review",
-            error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,
-            guessedName,
-            bottomText: bottom?.text || null,
-            bottomConf: Math.round(bottom?.confidence || 0),
-            score,
-            ms: Date.now() - perFileStart
-          });
-          continue;
-        }
+        queueReviewRecord({
+          reqId,
+          file: file.originalname,
+          reason: "low_name_confidence",
+          originalImagePath: preserved.absPath,
+          scanImageUrl: preserved.publicUrl,
+          reviewImageName: preserved.filename,
+          condition,
+          foil: isFoil,
+          guessedName,
+          score,
+          name: nameRes,
+          collector: bottom,
+          chosen: null
+        });
+
+        results.push({
+          file: file.originalname,
+          status: "review",
+          error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,
+          guessedName,
+          bottomText: bottom?.text || null,
+          bottomConf: Math.round(bottom?.confidence || 0),
+          score,
+          ms: Date.now() - perFileStart
+        });
+        continue;
+      }
 
         // 4) Scryfall pick
         console.log("🧙 [fi8170] Scryfall start", { reqId });
 
         let base = null;
         let card = null;
-        let matchCount = 999; // how many printings survived after filters (from picker meta)
+        let matchCount = 999;
 
         try {
-            const baseRes = await axios.get(
-            `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(resolvedName)}`
-          );
-          base = baseRes.data;
+          const baseMatches = findBestNameMatches(resolvedName, 25);
+          base = baseMatches[0] || null;
 
-          // If user provided setCode + we have collector number, Scryfall has an exact endpoint:
           if (collectorNumber && effectiveSetCode) {
-            const exactRes = await axios.get(
-              `https://api.scryfall.com/cards/${encodeURIComponent(effectiveSetCode)}/${encodeURIComponent(collectorNumber)}`
-            );
-            card = exactRes.data;
-            matchCount = 1;
-          }
-          else if (collectorNumber && base?.prints_search_uri && typeof pickPrintingByCollector === "function") {
-            const meta = await pickPrintingByCollector(
-              base.prints_search_uri,
+            card = findExactPrinting(effectiveSetCode, collectorNumber);
+            matchCount = card ? 1 : 0;
+          } else if (collectorNumber && typeof pickPrintingByCollectorLocal === "function") {
+            const meta = pickPrintingByCollectorLocal(
+              resolvedName,
               collectorNumber,
               isFoil,
-              false,
-              {
-        returnMeta: true,
-        setCode: effectiveSetCode || null
-      }
+              { setCode: effectiveSetCode || null }
             );
 
             let chosen = meta?.chosen || null;
-            let matchCount = meta?.matchCount ?? 999;
+            matchCount = meta?.matchCount ?? 999;
             const pool = meta?.pool || [];
 
-            // 🧠 NEW: Artwork hash refinement (only if ambiguous)
-            if (pool.length > 1) {
+            if (pool.length > 1 && typeof refineByArtworkHashLocal === "function") {
               const { chosen: hashChosen, bestDist } =
-                await refineByArtworkHash(originalPath, pool, { maxDist: 8 });
+                await refineByArtworkHashLocal(originalPath, pool, { maxDist: 8 });
 
               if (hashChosen) {
                 chosen = hashChosen;
@@ -519,32 +564,35 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
 
             if (!chosen) {
               throw new Error(
-                `Collector mismatch: OCR collector=${collectorNumber} did not match any printing for base="${base?.name}".`
+                `Collector mismatch: OCR collector=${collectorNumber} did not match any local printing for "${resolvedName}".`
               );
             }
 
             card = chosen;
-          }
-          // No collector number: if setCode given, do a search constrained to set
-          else if (!collectorNumber && setCodeFromBody) {
-            const query = `!"${guessedName}" set:${setCodeFromBody}`;
-            const s = await axios.get(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`);
-            card = s.data?.data?.[0] || base;
-            matchCount = s.data?.data?.length || 999;
-          }
-          // Fallback: just use base card
-          else {
+          } else if (!collectorNumber && effectiveSetCode) {
+            const exactSetMatches = baseMatches.filter(
+              c => String(c.set || "").toLowerCase() === String(effectiveSetCode).toLowerCase()
+            );
+            card = exactSetMatches[0] || base;
+            matchCount = exactSetMatches.length || 999;
+          } else {
             card = base;
-            matchCount = 999;
+            matchCount = baseMatches.length || 999;
           }
 
-          if (!card) throw new Error("No Scryfall card selected");
+          if (card && !card.imageUrl && card.local_image) {
+            const filename = path.basename(card.local_image);
+            card.imageUrl = `/local_card_images/${filename}`;
+          }
+
+          if (!card) throw new Error("No local card selected");
         } catch (err) {
           const score = computeOverallScore?.({
             nameConfidence: nameConf,
             collectorConfidence: bottom?.confidence ?? 0,
             hadCollector: !!collectorNumber,
-            matchCount
+            matchCount,
+            setSymbolScore: symbolResult?.score ?? null
           }) ?? 0;
 
           const preserved = preserveReviewImage(originalPath, file.originalname);
@@ -666,19 +714,18 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue; // ⛔ DO NOT insert
         }
 
-        // 6) Price + DB upsert (SAFE to ingest here)
-        const price = isFoil
-          ? parseFloat(card?.prices?.usd_foil || card?.prices?.usd || 0)
-          : parseFloat(card?.prices?.usd || 0);
+       const price = 0;
 
-        const inventoryItem = {
-          cardName: card.name,
-          set: card.set_name,
-          condition,
-          foil: isFoil,
-          priceUsd: price,
-          imageUrl: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || ""
-        };
+      const inventoryItem = {
+        cardName: card.name,
+        set: card.set_name,
+        condition,
+        foil: isFoil,
+        priceUsd: price,
+        imageUrl:
+          card.imageUrl ||
+          (card.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "")
+      };
 
         console.log("💾 [fi8170] DB upsert start", {
           reqId,
@@ -781,8 +828,11 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
   }
 });
 
-// ✅ IMPORTANT: place this ABOVE app.use(express.json())
 app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe is not configured locally.' });
+  }
+
   const sig = req.headers['stripe-signature'];
 
   let event;

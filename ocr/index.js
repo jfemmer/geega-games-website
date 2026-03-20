@@ -4,18 +4,16 @@ const { computeOverallScore, shouldAutoIngest } = require("./confidenceGate");
 const { enqueueForReview } = require("./reviewQueue");
 const { detectSetSymbol, ensureSetSymbolCache } = require("./setSymbolMatcher");
 
-let pickPrintingByCollectorLocal = null;
-let refineByArtworkHashLocal = null;
+let findBestLocalMatches = null;
 
 if (process.env.USE_LOCAL === "true") {
-  ({ pickPrintingByCollectorLocal, refineByArtworkHashLocal } = require("./localPicker"));
+  ({ findBestLocalMatches } = require("./localPicker"));
 }
 
 module.exports = {
   ocrCardNameHighAccuracy,
   ocrCollectorNumberHighAccuracy,
-  pickPrintingByCollectorLocal,
-  refineByArtworkHashLocal,
+  findBestLocalMatches,
   computeOverallScore,
   shouldAutoIngest,
   enqueueForReview,

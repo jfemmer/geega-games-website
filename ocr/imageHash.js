@@ -126,9 +126,33 @@ async function hashScryfallArtwork(card) {
 }
 
 // --------- Symbol helpers ----------
-async function hashScanSetSymbol(imagePath, dx = 0, dy = 0) {
-  const buf = await cropSetSymbolBuffer(imagePath, dx, dy);
-  return await dhash64FromBuffer(buf);
+async function hashScanSetSymbol(imagePath, dx = 0, dy = 0, returnBuffer = false) {
+  const sharp = require("sharp");
+  const { CROP } = require("./constants");
+
+  const img = sharp(imagePath);
+
+  const { left, top, width, height } = CROP.setSymbol;
+
+  const crop = img.extract({
+    left: Math.max(0, left + dx),
+    top: Math.max(0, top + dy),
+    width,
+    height
+  });
+
+  const buffer = await crop
+    .resize(64, 64)
+    .grayscale()
+    .toBuffer();
+
+  const hash = computeDHash(buffer); // whatever your existing function is
+
+  if (returnBuffer) {
+    return { hash, buffer };
+  }
+
+  return hash;
 }
 
 async function hashReferenceSymbolBuffer(imagePathOrBuffer) {

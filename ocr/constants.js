@@ -3,31 +3,41 @@ const FIXED_DIMS = { w: 771, h: 1061 };
 
 // Tuned crop boxes for the FI-8170 format
 const CROP = {
-  // Top name bar strip
+  // ✅ FIX: Name bar — stop well before the mana cost symbols.
+  // Old: width 585 (ends at px 637, overlapping the mana cost area).
+  // New: width 480 (ends at px 532, safely in the clear).
+  // Old: height 84 (too tall, pulling in art border or type line).
+  // New: height 52 (tight around just the name text).
+  // Old: top 26 (risked clipping ascenders on tall letters).
+  // New: top 22 (a little more headroom).
   nameBar: {
-    left: 58,
-    top: 34,
-    width: 565,
-    height: 62,
+    left: 52,
+    top: 22,
+    width: 480,
+    height: 52,
   },
 
-
-  // Upper-right set symbol crop (starting point; tune with debug logs if needed)
-   setSymbol: {
-      left: 632,
-      top: 587,
-      width: 108,
-      height: 94,
-    },
+  // Upper-right set symbol crop (unchanged)
+  setSymbol: {
+    left: 632,
+    top: 587,
+    width: 108,
+    height: 94,
+  },
 };
 
 const DEBUG_OCR = false;
 
-// Try multiple thresholds for robustness (glare/contrast variance)
-const OCR_THRESHOLDS = [null, 160];
+// ✅ FIX: Try more thresholds. Colored/gold name bars need a lower threshold
+// to keep the dark text visible. null = no binarization (use raw grayscale).
+const OCR_THRESHOLDS = [null, 180, 140, 110];
 
 const NAME_OFFSETS = [
-  { dx: 0, dy: 0 }
+  { dx: 0, dy: 0 },
+  // ✅ FIX: Add a small vertical jitter so a slightly mis-registered scan
+  // can still be caught by a second pass.
+  { dx: 0, dy: -3 },
+  { dx: 0, dy: 3 },
 ];
 
 const COLLECTOR_OFFSETS = [

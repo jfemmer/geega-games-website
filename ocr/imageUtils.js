@@ -35,9 +35,9 @@ async function cropAndPrepNameBar(
   //   - width:  60%  stops before mana cost symbols (was 73%, bled into pips)
   const base = {
     left:   Math.floor(W * 0.075),
-    top:    Math.floor(H * 0.092),
+    top:    Math.floor(H * 0.075),
     width:  Math.floor(W * 0.60),
-    height: Math.floor(H * 0.055),
+    height: Math.floor(H * 0.042),
   };
 
   const left   = Math.max(0, Math.min(W - 2, base.left + dx));

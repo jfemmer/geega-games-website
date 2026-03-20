@@ -181,8 +181,45 @@ function preserveReviewImage(srcPath, originalName = "scan.png") {
   }
 }
 
+function makeReviewHash({
+  file = "",
+  reason = "",
+  guessedName = "",
+  collectorNumber = "",
+  condition = "",
+  foil = false
+}) {
+  const raw = [
+    String(file || "").trim().toLowerCase(),
+    String(reason || "").trim().toLowerCase(),
+    String(guessedName || "").trim().toLowerCase(),
+    String(collectorNumber || "").trim().toLowerCase(),
+    String(condition || "").trim().toLowerCase(),
+    String(foil)
+  ].join("|");
+
+  return crypto.createHash("sha1").update(raw).digest("hex");
+}
+
 function queueReviewRecord(record) {
-  return enqueueForReview(record, REVIEW_QUEUE_PATH);
+  const withHash = {
+    ...record,
+    reviewHash:
+      record?.reviewHash ||
+      makeReviewHash({
+        file: record?.file,
+        reason: record?.reason,
+        guessedName: record?.guessedName,
+        collectorNumber:
+          record?.collector?.collectorNumber ||
+          record?.chosen?.collector_number ||
+          "",
+        condition: record?.condition,
+        foil: record?.foil
+      })
+  };
+
+  return enqueueForReview(withHash, REVIEW_QUEUE_PATH);
 }
 
 function removeReviewItemById(id, queuePath = REVIEW_QUEUE_PATH) {
@@ -463,12 +500,17 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         // IMPORTANT: do NOT null it out too aggressively here — collectorOcr.js already gates standalone parses harder.
         let collectorNumber = bottom?.collectorNumber || null;
 
+        const allowedSetCodes =
+          nameConf >= 70
+            ? localNameMatches.map(c => c.set).filter(Boolean)
+            : [];
+
         const symbolResult = await detectSetSymbol(originalPath, {
-          allowedSetCodes: localNameMatches.map(c => c.set).filter(Boolean)
+          allowedSetCodes
         });
 
         const detectedSetCode = symbolResult?.setCode || "";
-        const symbolTrusted = !!detectedSetCode && (symbolResult?.score ?? 0) >= 0.8;
+        const symbolTrusted = !!detectedSetCode && (symbolResult?.score ?? 0) >= 0.68;
 
         const effectiveSetCode =
           setCodeFromBody ||
@@ -495,7 +537,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           nameConfidence: nameConf,
           collectorConfidence: bottom?.confidence ?? 0,
           hadCollector: !!collectorNumber,
-          matchCount: 999
+          matchCount: 999,
+          setSymbolScore: symbolResult?.score ?? null
         }) ?? 0;
 
         const preserved = preserveReviewImage(originalPath, file.originalname);
@@ -513,9 +556,12 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           score,
           name: nameRes,
           collector: bottom,
-          chosen: null
+          chosen: null,
+          detectedSetCode: detectedSetCode || null,
+          setSymbolScore: symbolResult?.score ?? null,
+          setSymbolBestDist: symbolResult?.bestDist ?? null,
+          setSymbolTop: symbolResult?.top || []
         });
-
         results.push({
           file: file.originalname,
           status: "review",
@@ -641,6 +687,10 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             guessedName,
             name: nameRes,
             collector: bottom,
+            detectedSetCode: detectedSetCode || null,
+            setSymbolScore: symbolResult?.score ?? null,
+            setSymbolBestDist: symbolResult?.bestDist ?? null,
+            setSymbolTop: symbolResult?.top || [],
 
             // ⭐ we don’t have a chosen card here because lookup failed
             chosen: null,
@@ -675,7 +725,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           collectorConfidence: bottom?.confidence ?? 0,
           hadCollector: !!collectorNumber,
           matchCount,
-          // setSymbolScore: null, // later when you add symbol matching
+          setSymbolScore: symbolResult?.score ?? null
         }) ?? 0;
 
         console.log("✅ AUTO INGEST", {
@@ -686,41 +736,45 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         });
 
         if (!shouldAutoIngest?.(score)) {
-  const preserved = preserveReviewImage(originalPath, file.originalname);
+          const preserved = preserveReviewImage(originalPath, file.originalname);
 
-  queueReviewRecord({
-    reqId,
-    file: file.originalname,
-    reason: "below_confidence_threshold",
+          queueReviewRecord({
+            reqId,
+            file: file.originalname,
+            reason: "below_confidence_threshold",
 
-    // keep a review-safe copy of the scan image
-    originalImagePath: preserved.absPath,
-    scanImageUrl: preserved.publicUrl,
-    reviewImageName: preserved.filename,
+            // keep a review-safe copy of the scan image
+            originalImagePath: preserved.absPath,
+            scanImageUrl: preserved.publicUrl,
+            reviewImageName: preserved.filename,
 
-    // scan metadata
-    condition,
-    foil: isFoil,
+            // scan metadata
+            condition,
+            foil: isFoil,
 
-    // scoring / OCR details
-    score,
-    matchCount,
-    guessedName,
-    name: nameRes,
-    collector: bottom,
+            // scoring / OCR details
+            score,
+            matchCount,
+            guessedName,
+            name: nameRes,
+            collector: bottom,
+            detectedSetCode: detectedSetCode || null,
+            setSymbolScore: symbolResult?.score ?? null,
+            setSymbolBestDist: symbolResult?.bestDist ?? null,
+            setSymbolTop: symbolResult?.top || [],
 
-    // matched card candidate for side-by-side comparison
-    chosen: {
-      name: card?.name,
-      set: card?.set,
-      set_name: card?.set_name,
-      collector_number: card?.collector_number,
-      imageUrl:
-        card?.image_uris?.normal ||
-        card?.card_faces?.[0]?.image_uris?.normal ||
-        ""
-    }
-  });
+            // matched card candidate for side-by-side comparison
+            chosen: {
+              name: card?.name,
+              set: card?.set,
+              set_name: card?.set_name,
+              collector_number: card?.collector_number,
+              imageUrl:
+                card?.image_uris?.normal ||
+                card?.card_faces?.[0]?.image_uris?.normal ||
+                ""
+            }
+          });
 
           results.push({
             file: file.originalname,

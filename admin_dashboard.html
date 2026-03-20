@@ -976,8 +976,8 @@
   <!-- JS for Sidebar, Section Switching, and MTG Trends -->
 <script>
 
-  //const API_BASE = "https://geega-games-website-production.up.railway.app";
-  const API_BASE = "http://localhost:5500";
+  const API_BASE = "https://geega-games-website-production.up.railway.app";
+
 
   // ===== SIDEBAR / SECTION SWITCHING =====
   function toggleSidebar() {
@@ -1093,7 +1093,7 @@ async function approveReviewItem(id) {
   const condition = document.getElementById(`review-condition-${id}`)?.value || "NM";
 
   try {
-    const res = await fetch(`https://geega-games-website-production.up.railway.app/api/inventory-review/${id}/approve`, {
+    const res = await fetch(`${API_BASE}/api/inventory-review/${id}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cardName, setName, collectorNumber, condition })
@@ -1116,9 +1116,9 @@ async function rejectReviewItem(id) {
   if (!ok) return;
 
   try {
-    const res = await fetch(`https://geega-games-website-production.up.railway.app/api/inventory-review/${id}`, {
-      method: "DELETE"
-    });
+    const res = await fetch(`${API_BASE}/api/inventory-review/${id}`, {
+    method: "DELETE"
+});
 
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json.message || `Reject failed: ${res.status}`);

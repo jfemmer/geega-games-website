@@ -29,8 +29,7 @@ const fs = require('fs');
 const {
   ocrCardNameHighAccuracy,
   ocrCollectorNumberHighAccuracy,
-  pickPrintingByCollectorLocal,
-  refineByArtworkHashLocal,
+  findBestLocalMatches,
   computeOverallScore,
   shouldAutoIngest,
   enqueueForReview,
@@ -575,89 +574,61 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         continue;
       }
 
-        // 4) Scryfall pick
-        console.log("🧙 [fi8170] Scryfall start", { reqId });
+        // 4) Local whole-library image-first match
+          console.log("🧠 [fi8170] local image-first match start", { reqId });
 
-        let base = null;
-        let card = null;
-        let matchCount = 999;
+          let card = null;
+          let matchCount = 999;
+          let localMatchMeta = null;
 
-        try {
-          const baseMatches =
-            (process.env.USE_LOCAL === "true" && typeof findBestNameMatches === "function")
-              ? findBestNameMatches(resolvedName, 25)
-              : [];
-
-          base = baseMatches[0] || null;
-
-          if (
-            process.env.USE_LOCAL === "true" &&
-            collectorNumber &&
-            effectiveSetCode &&
-            typeof findExactPrinting === "function"
-          ) {
-            card = findExactPrinting(effectiveSetCode, collectorNumber);
-            matchCount = card ? 1 : 0;
-          } else if (
-            process.env.USE_LOCAL === "true" &&
-            collectorNumber &&
-            typeof pickPrintingByCollectorLocal === "function"
-          ) {
-            const meta = pickPrintingByCollectorLocal(
-              resolvedName,
-              collectorNumber,
+          try {
+            localMatchMeta = await findBestLocalMatches(originalPath, {
+              guessedName: resolvedName || guessedName || "",
+              collectorNumber: collectorNumber || "",
+              detectedSetCode: effectiveSetCode || detectedSetCode || "",
               isFoil,
-              { setCode: effectiveSetCode || null }
-            );
+              limit: 25
+            });
 
-            let chosen = meta?.chosen || null;
-            matchCount = meta?.matchCount ?? 999;
-            const pool = meta?.pool || [];
+            const best = localMatchMeta?.chosen || null;
+            const second = localMatchMeta?.second || null;
+            const margin = localMatchMeta?.margin ?? 0;
+            const pool = localMatchMeta?.pool || [];
 
-            if (pool.length > 1 && typeof refineByArtworkHashLocal === "function") {
-              const { chosen: hashChosen, bestDist } =
-                await refineByArtworkHashLocal(originalPath, pool, { maxDist: 8 });
+            matchCount = pool.length;
 
-              if (hashChosen) {
-                chosen = hashChosen;
-                matchCount = 1;
-
-                console.log("🧩 [fi8170] Hash-resolved printing", {
-                  reqId,
-                  bestDist,
-                  set: chosen.set,
-                  collector: chosen.collector_number
-                });
-              } else {
-                console.log("🧩 [fi8170] Hash match inconclusive (kept original choice)");
-              }
+            if (!best) {
+              throw new Error("No local card selected from full-library image search.");
             }
 
-            if (!chosen) {
+            console.log("🧠 [fi8170] local image-first result", {
+              reqId,
+              bestName: best?.name,
+              bestSet: best?.set,
+              bestCollector: best?.collector_number,
+              bestScore: best?._score,
+              secondScore: second?._score ?? null,
+              margin
+            });
+
+            // hard auto-pick conditions for near-100% precision
+            const strongEnough =
+              best._score >= 85 &&
+              margin >= 12;
+
+            if (!strongEnough) {
               throw new Error(
-                `Collector mismatch: OCR collector=${collectorNumber} did not match any local printing for "${resolvedName}".`
+                `Image match inconclusive: bestScore=${best?._score ?? 0}, margin=${margin}`
               );
             }
 
-            card = chosen;
-          } else if (!collectorNumber && effectiveSetCode) {
-            const exactSetMatches = baseMatches.filter(
-              c => String(c.set || "").toLowerCase() === String(effectiveSetCode).toLowerCase()
-            );
-            card = exactSetMatches[0] || base;
-            matchCount = exactSetMatches.length || 999;
-          } else {
-            card = base;
-            matchCount = baseMatches.length || 999;
-          }
+            card = best;
 
-          if (card && !card.imageUrl && card.local_image) {
-            const filename = path.basename(card.local_image);
-            card.imageUrl = `/local_card_images/${filename}`;
-          }
-
-          if (!card) throw new Error("No local card selected");
-        } catch (err) {
+            if (card && !card.imageUrl && card.local_image) {
+              const filename = path.basename(card.local_image);
+              card.imageUrl = `/local_card_images/${filename}`;
+            }
+          } catch (err) {
           const score = computeOverallScore?.({
             nameConfidence: nameConf,
             collectorConfidence: bottom?.confidence ?? 0,
@@ -671,31 +642,37 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           queueReviewRecord({
             reqId,
             file: file.originalname,
-            reason: "scryfall_lookup_failed",
+            reason: "image_match_failed",
 
-            // ⭐ preserve scan image for review UI
             originalImagePath: preserved.absPath,
             scanImageUrl: preserved.publicUrl,
             reviewImageName: preserved.filename,
 
-            // ⭐ metadata
             condition,
             foil: isFoil,
 
-            // ⭐ OCR + scoring info
             score,
             guessedName,
             name: nameRes,
             collector: bottom,
-            detectedSetCode: detectedSetCode || null,
-            setSymbolScore: symbolResult?.score ?? null,
-            setSymbolBestDist: symbolResult?.bestDist ?? null,
-            setSymbolTop: symbolResult?.top || [],
 
-            // ⭐ we don’t have a chosen card here because lookup failed
             chosen: null,
 
-            // ⭐ error details
+            // ⭐ ADD THIS PART HERE
+            topLocalCandidates: (localMatchMeta?.pool || []).slice(0, 5).map(c => ({
+              id: c.id,
+              name: c.name,
+              set: c.set,
+              set_name: c.set_name,
+              collector_number: c.collector_number,
+              imageUrl: c.imageUrl,
+              score: c._score,
+              distances: c._distances,
+              reasons: c._reasons
+            })),
+            bestLocalMargin: localMatchMeta?.margin ?? null,
+
+            // ⭐ keep error info
             details: err?.message || String(err)
           });
 
@@ -793,58 +770,60 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue; // ⛔ DO NOT insert
         }
 
-       const price = 0;
+       const preserved = preserveReviewImage(originalPath, file.originalname);
 
-      const inventoryItem = {
-        cardName: card.name,
-        set: card.set_name,
+      queueReviewRecord({
+        reqId,
+        file: file.originalname,
+        reason: "manual_review_required",
+
+        originalImagePath: preserved.absPath,
+        scanImageUrl: preserved.publicUrl,
+        reviewImageName: preserved.filename,
+
         condition,
         foil: isFoil,
-        priceUsd: price,
-        imageUrl:
-          card.imageUrl ||
-          (card.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "")
-      };
 
-        console.log("💾 [fi8170] DB upsert start", {
-          reqId,
-          cardName: inventoryItem.cardName,
-          set: inventoryItem.set,
-          foil: inventoryItem.foil,
-          condition: inventoryItem.condition,
-          score
-        });
+        score,
+        matchCount,
+        guessedName,
+        name: nameRes,
+        collector: bottom,
 
-        await CardInventory.findOneAndUpdate(
-          {
-            cardName: inventoryItem.cardName,
-            set: inventoryItem.set,
-            foil: inventoryItem.foil,
-            condition: inventoryItem.condition
-          },
-          {
-            $inc: { quantity: 1 },
-            $setOnInsert: inventoryItem
-          },
-          { upsert: true }
-        );
+        detectedSetCode: detectedSetCode || null,
+        setSymbolScore: symbolResult?.score ?? null,
+        setSymbolBestDist: symbolResult?.bestDist ?? null,
+        setSymbolTop: symbolResult?.top || [],
 
-        console.log("💾 [fi8170] DB upsert done", { reqId });
+        chosen: {
+          name: card?.name,
+          set: card?.set,
+          set_name: card?.set_name,
+          collector_number: card?.collector_number,
+          imageUrl:
+            card?.imageUrl ||
+            card?.image_uris?.normal ||
+            card?.card_faces?.[0]?.image_uris?.normal ||
+            (card?.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "")
+        }
+      });
 
-        results.push({
-          file: file.originalname,
-          status: "added",
-          success: card.name,
-          guessedName,
-          nameConfidence: Math.round(nameConf),
-          collectorNumber: collectorNumber || null,
-          chosenSet: card?.set || null,
-          chosenSetName: card?.set_name || null,
-          chosenCollector: card?.collector_number || null,
-          matchCount,
-          score,
-          ms: Date.now() - perFileStart
-        });
+      results.push({
+        file: file.originalname,
+        status: "review",
+        reason: "manual_review_required",
+        guessedName,
+        nameConfidence: Math.round(nameConf),
+        collectorNumber: collectorNumber || null,
+        chosenSet: card?.set || null,
+        chosenSetName: card?.set_name || null,
+        chosenCollector: card?.collector_number || null,
+        matchCount,
+        score,
+        ms: Date.now() - perFileStart
+      });
+
+      continue;
 
       } catch (err) {
         console.error("❌ [fi8170] per-file error:", {

@@ -39,28 +39,50 @@ function scoreCandidate(card, ctx) {
   const ocrNameNorm = normalizeName(ctx.guessedName || "");
   const cardNameNorm = normalizeName(card.normalized_name || card.name || "");
 
-  if (ocrNameNorm && ocrNameNorm === cardNameNorm) {
-    score += 30;
-    reasons.push("exact_name");
+  if (ocrNameNorm && cardNameNorm) {
+    if (ocrNameNorm === cardNameNorm) {
+      score += 12;
+      reasons.push("exact_name");
+    } else if (cardNameNorm.includes(ocrNameNorm) || ocrNameNorm.includes(cardNameNorm)) {
+      score += 6;
+      reasons.push("partial_name");
+    } else {
+      reasons.push("name_mismatch_ignored");
+    }
   }
 
-  if (ctx.detectedSetCode && String(card.set || "").toLowerCase() === String(ctx.detectedSetCode).toLowerCase()) {
-    score += 35;
-    reasons.push("set_symbol_match");
+  if (ctx.detectedSetCode) {
+    if (String(card.set || "").toLowerCase() === String(ctx.detectedSetCode).toLowerCase()) {
+      score += 55;
+      reasons.push("set_symbol_match");
+    } else {
+      score -= 25;
+      reasons.push("set_symbol_mismatch_penalty");
+    }
   }
 
   const scanCollector = normalizeCollector(ctx.collectorNumber || "");
   const cardCollector = normalizeCollector(card.collector_number || "");
-  if (scanCollector && scanCollector === cardCollector) {
-    score += 35;
-    reasons.push("exact_collector");
-  } else if (
-    scanCollector &&
-    String(scanCollector).replace(/[^0-9]/g, "") &&
-    String(scanCollector).replace(/[^0-9]/g, "") === String(card.collector_digits_only || "").replace(/^0+/, "")
-  ) {
-    score += 18;
-    reasons.push("digits_only_collector");
+
+  if (scanCollector && cardCollector) {
+    if (scanCollector === cardCollector) {
+      score += 60;
+      reasons.push("exact_collector");
+    } else {
+      return {
+        ...card,
+        imageUrl: toPublicImageUrl(card.local_image),
+        _score: -9999,
+        _distances: {
+          artDist: 9999,
+          frameDist: 9999,
+          titleDist: 9999,
+          fullDist: 9999,
+          symbolDist: 9999
+        },
+        _reasons: ["collector_mismatch_hard_reject"]
+      };
+    }
   }
 
   if (ctx.isFoil ? !!card.foil : !!card.nonfoil) {
@@ -77,11 +99,12 @@ function scoreCandidate(card, ctx) {
       ? hammingHex64(ctx.scan.symbol_hash, card.symbol_hash)
       : 9999;
 
-  score += Math.max(0, 30 - artDist * 2.0);
-  score += Math.max(0, 24 - frameDist * 1.8);
-  score += Math.max(0, 18 - titleDist * 1.5);
-  score += Math.max(0, 14 - fullDist * 1.0);
-  score += Math.max(0, 12 - symbolDist * 1.2);
+  // Image evidence should support collector/set, not overpower them
+  score += Math.max(0, 20 - artDist * 1.8);
+  score += Math.max(0, 26 - frameDist * 2.0);
+  score += Math.max(0, 10 - titleDist * 1.2);
+  score += Math.max(0, 8 - fullDist * 0.8);
+  score += Math.max(0, 20 - symbolDist * 1.8);
 
   return {
     ...card,

@@ -364,7 +364,6 @@ If you didn’t create an account, you can ignore this email.`;
 // - pickPrintingByCollector(...) helper (optional but recommended)
 // Put these near the top of server.js (once)
 
-// ---------- UPDATED ROUTE (99% pipeline + review queue) ----------
 app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req, res) => {
   if (process.env.USE_LOCAL !== "true") {
     return res.status(503).json({ error: "Local scan pipeline is disabled on this environment." });
@@ -393,14 +392,11 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
     const isFoil = String(foil) === "true";
     const results = [];
 
-    // Use a temp dir for crops (Railway-safe if /tmp exists)
     const tmpDir = process.env.RAILWAY_ENVIRONMENT ? "/tmp/uploads" : path.join(__dirname, "uploads");
     try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
 
-    // Batch-level setCode (optional)
     const setCodeFromBody = (req.body.setCode || "").trim().toLowerCase();
 
-    // ✅ OPTIONAL: dedupe repeated uploads (helps if multer or client retries)
     const seen = new Set();
     const uniqueFiles = [];
     for (const f of files) {
@@ -413,6 +409,17 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
     for (const file of uniqueFiles) {
       const perFileStart = Date.now();
       const originalPath = file.path;
+
+      // ✅ NEW: immediately copy upload to review_uploads so it survives
+      // the finally-block cleanup and can be viewed via /review_uploads/
+      const debugCopyName = `debug_${Date.now()}_${file.originalname}.png`;
+      const debugCopyPath = path.join(REVIEW_IMAGE_DIR, debugCopyName);
+      try {
+        fs.copyFileSync(originalPath, debugCopyPath);
+        console.log("🖼️ [fi8170] debug copy saved:", `/review_uploads/${debugCopyName}`);
+      } catch (e) {
+        console.log("⚠️ [fi8170] could not save debug copy:", e.message);
+      }
 
       try {
         console.log("🖼️ [fi8170] file start:", {
@@ -492,11 +499,10 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue;
         }
 
-        // 2) OCR: Collector number (strict + jitter + thresholds inside module)
+        // 2) OCR: Collector number
         console.log("🔢 [fi8170] OCR(bottom line) start", { reqId });
         const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
 
-        // IMPORTANT: do NOT null it out too aggressively here — collectorOcr.js already gates standalone parses harder.
         let collectorNumber = bottom?.collectorNumber || null;
 
         const allowedSetCodes =
@@ -532,103 +538,101 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         });
 
         if (nameConf < 45) {
-        const score = computeOverallScore?.({
-          nameConfidence: nameConf,
-          collectorConfidence: bottom?.confidence ?? 0,
-          hadCollector: !!collectorNumber,
-          matchCount: 999,
-          setSymbolScore: symbolResult?.score ?? null
-        }) ?? 0;
+          const score = computeOverallScore?.({
+            nameConfidence: nameConf,
+            collectorConfidence: bottom?.confidence ?? 0,
+            hadCollector: !!collectorNumber,
+            matchCount: 999,
+            setSymbolScore: symbolResult?.score ?? null
+          }) ?? 0;
 
-        const preserved = preserveReviewImage(originalPath, file.originalname);
+          const preserved = preserveReviewImage(originalPath, file.originalname);
 
-        queueReviewRecord({
-          reqId,
-          file: file.originalname,
-          reason: "low_name_confidence",
-          originalImagePath: preserved.absPath,
-          scanImageUrl: preserved.publicUrl,
-          reviewImageName: preserved.filename,
-          condition,
-          foil: isFoil,
-          guessedName,
-          score,
-          name: nameRes,
-          collector: bottom,
-          chosen: null,
-          detectedSetCode: detectedSetCode || null,
-          setSymbolScore: symbolResult?.score ?? null,
-          setSymbolBestDist: symbolResult?.bestDist ?? null,
-          setSymbolTop: symbolResult?.top || []
-        });
-        results.push({
-          file: file.originalname,
-          status: "review",
-          error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,
-          guessedName,
-          bottomText: bottom?.text || null,
-          bottomConf: Math.round(bottom?.confidence || 0),
-          score,
-          ms: Date.now() - perFileStart
-        });
-        continue;
-      }
+          queueReviewRecord({
+            reqId,
+            file: file.originalname,
+            reason: "low_name_confidence",
+            originalImagePath: preserved.absPath,
+            scanImageUrl: preserved.publicUrl,
+            reviewImageName: preserved.filename,
+            condition,
+            foil: isFoil,
+            guessedName,
+            score,
+            name: nameRes,
+            collector: bottom,
+            chosen: null,
+            detectedSetCode: detectedSetCode || null,
+            setSymbolScore: symbolResult?.score ?? null,
+            setSymbolBestDist: symbolResult?.bestDist ?? null,
+            setSymbolTop: symbolResult?.top || []
+          });
 
-        // 4) Local whole-library image-first match
-          console.log("🧠 [fi8170] local image-first match start", { reqId });
+          results.push({
+            file: file.originalname,
+            status: "review",
+            error: `Low OCR confidence (${Math.round(nameConf)}). Needs review.`,
+            guessedName,
+            bottomText: bottom?.text || null,
+            bottomConf: Math.round(bottom?.confidence || 0),
+            score,
+            ms: Date.now() - perFileStart
+          });
+          continue;
+        }
 
-          let card = null;
-          let matchCount = 999;
-          let localMatchMeta = null;
+        // 3) Local whole-library image-first match
+        console.log("🧠 [fi8170] local image-first match start", { reqId });
 
-          try {
-            localMatchMeta = await findBestLocalMatches(originalPath, {
-              guessedName: resolvedName || guessedName || "",
-              collectorNumber: collectorNumber || "",
-              detectedSetCode: effectiveSetCode || detectedSetCode || "",
-              isFoil,
-              limit: 25
-            });
+        let card = null;
+        let matchCount = 999;
+        let localMatchMeta = null;
 
-            const best = localMatchMeta?.chosen || null;
-            const second = localMatchMeta?.second || null;
-            const margin = localMatchMeta?.margin ?? 0;
-            const pool = localMatchMeta?.pool || [];
+        try {
+          localMatchMeta = await findBestLocalMatches(originalPath, {
+            guessedName: resolvedName || guessedName || "",
+            collectorNumber: collectorNumber || "",
+            detectedSetCode: effectiveSetCode || detectedSetCode || "",
+            isFoil,
+            limit: 25
+          });
 
-            matchCount = pool.length;
+          const best = localMatchMeta?.chosen || null;
+          const second = localMatchMeta?.second || null;
+          const margin = localMatchMeta?.margin ?? 0;
+          const pool = localMatchMeta?.pool || [];
 
-            if (!best) {
-              throw new Error("No local card selected from full-library image search.");
-            }
+          matchCount = pool.length;
 
-            console.log("🧠 [fi8170] local image-first result", {
-              reqId,
-              bestName: best?.name,
-              bestSet: best?.set,
-              bestCollector: best?.collector_number,
-              bestScore: best?._score,
-              secondScore: second?._score ?? null,
-              margin
-            });
+          if (!best) {
+            throw new Error("No local card selected from full-library image search.");
+          }
 
-            // hard auto-pick conditions for near-100% precision
-            const strongEnough =
-              best._score >= 85 &&
-              margin >= 12;
+          console.log("🧠 [fi8170] local image-first result", {
+            reqId,
+            bestName: best?.name,
+            bestSet: best?.set,
+            bestCollector: best?.collector_number,
+            bestScore: best?._score,
+            secondScore: second?._score ?? null,
+            margin
+          });
 
-            if (!strongEnough) {
-              throw new Error(
-                `Image match inconclusive: bestScore=${best?._score ?? 0}, margin=${margin}`
-              );
-            }
+          const strongEnough = best._score >= 85 && margin >= 12;
 
-            card = best;
+          if (!strongEnough) {
+            throw new Error(
+              `Image match inconclusive: bestScore=${best?._score ?? 0}, margin=${margin}`
+            );
+          }
 
-            if (card && !card.imageUrl && card.local_image) {
-              const filename = path.basename(card.local_image);
-              card.imageUrl = `/local_card_images/${filename}`;
-            }
-          } catch (err) {
+          card = best;
+
+          if (card && !card.imageUrl && card.local_image) {
+            const filename = path.basename(card.local_image);
+            card.imageUrl = `/local_card_images/${filename}`;
+          }
+        } catch (err) {
           const score = computeOverallScore?.({
             nameConfidence: nameConf,
             collectorConfidence: bottom?.confidence ?? 0,
@@ -643,22 +647,16 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             reqId,
             file: file.originalname,
             reason: "image_match_failed",
-
             originalImagePath: preserved.absPath,
             scanImageUrl: preserved.publicUrl,
             reviewImageName: preserved.filename,
-
             condition,
             foil: isFoil,
-
             score,
             guessedName,
             name: nameRes,
             collector: bottom,
-
             chosen: null,
-
-            // ⭐ ADD THIS PART HERE
             topLocalCandidates: (localMatchMeta?.pool || []).slice(0, 5).map(c => ({
               id: c.id,
               name: c.name,
@@ -671,8 +669,6 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
               reasons: c._reasons
             })),
             bestLocalMargin: localMatchMeta?.margin ?? null,
-
-            // ⭐ keep error info
             details: err?.message || String(err)
           });
 
@@ -696,7 +692,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           matchCount
         });
 
-        // 5) Compute overall score + confidence gate (THIS is the 99% behavior)
+        // 4) Compute overall score + confidence gate
         const score = computeOverallScore?.({
           nameConfidence: nameConf,
           collectorConfidence: bottom?.confidence ?? 0,
@@ -719,17 +715,11 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             reqId,
             file: file.originalname,
             reason: "below_confidence_threshold",
-
-            // keep a review-safe copy of the scan image
             originalImagePath: preserved.absPath,
             scanImageUrl: preserved.publicUrl,
             reviewImageName: preserved.filename,
-
-            // scan metadata
             condition,
             foil: isFoil,
-
-            // scoring / OCR details
             score,
             matchCount,
             guessedName,
@@ -739,8 +729,6 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             setSymbolScore: symbolResult?.score ?? null,
             setSymbolBestDist: symbolResult?.bestDist ?? null,
             setSymbolTop: symbolResult?.top || [],
-
-            // matched card candidate for side-by-side comparison
             chosen: {
               name: card?.name,
               set: card?.set,
@@ -767,63 +755,59 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             matchCount,
             ms: Date.now() - perFileStart
           });
-          continue; // ⛔ DO NOT insert
+          continue;
         }
 
-       const preserved = preserveReviewImage(originalPath, file.originalname);
+        // 5) Queue for manual review (passed confidence gate)
+        const preserved = preserveReviewImage(originalPath, file.originalname);
 
-      queueReviewRecord({
-        reqId,
-        file: file.originalname,
-        reason: "manual_review_required",
+        queueReviewRecord({
+          reqId,
+          file: file.originalname,
+          reason: "manual_review_required",
+          originalImagePath: preserved.absPath,
+          scanImageUrl: preserved.publicUrl,
+          reviewImageName: preserved.filename,
+          condition,
+          foil: isFoil,
+          score,
+          matchCount,
+          guessedName,
+          name: nameRes,
+          collector: bottom,
+          detectedSetCode: detectedSetCode || null,
+          setSymbolScore: symbolResult?.score ?? null,
+          setSymbolBestDist: symbolResult?.bestDist ?? null,
+          setSymbolTop: symbolResult?.top || [],
+          chosen: {
+            name: card?.name,
+            set: card?.set,
+            set_name: card?.set_name,
+            collector_number: card?.collector_number,
+            imageUrl:
+              card?.imageUrl ||
+              card?.image_uris?.normal ||
+              card?.card_faces?.[0]?.image_uris?.normal ||
+              (card?.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "")
+          }
+        });
 
-        originalImagePath: preserved.absPath,
-        scanImageUrl: preserved.publicUrl,
-        reviewImageName: preserved.filename,
+        results.push({
+          file: file.originalname,
+          status: "review",
+          reason: "manual_review_required",
+          guessedName,
+          nameConfidence: Math.round(nameConf),
+          collectorNumber: collectorNumber || null,
+          chosenSet: card?.set || null,
+          chosenSetName: card?.set_name || null,
+          chosenCollector: card?.collector_number || null,
+          matchCount,
+          score,
+          ms: Date.now() - perFileStart
+        });
 
-        condition,
-        foil: isFoil,
-
-        score,
-        matchCount,
-        guessedName,
-        name: nameRes,
-        collector: bottom,
-
-        detectedSetCode: detectedSetCode || null,
-        setSymbolScore: symbolResult?.score ?? null,
-        setSymbolBestDist: symbolResult?.bestDist ?? null,
-        setSymbolTop: symbolResult?.top || [],
-
-        chosen: {
-          name: card?.name,
-          set: card?.set,
-          set_name: card?.set_name,
-          collector_number: card?.collector_number,
-          imageUrl:
-            card?.imageUrl ||
-            card?.image_uris?.normal ||
-            card?.card_faces?.[0]?.image_uris?.normal ||
-            (card?.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "")
-        }
-      });
-
-      results.push({
-        file: file.originalname,
-        status: "review",
-        reason: "manual_review_required",
-        guessedName,
-        nameConfidence: Math.round(nameConf),
-        collectorNumber: collectorNumber || null,
-        chosenSet: card?.set || null,
-        chosenSetName: card?.set_name || null,
-        chosenCollector: card?.collector_number || null,
-        matchCount,
-        score,
-        ms: Date.now() - perFileStart
-      });
-
-      continue;
+        continue;
 
       } catch (err) {
         console.error("❌ [fi8170] per-file error:", {
@@ -838,25 +822,15 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           reqId,
           file: file?.originalname,
           reason: "per_file_exception",
-
-          // keep the scan image for the review UI
           originalImagePath: preserved.absPath,
           scanImageUrl: preserved.publicUrl,
           reviewImageName: preserved.filename,
-
-          // basic metadata
           condition,
           foil: isFoil,
-
-          // error details
           details: err?.message || String(err),
-
-          // we may not have OCR data in this case
           guessedName: guessedName || "",
           name: nameRes || null,
           collector: bottom || null,
-
-          // no chosen card
           chosen: null
         });
 
@@ -867,7 +841,6 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           ms: Date.now() - perFileStart
         });
       } finally {
-        // Cleanup original upload for THIS batch route
         try { if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath); } catch {}
       }
     }

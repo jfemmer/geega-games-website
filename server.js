@@ -1534,12 +1534,12 @@ app.post("/api/scan-ingest", requireIngestKey, upload.single("image"), async (re
 
     scanWorkerTick().catch(() => {});
 
-    res.json({ jobId: String(job._id), status: job.status });
-
-    res.json({ jobId: String(job._id), status: job.status });
+    return res.json({ jobId: String(job._id), status: job.status });
   } catch (e) {
     console.error("❌ scan-ingest error:", e);
-    res.status(500).json({ message: "Failed to ingest scan." });
+    if (!res.headersSent) {
+      return res.status(500).json({ message: "Failed to ingest scan." });
+    }
   }
 });
 
@@ -3135,9 +3135,6 @@ setInterval(() => {
 
 // -------------------- ScanJob Worker --------------------
 // Put this BELOW: ScanJob model + processSingleScanToInventory(...)
-
-const WORKER_ENABLED = String(process.env.SCAN_WORKER_ENABLED || "true") === "true";
-const WORKER_CONCURRENCY = Number(process.env.SCAN_WORKER_CONCURRENCY || 1);
 
 async function lockNextJob() {
   // Atomically claim 1 queued job

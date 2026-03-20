@@ -14,11 +14,11 @@ const CROP = {
 
   // Upper-right set symbol crop (starting point; tune with debug logs if needed)
    setSymbol: {
-    left: 640,
-    top: 595,
-    width: 92,
-    height: 78,
-  },
+      left: 632,
+      top: 587,
+      width: 108,
+      height: 94,
+    },
 };
 
 const DEBUG_OCR = false;
@@ -35,7 +35,11 @@ const COLLECTOR_OFFSETS = [
 ];
 
 const SYMBOL_OFFSETS = [
-  { dx: 0, dy: 0 }
+  { dx: 0, dy: 0 },
+  { dx: 2, dy: 0 },
+  { dx: -2, dy: 0 },
+  { dx: 0, dy: 2 },
+  { dx: 0, dy: -2 }
 ];
 
 // Confidence gating defaults (tune later with logs)

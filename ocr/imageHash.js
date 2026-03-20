@@ -144,10 +144,112 @@ async function hashReferenceSymbolBuffer(imagePathOrBuffer) {
   return await dhash64FromBuffer(buf);
 }
 
+async function cropTitleBarBuffer(imagePathOrBuffer) {
+  const img = sharp(imagePathOrBuffer);
+  const meta = await img.metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  const region = clampRegion({
+    left: Math.floor(W * 0.07),
+    top: Math.floor(H * 0.03),
+    width: Math.floor(W * 0.74),
+    height: Math.floor(H * 0.07),
+  }, W, H);
+
+  return await img
+    .extract(region)
+    .grayscale()
+    .normalize()
+    .sharpen()
+    .resize(192, 48, { fit: "fill" })
+    .toBuffer();
+}
+
+async function cropFrameBuffer(imagePathOrBuffer) {
+  const img = sharp(imagePathOrBuffer);
+  const meta = await img.metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  const region = clampRegion({
+    left: Math.floor(W * 0.04),
+    top: Math.floor(H * 0.03),
+    width: Math.floor(W * 0.92),
+    height: Math.floor(H * 0.94),
+  }, W, H);
+
+  return await img
+    .extract(region)
+    .grayscale()
+    .normalize()
+    .sharpen()
+    .resize(128, 128, { fit: "fill" })
+    .toBuffer();
+}
+
+async function cropFullCardBuffer(imagePathOrBuffer) {
+  const img = sharp(imagePathOrBuffer);
+  const meta = await img.metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  const region = clampRegion({
+    left: 0,
+    top: 0,
+    width: W,
+    height: H,
+  }, W, H);
+
+  return await img
+    .extract(region)
+    .grayscale()
+    .normalize()
+    .resize(128, 128, { fit: "fill" })
+    .toBuffer();
+}
+
+async function hashScanFrame(imagePath) {
+  const buf = await cropFrameBuffer(imagePath);
+  return await dhash64FromBuffer(buf);
+}
+
+async function hashScanTitle(imagePath) {
+  const buf = await cropTitleBarBuffer(imagePath);
+  return await dhash64FromBuffer(buf);
+}
+
+async function hashScanFull(imagePath) {
+  const buf = await cropFullCardBuffer(imagePath);
+  return await dhash64FromBuffer(buf);
+}
+
+async function hashLocalImageFingerprints(imagePath) {
+  const [art_hash, frame_hash, title_hash, full_hash, symbol_hash] = await Promise.all([
+    hashScanArtwork(imagePath),
+    hashScanFrame(imagePath),
+    hashScanTitle(imagePath),
+    hashScanFull(imagePath),
+    hashScanSetSymbol(imagePath).catch(() => null),
+  ]);
+
+  return {
+    art_hash,
+    frame_hash,
+    title_hash,
+    full_hash,
+    symbol_hash
+  };
+}
+
 module.exports = {
   hashScanArtwork,
   hashScryfallArtwork,
   hashScanSetSymbol,
   hashReferenceSymbolBuffer,
+  hashScanFrame,
+  hashScanTitle,
+  hashScanFull,
+  hashLocalImageFingerprints,
   hammingHex64,
 };

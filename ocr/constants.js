@@ -21,28 +21,21 @@ const CROP = {
   },
 };
 
-const DEBUG_OCR = true;
+const DEBUG_OCR = false;
 
 // Try multiple thresholds for robustness (glare/contrast variance)
-const OCR_THRESHOLDS = [null, 140, 160, 180];
+const OCR_THRESHOLDS = [null, 160];
 
-// Small crop jitter offsets (pixels) to tolerate scan drift
 const NAME_OFFSETS = [
-  { dx: 0, dy: 0 },
-  { dx: 3, dy: 0 }, { dx: -3, dy: 0 },
-  { dx: 0, dy: 2 }, { dx: 0, dy: -2 },
+  { dx: 0, dy: 0 }
 ];
 
 const COLLECTOR_OFFSETS = [
-  { dx: 0, dy: 0 },
-  { dx: 3, dy: 0 }, { dx: -3, dy: 0 },
-  { dx: 0, dy: 2 }, { dx: 0, dy: -2 },
+  { dx: 0, dy: 0 }
 ];
 
 const SYMBOL_OFFSETS = [
-  { dx: 0, dy: 0 },
-  { dx: 2, dy: 0 }, { dx: -2, dy: 0 },
-  { dx: 0, dy: 2 }, { dx: 0, dy: -2 },
+  { dx: 0, dy: 0 }
 ];
 
 // Confidence gating defaults (tune later with logs)

@@ -129,7 +129,38 @@ async function detectSetSymbol(imagePath, opts = {}) {
     let scanHash = null;
 
    try {
-    scanHash = await hashScanSetSymbol(imagePath, dx, dy);
+    const fs = require("fs");
+    const path = require("path");
+
+    const debugDir = path.join(__dirname, "..", "ocr_debug");
+    if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir, { recursive: true });
+
+    let scanHash = null;
+
+    try {
+      // 👇 NEW: also get the cropped buffer
+      const { hash, buffer } = await hashScanSetSymbol(imagePath, dx, dy, true);
+
+      scanHash = hash;
+
+      // 👇 Save the actual crop
+      const debugPath = path.join(
+        debugDir,
+        `symbol_${Date.now()}_${dx}_${dy}.png`
+      );
+
+      fs.writeFileSync(debugPath, buffer);
+
+      console.log("🟡 [symbol] crop saved ->", debugPath);
+
+    } catch (err) {
+      console.log("🧩 [symbol] hashScanSetSymbol failed", {
+        dx,
+        dy,
+        error: err?.message || String(err)
+      });
+      continue;
+    }
     } catch (err) {
     console.log("🧩 [symbol] hashScanSetSymbol failed", {
         dx,
@@ -174,6 +205,8 @@ async function detectSetSymbol(imagePath, opts = {}) {
   }
 
   scored.sort((a, b) => a.weightedDist - b.weightedDist || a.dist - b.dist);
+
+  console.log("🟡 [symbol] top matches:", scored.slice(0, 5));
 
   if (best.dist > 12) {
     return {

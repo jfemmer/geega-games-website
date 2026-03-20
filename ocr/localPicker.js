@@ -1,8 +1,9 @@
 const path = require("path");
 const fs = require("fs");
-const { hashScanArtwork, hammingHex64, dhash64FromBuffer } = require("./imageHash");
-const { getHash, setHash } = require("./hashCache");
-const sharp = require("sharp");
+const {
+  hashLocalImageFingerprints,
+  hammingHex64
+} = require("./imageHash");
 
 const LOCAL_INDEX_PATH =
   process.env.LOCAL_INDEX_PATH || "D:/MTG_DATA/scryfall/local_index.json";
@@ -13,6 +14,10 @@ function loadLocalIndex() {
   if (LOCAL_INDEX_CACHE) return LOCAL_INDEX_CACHE;
   LOCAL_INDEX_CACHE = JSON.parse(fs.readFileSync(LOCAL_INDEX_PATH, "utf8"));
   return LOCAL_INDEX_CACHE;
+}
+
+function normalizeName(str = "") {
+  return String(str).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function normalizeCollector(str) {
@@ -27,144 +32,109 @@ function toPublicImageUrl(localImagePath) {
   return `/local_card_images/${path.basename(localImagePath)}`;
 }
 
-function buildCandidatePool(name, options = {}) {
-  const cards = loadLocalIndex();
-  const targetName = String(name || "").toLowerCase().trim();
-  const targetSet = String(options.setCode || "").toLowerCase().trim();
+function scoreCandidate(card, ctx) {
+  let score = 0;
+  const reasons = [];
 
-  let pool = cards.filter(card =>
-    String(card.name || "").toLowerCase() === targetName
-  );
+  const ocrNameNorm = normalizeName(ctx.guessedName || "");
+  const cardNameNorm = normalizeName(card.normalized_name || card.name || "");
 
-  if (targetSet) {
-    const bySet = pool.filter(card => String(card.set || "").toLowerCase() === targetSet);
-    if (bySet.length) pool = bySet;
+  if (ocrNameNorm && ocrNameNorm === cardNameNorm) {
+    score += 30;
+    reasons.push("exact_name");
   }
 
-  return pool;
-}
-
-function pickPrintingByCollectorLocal(name, collectorNumber, isFoil, options = {}) {
-  const target = normalizeCollector(collectorNumber);
-  if (!target) return { chosen: null, matchCount: 0, pool: [] };
-
-  let pool = buildCandidatePool(name, options);
-
-  pool = pool.filter(card => String(card.layout || "").toLowerCase() !== "token");
-
-  let exact = pool.filter(card =>
-    normalizeCollector(card.collector_number) === target
-  );
-
-  if (!exact.length) {
-    const targetDigits = target.replace(/[^0-9]/g, "");
-    if (targetDigits) {
-      exact = pool.filter(card => {
-        const cd = normalizeCollector(card.collector_number).replace(/[^0-9]/g, "");
-        return cd === targetDigits;
-      });
-    }
+  if (ctx.detectedSetCode && String(card.set || "").toLowerCase() === String(ctx.detectedSetCode).toLowerCase()) {
+    score += 35;
+    reasons.push("set_symbol_match");
   }
 
-  if (!exact.length) {
-    return { chosen: null, matchCount: 0, pool: [] };
+  const scanCollector = normalizeCollector(ctx.collectorNumber || "");
+  const cardCollector = normalizeCollector(card.collector_number || "");
+  if (scanCollector && scanCollector === cardCollector) {
+    score += 35;
+    reasons.push("exact_collector");
+  } else if (
+    scanCollector &&
+    String(scanCollector).replace(/[^0-9]/g, "") &&
+    String(scanCollector).replace(/[^0-9]/g, "") === String(card.collector_digits_only || "").replace(/^0+/, "")
+  ) {
+    score += 18;
+    reasons.push("digits_only_collector");
   }
 
-  const finishMatches = exact.filter(card => {
-    if (isFoil) return !!card.foil;
-    return !!card.nonfoil;
-  });
+  if (ctx.isFoil ? !!card.foil : !!card.nonfoil) {
+    score += 10;
+    reasons.push("finish_match");
+  }
 
-  const finalPool = finishMatches.length ? finishMatches : exact;
+  const artDist = hammingHex64(ctx.scan.art_hash, card.art_hash);
+  const frameDist = hammingHex64(ctx.scan.frame_hash, card.frame_hash);
+  const titleDist = hammingHex64(ctx.scan.title_hash, card.title_hash);
+  const fullDist = hammingHex64(ctx.scan.full_hash, card.full_hash);
+  const symbolDist =
+    ctx.scan.symbol_hash && card.symbol_hash
+      ? hammingHex64(ctx.scan.symbol_hash, card.symbol_hash)
+      : 9999;
 
-  finalPool.sort((a, b) => {
-    const aLang = a.lang === "en" ? 1 : 0;
-    const bLang = b.lang === "en" ? 1 : 0;
-    if (bLang !== aLang) return bLang - aLang;
-    return String(a.set_name || "").localeCompare(String(b.set_name || ""));
-  });
-
-  const chosen = finalPool[0]
-    ? {
-        ...finalPool[0],
-        imageUrl: toPublicImageUrl(finalPool[0].local_image)
-      }
-    : null;
+  score += Math.max(0, 30 - artDist * 2.0);
+  score += Math.max(0, 24 - frameDist * 1.8);
+  score += Math.max(0, 18 - titleDist * 1.5);
+  score += Math.max(0, 14 - fullDist * 1.0);
+  score += Math.max(0, 12 - symbolDist * 1.2);
 
   return {
-    chosen,
-    matchCount: finalPool.length,
-    pool: finalPool.map(card => ({
-      ...card,
-      imageUrl: toPublicImageUrl(card.local_image)
-    }))
+    ...card,
+    imageUrl: toPublicImageUrl(card.local_image),
+    _score: score,
+    _distances: {
+      artDist,
+      frameDist,
+      titleDist,
+      fullDist,
+      symbolDist
+    },
+    _reasons: reasons
   };
 }
 
-async function hashLocalArtworkFromPath(imagePath) {
-  const meta = await sharp(imagePath).metadata();
-  const W = meta.width;
-  const H = meta.height;
+async function findBestLocalMatches(scanImagePath, options = {}) {
+  const cards = loadLocalIndex().filter(card =>
+    card.local_image &&
+    card.art_hash &&
+    card.frame_hash &&
+    card.title_hash &&
+    String(card.layout || "").toLowerCase() !== "token"
+  );
 
-  const artBuf = await sharp(imagePath)
-    .extract({
-      left: Math.floor(W * 0.11),
-      top: Math.floor(H * 0.17),
-      width: Math.floor(W * 0.78),
-      height: Math.floor(H * 0.40),
-    })
-    .grayscale()
-    .normalize()
-    .toBuffer();
+  const scan = await hashLocalImageFingerprints(scanImagePath);
 
-  return await dhash64FromBuffer(artBuf);
-}
+  const ctx = {
+    guessedName: options.guessedName || "",
+    collectorNumber: options.collectorNumber || "",
+    detectedSetCode: options.detectedSetCode || "",
+    isFoil: !!options.isFoil,
+    scan
+  };
 
-async function refineByArtworkHashLocal(scanImagePath, candidates, opts = {}) {
-  if (!scanImagePath || !Array.isArray(candidates) || candidates.length === 0) {
-    return { chosen: null, bestDist: 9999, scored: [] };
-  }
+  const scored = cards.map(card => scoreCandidate(card, ctx));
+  scored.sort((a, b) => b._score - a._score);
 
-  const scanHash = await hashScanArtwork(scanImagePath);
+  const top = scored.slice(0, options.limit || 25);
+  const best = top[0] || null;
+  const second = top[1] || null;
+  const margin = best && second ? (best._score - second._score) : 999;
 
-  let best = null;
-  let bestDist = 9999;
-  const scored = [];
-
-  for (const c of candidates) {
-    const key = c?.id || c?.local_image;
-    if (!key || !c?.local_image || !fs.existsSync(c.local_image)) continue;
-
-    let h = getHash(key);
-    if (!h) {
-      h = await hashLocalArtworkFromPath(c.local_image);
-      setHash(key, h);
-    }
-
-    const d = hammingHex64(scanHash, h);
-    scored.push({
-      id: c.id,
-      set: c.set,
-      collector: c.collector_number,
-      dist: d
-    });
-
-    if (d < bestDist) {
-      bestDist = d;
-      best = c;
-    }
-  }
-
-  const maxDist = opts.maxDist ?? 8;
-  if (!best || bestDist > maxDist) {
-    return { chosen: null, bestDist, scored };
-  }
-
-  return { chosen: best, bestDist, scored };
+  return {
+    chosen: best,
+    second,
+    margin,
+    pool: top,
+    scan
+  };
 }
 
 module.exports = {
-  pickPrintingByCollectorLocal,
-  refineByArtworkHashLocal,
+  findBestLocalMatches,
   toPublicImageUrl
 };

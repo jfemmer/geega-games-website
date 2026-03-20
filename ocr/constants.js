@@ -31,7 +31,7 @@ const CROP = {
   },
 };
 
-const DEBUG_OCR = false;
+const DEBUG_OCR = true;
 
 // ✅ FIX: Try more thresholds. Colored/gold name bars need a lower threshold
 // to keep the dark text visible. null = no binarization (use raw grayscale).

@@ -841,7 +841,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           ms: Date.now() - perFileStart
         });
       } finally {
-        try { if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath); } catch {}
+        //try { if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath); } catch {}
       }
     }
 

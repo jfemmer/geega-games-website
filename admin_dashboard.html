@@ -590,6 +590,43 @@
 .inventory-inner-tab {
   margin-top: 10px;
 }
+
+/* 🔔 Live review badge + toast */
+
+.review-badge {
+  position: fixed;
+  top: 20px;
+  right: 80px;
+  background: crimson;
+  color: white;
+  font-weight: bold;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  z-index: 2000;
+  display: none;
+}
+
+.review-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rebeccapurple;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  font-size: 0.9rem;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+  z-index: 2000;
+}
+
+.review-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
   </style>
   
 <!-- 🔐 Login Logic (commented out)
@@ -619,6 +656,9 @@
   <!-- 🔐 Login Overlay (commented out)
   <div id="admin-login" ...>...</div>
   -->
+
+  <div id="review-badge" class="review-badge">0</div>
+  <div id="review-toast" class="review-toast">New review item</div>
 
   <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
@@ -2222,6 +2262,97 @@ function showInventoryTab(tabId, btnEl) {
     btnEl.classList.add('active-inventory-tab');
   }
 }
+
+(function () {
+  const API_BASE = "https://geega-games-website-production.up.railway.app";
+  const INGEST_KEY = "a7GkP9zLm4Qr8Xv2Hs6Tw1Bn5Yc3Df0J";
+
+  const badge = document.getElementById("review-badge");
+  const toast = document.getElementById("review-toast");
+
+  let unseenCount = 0;
+  let isReviewTabOpen = false;
+
+  // Detect if review tab is active
+  const observer = new MutationObserver(() => {
+    const reviewTab = document.getElementById("inventory-review-tab");
+    isReviewTabOpen = reviewTab && reviewTab.style.display !== "none";
+  });
+
+  observer.observe(document.body, { subtree: true, attributes: true });
+
+  function showToast(message) {
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add("show");
+
+    setTimeout(() => {
+      toast.classList.remove("show");
+    }, 2500);
+  }
+
+  function updateBadge() {
+    if (!badge) return;
+
+    if (unseenCount > 0) {
+      badge.style.display = "block";
+      badge.textContent = unseenCount;
+    } else {
+      badge.style.display = "none";
+    }
+  }
+
+  function connectSSE() {
+    const url = `${API_BASE}/api/inventory-review/stream?key=${INGEST_KEY}`;
+    const evtSource = new EventSource(url);
+
+    evtSource.onmessage = function (event) {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "review_updated") {
+          console.log("📡 Review update received");
+
+          if (typeof loadInventoryReview === "function") {
+            loadInventoryReview();
+          }
+
+          if (!isReviewTabOpen) {
+            unseenCount++;
+            updateBadge();
+            showToast("📥 New review item");
+          }
+        }
+      } catch (err) {
+        console.error("❌ SSE parse error:", err);
+      }
+    };
+
+    evtSource.onerror = function () {
+      console.warn("⚠️ SSE disconnected, retrying...");
+      evtSource.close();
+      setTimeout(connectSSE, 3000);
+    };
+  }
+
+  // Reset badge when user opens review tab
+  const originalShowSection = window.showSection;
+  window.showSection = function (sectionId) {
+    originalShowSection(sectionId);
+
+    if (sectionId === "inventory-section") {
+      setTimeout(() => {
+        const reviewTab = document.getElementById("inventory-review-tab");
+        if (reviewTab && reviewTab.style.display !== "none") {
+          unseenCount = 0;
+          updateBadge();
+        }
+      }, 100);
+    }
+  };
+
+  connectSSE();
+})();
 
 </script>
   

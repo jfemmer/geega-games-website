@@ -487,6 +487,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             collector: null,
             chosen: null
           });
+          notifyReviewClients();
+        
 
           results.push({
             file: file.originalname,
@@ -567,6 +569,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             setSymbolBestDist: symbolResult?.bestDist ?? null,
             setSymbolTop: symbolResult?.top || []
           });
+
+          notifyReviewClients();
 
           results.push({
             file: file.originalname,
@@ -672,6 +676,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             details: err?.message || String(err)
           });
 
+          notifyReviewClients();
+
           results.push({
             file: file.originalname,
             status: "review",
@@ -741,6 +747,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             }
           });
 
+          notifyReviewClients();
+
           results.push({
             file: file.originalname,
             status: "review",
@@ -791,6 +799,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
               (card?.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "")
           }
         });
+        
+        notifyReviewClients();
 
         results.push({
           file: file.originalname,
@@ -833,6 +843,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           collector: bottom || null,
           chosen: null
         });
+
+        notifyReviewClients();
 
         results.push({
           file: file.originalname,
@@ -1194,6 +1206,7 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
       foil: isFoil,
       name: nameRes
     });
+    notifyReviewClients();
 
     throw new Error("Could not detect card name from name bar. Sent to review.");
   }
@@ -1363,6 +1376,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
       details: err?.message || String(err)
     });
 
+    notifyReviewClients();
+
     throw new Error(`Sent to review: ${err?.message || "Scryfall lookup failed"}`);
   }
 
@@ -1410,6 +1425,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
       setSymbolBestDist: symbolResult?.bestDist ?? null,
       setSymbolTop: symbolResult?.top || []
     });
+
+    notifyReviewClients();
 
     throw new Error(`Sent to review: score ${score.toFixed(3)} below threshold`);
   }
@@ -1515,12 +1532,58 @@ app.post("/api/scan-ingest", requireIngestKey, upload.single("image"), async (re
       setCode
     });
 
+    scanWorkerTick().catch(() => {});
+
+    res.json({ jobId: String(job._id), status: job.status });
+
     res.json({ jobId: String(job._id), status: job.status });
   } catch (e) {
     console.error("❌ scan-ingest error:", e);
     res.status(500).json({ message: "Failed to ingest scan." });
   }
 });
+
+const sseClients = new Set();
+
+function notifyReviewClients(payload = {}) {
+  const data = JSON.stringify({ type: "review_updated", ts: Date.now(), ...payload });
+  for (const res of sseClients) {
+    try {
+      res.write(`data: ${data}\n\n`);
+    } catch {
+      sseClients.delete(res);
+    }
+  }
+}
+
+// ⬇️ ADD THIS ROUTE WITH YOUR OTHER ROUTES
+app.get("/api/inventory-review/stream", (req, res) => {
+  const key = req.headers["x-ingest-key"] || req.query.key || "";
+  if (key !== process.env.INGEST_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  res.write(`: connected\n\n`);
+
+  sseClients.add(res);
+  console.log(`📡 SSE client connected (total: ${sseClients.size})`);
+
+  const heartbeat = setInterval(() => {
+    try { res.write(`: heartbeat\n\n`); } catch {}
+  }, 25000);
+
+  req.on("close", () => {
+    sseClients.delete(res);
+    clearInterval(heartbeat);
+    console.log(`📡 SSE client disconnected (total: ${sseClients.size})`);
+  });
+});
+
 
 // ✅ Routes
 
@@ -2976,98 +3039,104 @@ app.get('/api/manual-update-optin', async (req, res) => {
   }
 });
 
-const SCAN_WORKERS = Number(process.env.SCAN_WORKERS || 2); // keep 1-3
+const SCAN_WORKERS      = Number(process.env.SCAN_WORKERS      || 2);
 const SCAN_MAX_ATTEMPTS = Number(process.env.SCAN_MAX_ATTEMPTS || 5);
-const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+const LOCK_TIMEOUT_MS   = 5 * 60 * 1000; // 5 min stale-lock window
+const WORKER_POLL_MS    = Number(process.env.SCAN_WORKER_POLL_MS || 2000); // safety net only
 
 let scanInFlight = 0;
 
+// B7: Atomic job claim with stale-lock reclaim.
+// Adds `lockedAt: { $lt: lockExpired }` to recover jobs that were claimed by a
+// crashed worker, preventing them from getting stuck in "processing" forever.
+// Recommendation: add a MongoDB index in your shell:
+//   db.scanjobs.createIndex({ status: 1, createdAt: 1 })
 async function claimNextScanJob() {
   const lockExpired = new Date(Date.now() - LOCK_TIMEOUT_MS);
-
+ 
   return ScanJob.findOneAndUpdate(
     {
-      status: { $in: ["queued", "processing"] },
       $or: [
         { status: "queued" },
-        { status: "processing", lockedAt: { $lt: lockExpired } }
-      ]
+        { status: "processing", lockedAt: { $lt: lockExpired } },
+      ],
     },
     {
       $set: { status: "processing", lockedAt: new Date() },
-      $inc: { attempts: 1 }
+      $inc: { attempts: 1 },
     },
     { sort: { createdAt: 1 }, new: true }
   );
 }
-
+ 
+// B5: Non-polling worker tick — drain as many jobs as concurrency allows.
+// Called both on a timer AND immediately when a job is enqueued.
 async function scanWorkerTick() {
   while (scanInFlight < SCAN_WORKERS) {
     const job = await claimNextScanJob();
     if (!job) break;
-
+ 
     scanInFlight++;
-
+ 
     (async () => {
       try {
         const result = await processSingleScanToInventory({
-          filePath: job.filePath,
+          filePath:     job.filePath,
           originalName: job.originalName,
-          condition: job.condition,
-          foil: job.foil,
-          setCode: job.setCode
+          condition:    job.condition,
+          foil:         job.foil,
+          setCode:      job.setCode,
         });
-
-        job.status = "done";
-        job.finishedAt = new Date();
-        job.lastError = null;
-
-        job.guessedName = result.guessedName;
-        job.nameConfidence = result.nameConfidence;
-        job.collectorNumber = result.collectorNumber;
-        job.chosenSet = result.chosenSet;
+ 
+        job.status        = "done";
+        job.finishedAt    = new Date();
+        job.lastError     = null;
+        job.guessedName   = result.guessedName;
+        job.nameConfidence= result.nameConfidence;
+        job.collectorNumber=result.collectorNumber;
+        job.chosenSet     = result.chosenSet;
         job.chosenSetName = result.chosenSetName;
-        job.chosenCollector = result.chosenCollector;
+        job.chosenCollector=result.chosenCollector;
         job.ocrTextBottom = result.ocrTextBottom;
-
+ 
         await job.save();
+ 
+        // B8: Push new review item to all SSE clients
+        notifyReviewClients();
+ 
       } catch (e) {
         job.lastError = e?.message || String(e);
-
         if (job.attempts >= SCAN_MAX_ATTEMPTS) {
-          job.status = "failed";
+          job.status     = "failed";
           job.finishedAt = new Date();
         } else {
           job.status = "queued";
         }
-
         await job.save();
       } finally {
-        // cleanup original uploaded file
-        // NEW (only delete when done/failed)
-      try {
-        const terminal = job.status === "done" || job.status === "failed";
-        if (terminal && job.filePath && fs.existsSync(job.filePath)) {
-          fs.unlinkSync(job.filePath);
-        }
-      } catch {}
-
+        try {
+          const terminal = job.status === "done" || job.status === "failed";
+          if (terminal && job.filePath && fs.existsSync(job.filePath)) {
+            fs.unlinkSync(job.filePath);
+          }
+        } catch {}
         scanInFlight--;
+        // Re-drain: if more jobs arrived while this one ran, pick them up now.
+        scanWorkerTick().catch(() => {});
       }
     })();
   }
 }
-
-// Start worker loop
+ 
+// B5: Catch-all poll timer — handles edge cases where the push trigger was missed.
 setInterval(() => {
   scanWorkerTick().catch(err => console.error("❌ scanWorkerTick:", err));
-}, 1000);
+}, WORKER_POLL_MS);
 
 // -------------------- ScanJob Worker --------------------
 // Put this BELOW: ScanJob model + processSingleScanToInventory(...)
 
 const WORKER_ENABLED = String(process.env.SCAN_WORKER_ENABLED || "true") === "true";
-const WORKER_POLL_MS = Number(process.env.SCAN_WORKER_POLL_MS || 1500);
 const WORKER_CONCURRENCY = Number(process.env.SCAN_WORKER_CONCURRENCY || 1);
 
 async function lockNextJob() {

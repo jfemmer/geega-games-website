@@ -26,18 +26,19 @@ async function cropAndPrepNameBar(
   const W = meta.width;
   const H = meta.height;
 
-  const base =
-    W === FIXED_DIMS.w && H === FIXED_DIMS.h
-      ? CROP.nameBar
-      : {
-          // ✅ FIX: Old fallback was W*0.73 wide — pulled in mana cost symbols.
-          // Name text only occupies roughly the left 60% of the name bar.
-          // Right edge of mana cost area starts around 82% so stop at 60% to be safe.
-          left:   Math.floor(W * 0.075),
-          top:    Math.floor(H * 0.030),
-          width:  Math.floor(W * 0.60),
-          height: Math.floor(H * 0.052),
-        };
+  // Always use percent-based crop — scanner dimensions vary slightly per scan.
+  //
+  // Calibrated from debug crop of Counterspell at ~770x1062:
+  //   - top:    8.5% skips the outer black border + hatched frame region
+  //   - height: 9%   captures the full name text including descenders
+  //   - left:   7.5% skips the left card border
+  //   - width:  60%  stops before mana cost symbols (was 73%, bled into pips)
+  const base = {
+    left:   Math.floor(W * 0.075),
+    top:    Math.floor(H * 0.085),
+    width:  Math.floor(W * 0.60),
+    height: Math.floor(H * 0.09),
+  };
 
   const left   = Math.max(0, Math.min(W - 2, base.left + dx));
   const top    = Math.max(0, Math.min(H - 2, base.top  + dy));
@@ -48,12 +49,7 @@ async function cropAndPrepNameBar(
     .extract({ left, top, width, height })
     .grayscale()
     .normalize()
-    // ✅ FIX: Moderate unsharp mask instead of default sharpen.
-    // Default sharpen is too aggressive on low-contrast colored name bars
-    // and creates ringing artifacts that Tesseract misreads as extra letters.
     .sharpen({ sigma: 1.2, m1: 0.5, m2: 0.3 })
-    // ✅ FIX: Scale to 1600px wide (was 1400). More pixels = better LSTM accuracy
-    // on short strings like card names.
     .resize({ width: 1600, withoutEnlargement: false });
 
   if (useThreshold) pipeline = pipeline.threshold(thresholdValue);

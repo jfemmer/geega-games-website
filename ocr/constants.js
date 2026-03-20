@@ -1,28 +1,33 @@
 const path = require("path");
-const FIXED_DIMS = { w: 771, h: 1061 };
 
-// Tuned crop boxes for the FI-8170 format
+// ✅ UPDATE: Set this to your actual 300 DPI scan dimensions once you check
+// the PNG size in Windows Explorer → right-click → Properties → Details.
+// At 300 DPI with a standard MTG card the fi-8170 should produce ~1275×1753
+// plus the 1mm border (12px each side) = likely ~1299×1777.
+// Replace these values with the exact numbers from your scanner.
+const FIXED_DIMS = { w: 1299, h: 1777 };
+
+// 1mm at 300 DPI = ~12px. Every crop value below already has this baked in
+// (card content starts at pixel 12, not pixel 0).
+const BORDER_PX = 12;
+
+// Tuned crop boxes for the FI-8170 format at 300 DPI + 1mm border
 const CROP = {
-  // ✅ FIX: Name bar — stop well before the mana cost symbols.
-  // Old: width 585 (ends at px 637, overlapping the mana cost area).
-  // New: width 480 (ends at px 532, safely in the clear).
-  // Old: height 84 (too tall, pulling in art border or type line).
-  // New: height 52 (tight around just the name text).
-  // Old: top 26 (risked clipping ascenders on tall letters).
-  // New: top 22 (a little more headroom).
+  // Name bar — left edge of card name text to just before mana cost symbols.
+  // All values offset by BORDER_PX to account for the 1mm scanner margin.
   nameBar: {
-    left: 52,
-    top: 22,
-    width: 480,
-    height: 52,
+    left:   BORDER_PX + 86,   // ~98px from image edge
+    top:    BORDER_PX + 36,   // ~48px from image edge
+    width:  800,              // stops well before mana cost area
+    height: 86,               // tight around just the name text
   },
 
-  // Upper-right set symbol crop (unchanged)
+  // Set symbol — upper right of card
   setSymbol: {
-    left: 632,
-    top: 587,
-    width: 108,
-    height: 94,
+    left:   BORDER_PX + 1056,
+    top:    BORDER_PX + 978,
+    width:  180,
+    height: 157,
   },
 };
 

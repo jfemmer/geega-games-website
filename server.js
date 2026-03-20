@@ -1557,6 +1557,12 @@ app.get('/', (req, res) => res.send('🧙‍♂️ Welcome to the Geega Games AP
 // Version Check
 app.get('/api/version-check', (req, res) => res.send('✅ Latest server.js version'));
 
+app.get("/api/debug/ocr-crop/:filename", (req, res) => {
+  const file = path.join(__dirname, "ocr_debug", req.params.filename);
+  if (!fs.existsSync(file)) return res.status(404).send("not found");
+  res.sendFile(file);
+});
+
 // ✅ Email verification: click link route
 app.get('/verify-email', async (req, res) => {
   try {

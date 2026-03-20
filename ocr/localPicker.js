@@ -39,15 +39,13 @@ function scoreCandidate(card, ctx) {
   const ocrNameNorm = normalizeName(ctx.guessedName || "");
   const cardNameNorm = normalizeName(card.normalized_name || card.name || "");
 
+  // OCR name is only a very weak hint now
   if (ocrNameNorm && cardNameNorm) {
     if (ocrNameNorm === cardNameNorm) {
-      score += 12;
-      reasons.push("exact_name");
-    } else if (cardNameNorm.includes(ocrNameNorm) || ocrNameNorm.includes(cardNameNorm)) {
-      score += 6;
-      reasons.push("partial_name");
+      score += 4;
+      reasons.push("exact_name_weak");
     } else {
-      reasons.push("name_mismatch_ignored");
+      reasons.push("name_ignored");
     }
   }
 
@@ -123,11 +121,12 @@ function scoreCandidate(card, ctx) {
 
 async function findBestLocalMatches(scanImagePath, options = {}) {
   const cards = loadLocalIndex().filter(card =>
-    card.local_image &&
-    card.art_hash &&
-    card.frame_hash &&
-    card.title_hash &&
-    String(card.layout || "").toLowerCase() !== "token"
+  card.local_image &&
+  card.art_hash &&
+  card.frame_hash &&
+  card.title_hash &&
+  card.full_hash &&
+  String(card.layout || "").toLowerCase() !== "token"
   ).filter(card => {
     const scanCollector = normalizeCollector(options.collectorNumber || "");
     if (!scanCollector) return true;
@@ -146,7 +145,10 @@ async function findBestLocalMatches(scanImagePath, options = {}) {
     scan
   };
 
-  const scored = cards.map(card => scoreCandidate(card, ctx));
+  const scored = cards
+  .map(card => scoreCandidate(card, ctx))
+  .filter(card => Number.isFinite(card?._score) && card._score > -9999);
+
   scored.sort((a, b) => b._score - a._score);
 
   const top = scored.slice(0, options.limit || 25);

@@ -128,7 +128,13 @@ async function findBestLocalMatches(scanImagePath, options = {}) {
     card.frame_hash &&
     card.title_hash &&
     String(card.layout || "").toLowerCase() !== "token"
-  );
+  ).filter(card => {
+    const scanCollector = normalizeCollector(options.collectorNumber || "");
+    if (!scanCollector) return true;
+
+    const cardCollector = normalizeCollector(card.collector_number || "");
+    return !cardCollector || cardCollector === scanCollector;
+  });
 
   const scan = await hashLocalImageFingerprints(scanImagePath);
 

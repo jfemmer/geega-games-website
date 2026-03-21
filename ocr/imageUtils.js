@@ -129,19 +129,7 @@ function buildCollectorRegions(W, H) {
     {
       left:   Math.floor(W * 0.04),
       top:    Math.floor(H * 0.915),
-      width:  Math.floor(W * 0.10),  // was 0.18, now stops before set code
-      height: Math.floor(H * 0.04),
-    },
-    {
-      left:   Math.floor(W * 0.42),
-      top:    Math.floor(H * 0.915),
-      width:  Math.floor(W * 0.20),
-      height: Math.floor(H * 0.04),
-    },
-    {
-      left:   Math.floor(W * 0.62),
-      top:    Math.floor(H * 0.915),
-      width:  Math.floor(W * 0.22),
+      width:  Math.floor(W * 0.10),
       height: Math.floor(H * 0.04),
     },
   ];

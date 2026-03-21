@@ -129,8 +129,8 @@ function buildCollectorRegions(W, H) {
     {
       left:   Math.floor(W * 0.04),
       top:    Math.floor(H * 0.915),
-      width: Math.floor(W * 0.14),  // was 0.10, gives more room for the number
-      height: Math.floor(H * 0.04),
+      width:  Math.floor(W * 0.14),
+      height: Math.floor(H * 0.025),  // was 0.04, cut in half to drop second line
     },
   ];
 }

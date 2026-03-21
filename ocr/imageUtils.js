@@ -35,9 +35,9 @@ async function cropAndPrepNameBar(
   //   - width:  60%  stops before mana cost symbols (was 73%, bled into pips)
   const base = {
     left:   Math.floor(W * 0.075),
-    top:    Math.floor(H * 0.068),
+    top:    Math.floor(H * 0.085),
     width:  Math.floor(W * 0.60),
-    height: Math.floor(H * 0.042),
+    height: Math.floor(H * 0.09),
   };
 
   const left   = Math.max(0, Math.min(W - 2, base.left + dx));
@@ -129,7 +129,7 @@ function buildCollectorRegions(W, H) {
     {
       left:   Math.floor(W * 0.04),
       top:    Math.floor(H * 0.915),
-      width:  Math.floor(W * 0.18),
+      width:  Math.floor(W * 0.10),  // was 0.18, now stops before set code
       height: Math.floor(H * 0.04),
     },
     {

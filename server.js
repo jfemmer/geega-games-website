@@ -853,9 +853,9 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           condition,
           foil: isFoil,
           details: err?.message || String(err),
-          guessedName: guessedName || "",
-          name: nameRes || null,
-          collector: bottom || null,
+          guessedName: (typeof guessedName !== "undefined" ? guessedName : ""), 
+          name: (typeof nameRes !== "undefined" ? nameRes : null),
+          collector: (typeof bottom !== "undefined" ? bottom : null),
           chosen: null
         });
 

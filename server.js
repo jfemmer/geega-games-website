@@ -5,12 +5,14 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 const crypto = require('crypto'); // ✅ NEW (email verification)
+const { registerCropDebugRoutes } = require(".../cropDebugViewer");
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 console.log("Stripe key exists?", !!process.env.STRIPE_SECRET_KEY);
 console.log("MONGODB_URI:", process.env.MONGODB_URI);
 console.log("INVENTORY_DB_URI:", process.env.INVENTORY_DB_URI);
 console.log("EMPLOYEE_DB_URI:", process.env.EMPLOYEE_DB_URI);
 console.log("TRADEIN_DB_URI:", process.env.TRADEIN_DB_URI);
+
 
 const stripe = process.env.STRIPE_SECRET_KEY
   ? require('stripe')(process.env.STRIPE_SECRET_KEY)
@@ -3312,6 +3314,8 @@ app.get("/api/watch-folder-debug", (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+registerCropDebugRoutes(app);
 
 // Start Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

@@ -103,9 +103,9 @@ async function detectSetSymbol(imagePath, opts = {}) {
       )
     : null;
 
-  const pool = allowedSetCodes
-    ? entries.filter(e => allowedSetCodes.has(e.setCode))
-    : entries;
+  const pool = (allowedSetCodes && allowedSetCodes.size > 0)
+  ? entries.filter(e => allowedSetCodes.has(e.setCode))
+  : entries;
 
     console.log("🧩 [symbol] cache status", {
         entries: entries.length,

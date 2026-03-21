@@ -127,9 +127,9 @@ async function detectWhiteBorder(filePath) {
 function buildCollectorRegions(W, H) {
   return [
     {
-      left:   Math.floor(W * 0.06),
-      top:    Math.floor(H * 0.925),  // was 0.915, move down slightly
-      width:  Math.floor(W * 0.13),
+      left:   Math.floor(W * 0.06),   // was 0.04, shift right to trim black
+      top:    Math.floor(H * 0.915),
+      width:  Math.floor(W * 0.13),   // was 0.14, compensate for left shift
       height: Math.floor(H * 0.025),
     },
   ];

@@ -8,8 +8,13 @@ let CACHE = null;
 
 function loadLocalIndex() {
   if (CACHE) return CACHE;
-  CACHE = JSON.parse(fs.readFileSync(LOCAL_INDEX_PATH, "utf8"));
-  return CACHE;
+  try {
+    CACHE = JSON.parse(fs.readFileSync(LOCAL_INDEX_PATH, "utf8"));
+    return CACHE;
+  } catch (e) {
+    console.warn("⚠️ local_index.json not found, local matching disabled.");
+    return [];
+  }
 }
 
 function normalizeName(str = "") {

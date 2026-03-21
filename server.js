@@ -11,7 +11,7 @@ console.log("MONGODB_URI:", process.env.MONGODB_URI);
 console.log("INVENTORY_DB_URI:", process.env.INVENTORY_DB_URI);
 console.log("EMPLOYEE_DB_URI:", process.env.EMPLOYEE_DB_URI);
 console.log("TRADEIN_DB_URI:", process.env.TRADEIN_DB_URI);
-const { registerCropDebugRoutes } = require("../cropDebugViewer");
+const { registerCropDebugRoutes } = require("./cropDebugViewer");
 
 
 const stripe = process.env.STRIPE_SECRET_KEY

@@ -542,7 +542,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
 
         const effectiveSetCode =
           setCodeFromBody ||
-          (symbolTrusted ? detectedSetCode : "");
+          (symbolTrusted ? detectedSetCode : "") ||
+          (setCodeOcrValue ? setCodeOcrValue.toLowerCase() : "");
 
         console.log("🧩 [fi8170] Set symbol detection done", {
           detectedSetCode,
@@ -1291,7 +1292,10 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
 
   const detectedSetCode = (symbolResult?.setCode || "").trim().toLowerCase();
   const symbolTrusted = (symbolResult?.score ?? 0) >= 0.68;
-  const effectiveSetCode = setCodeFromBody || (symbolTrusted ? detectedSetCode : "");
+  const effectiveSetCode =
+  setCodeFromBody ||
+  (symbolTrusted ? detectedSetCode : "") ||
+  (setCodeOcrValue ? setCodeOcrValue.toLowerCase() : "");
 
   console.log("🧩 [scan-ingest] Set symbol detection done", {
     detectedSetCode,

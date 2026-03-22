@@ -127,29 +127,38 @@ async function hashScryfallArtwork(card) {
 
 // --------- Symbol helpers ----------
 async function hashScanSetSymbol(imagePath, dx = 0, dy = 0, returnBuffer = false) {
-  const sharp = require("sharp");
-  const { CROP } = require("./constants");
-
   const img = sharp(imagePath);
+  const meta = await img.metadata();
+  const W = meta.width;
+  const H = meta.height;
 
   const { left, top, width, height } = CROP.setSymbol;
 
-  const crop = img.extract({
-    left: Math.max(0, left + dx),
-    top: Math.max(0, top + dy),
-    width,
-    height
-  });
+  const region = clampRegion({ left: left + dx, top: top + dy, width, height }, W, H);
 
-  const buffer = await crop
-    .resize(64, 64)
+  // Hash input: matches hashReferenceSymbolBuffer pipeline exactly
+  const hashBuf = await sharp(imagePath)
+    .extract(region)
     .grayscale()
+    .normalize()
+    .sharpen()
+    .resize(96, 96, { fit: "fill" })
+    .threshold(160)
     .toBuffer();
 
-  const hash = computeDHash(buffer); // whatever your existing function is
+  const hash = await dhash64FromBuffer(hashBuf);
 
   if (returnBuffer) {
-    return { hash, buffer };
+    // Larger, readable version for the debug viewer
+    const debugBuf = await sharp(imagePath)
+      .extract(region)
+      .grayscale()
+      .normalize()
+      .sharpen()
+      .resize(128, 128, { fit: "fill" })
+      .png()
+      .toBuffer();
+    return { hash, buffer: debugBuf };
   }
 
   return hash;

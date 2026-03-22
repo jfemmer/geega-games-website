@@ -44,6 +44,7 @@ const fs = require('fs');
 const {
   ocrCardNameHighAccuracy,
   ocrCollectorNumberHighAccuracy,
+  ocrSetCodeHighAccuracy,
   findBestLocalMatches,
   computeOverallScore,
   shouldAutoIngest,
@@ -519,6 +520,11 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         // 2) OCR: Collector number
         console.log("🔢 [fi8170] OCR(bottom line) start", { reqId });
         const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
+        const setCodeOcrResult = await ocrSetCodeHighAccuracy(originalPath, tmpDir);
+        const setCodeOcrValue  = setCodeOcrResult?.setCode || null;
+        const setCodeCropUrl   = setCodeOcrResult?.debugCropPath
+          ? `/ocr_debug/${path.basename(setCodeOcrResult.debugCropPath)}`
+          : null;
 
         let collectorNumber = bottom?.collectorNumber || null;
 
@@ -578,6 +584,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             score,
             name: nameRes,
             collector: bottom,
+            setCodeOcr: setCodeOcrResult,
+            setCodeCropUrl,
             chosen: null,
             detectedSetCode: detectedSetCode || null,
             setSymbolScore: symbolResult?.score ?? null,
@@ -675,6 +683,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             guessedName,
             name: nameRes,
             collector: bottom,
+            setCodeOcr: setCodeOcrResult,
+            setCodeCropUrl,
             chosen: null,
             topLocalCandidates: (localMatchMeta?.pool || []).slice(0, 5).map(c => ({
               id: c.id,
@@ -746,6 +756,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             guessedName,
             name: nameRes,
             collector: bottom,
+            setCodeOcr: setCodeOcrResult,
+            setCodeCropUrl,
             detectedSetCode: detectedSetCode || null,
             setSymbolScore: symbolResult?.score ?? null,
             setSymbolBestDist: symbolResult?.bestDist ?? null,
@@ -798,6 +810,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           guessedName,
           name: nameRes,
           collector: bottom,
+          setCodeOcr: setCodeOcrResult,
+          setCodeCropUrl,
           detectedSetCode: detectedSetCode || null,
           setSymbolScore: symbolResult?.score ?? null,
           setSymbolBestDist: symbolResult?.bestDist ?? null,
@@ -1240,6 +1254,11 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
   // 2) OCR: bottom line
   console.log("🔢 [scan-ingest] OCR(bottom line) start");
   const bottom = await ocrCollectorNumberHighAccuracy(filePath, tmpDir);
+  const setCodeOcrResult = await ocrSetCodeHighAccuracy(filePath, tmpDir);
+  const setCodeOcrValue  = setCodeOcrResult?.setCode || null;
+  const setCodeCropUrl   = setCodeOcrResult?.debugCropPath
+    ? `/ocr_debug/${path.basename(setCodeOcrResult.debugCropPath)}`
+    : null;
 
   let collectorNumber = bottom?.collectorNumber || null;
   if (collectorNumber && (bottom?.confidence ?? 0) < 45) {
@@ -1377,6 +1396,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
       }),
       name: nameRes,
       collector: bottom,
+      setCodeOcr: setCodeOcrResult,
+      setCodeCropUrl,
       chosen: base ? {
         name: base?.name,
         set: base?.set,
@@ -1428,6 +1449,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
       score,
       name: nameRes,
       collector: bottom,
+      setCodeOcr: setCodeOcrResult,
+      setCodeCropUrl,
       chosen: {
         name: card?.name,
         set: card?.set,

@@ -38,6 +38,7 @@ function classifyFile(filename) {
   if (f.startsWith("bottom_"))             return { type: "collector", label: "Collector #",     color: "#fb923c" };
   if (f.startsWith("preview_setsymbol"))   return { type: "symbol",    label: "Set Symbol",      color: "#f472b6" };
   if (f.startsWith("symbol_"))             return { type: "symbol",    label: "Set Symbol",      color: "#f472b6" };
+  if (f.startsWith("setcode_"))            return { type: "setcode",   label: "Set Code",        color: "#4ade80" };
   if (f.startsWith("preview_frame"))       return { type: "frame",     label: "Frame Hash",      color: "#60a5fa" };
   if (f.startsWith("preview_full"))        return { type: "full",      label: "Full Card Hash",  color: "#94a3b8" };
   return                                          { type: "other",     label: "Other",           color: "#64748b" };
@@ -68,7 +69,7 @@ function buildPage(files) {
   const sessions = groupFilesBySession(files);
   const totalFiles = files.length;
 
-  const TYPE_ORDER = ["name", "collector", "symbol", "artwork", "frame", "full", "other"];
+  const TYPE_ORDER = ["name", "collector", "setcode", "symbol", "artwork", "frame", "full", "other"];
 
   const sessionBlocks = sessions.map((session, si) => {
     const ts = session.ts !== "ungrouped"
@@ -451,6 +452,7 @@ function buildPage(files) {
     <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
     <button class="filter-btn" onclick="setFilter('name', this)"     style="--c:#a78bfa">Name</button>
     <button class="filter-btn" onclick="setFilter('collector', this)" style="--c:#fb923c">Collector</button>
+    <button class="filter-btn" onclick="setFilter('setcode', this)"   style="--c:#4ade80">Set Code</button>
     <button class="filter-btn" onclick="setFilter('symbol', this)"    style="--c:#f472b6">Symbol</button>
     <button class="filter-btn" onclick="setFilter('artwork', this)"   style="--c:#34d399">Artwork</button>
     <button class="filter-btn" onclick="setFilter('frame', this)"     style="--c:#60a5fa">Frame</button>

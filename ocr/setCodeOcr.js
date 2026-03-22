@@ -14,7 +14,7 @@ const path = require("path");
 const sharp = require("sharp");
 const Tesseract = require("tesseract.js");
 const { acquireWorker, releaseWorker, recognizeWithTimeout } = require("./nameOcr");
-const { OCR_THRESHOLDS, DEBUG_OCR, DEBUG_DIR } = require("./constants");
+const { OCR_THRESHOLDS } = require("./constants");
 
 // ─── Region builder ───────────────────────────────────────────────────────────
 
@@ -36,14 +36,14 @@ function buildSetCodeRegions(W, H) {
     {
       left:   Math.floor(W * 0.06),
       top:    Math.floor(H * 0.940),
-      width:  Math.floor(W * 0.20),   // wider than collector — set codes vary in length
+      width:  Math.floor(W * 0.14),   // wider than collector — set codes vary in length
       height: Math.floor(H * 0.022),
     },
     // Fallback: slightly taller crop in case of vertical registration shift
     {
       left:   Math.floor(W * 0.06),
       top:    Math.floor(H * 0.936),
-      width:  Math.floor(W * 0.22),
+      width:  Math.floor(W * 0.154),
       height: Math.floor(H * 0.030),
     },
   ];
@@ -128,28 +128,6 @@ const SET_CODE_OPTS = {
   tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ",
 };
 
-// ─── Debug crop helper ────────────────────────────────────────────────────────
-
-/**
- * Save a Buffer to DEBUG_DIR and return its absolute path.
- * Returns null if DEBUG_OCR is off, buf is falsy, or saving fails.
- * Caller builds the public URL as: `/ocr_debug/${path.basename(result)}`
- * @private
- */
-function _saveDebugCrop(buf, ts, tag) {
-  if (!DEBUG_OCR || !buf) return null;
-  try {
-    fs.mkdirSync(DEBUG_DIR, { recursive: true });
-    const filename = `setcode_${ts}_${tag}.png`;
-    const outPath = path.join(DEBUG_DIR, filename);
-    fs.writeFileSync(outPath, buf);
-    console.log("🟢 [setCodeOcr] Debug crop saved:", outPath);
-    return outPath;
-  } catch {
-    return null;
-  }
-}
-
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
@@ -201,9 +179,7 @@ async function ocrSetCodeHighAccuracy(originalPath, tmpDir) {
 
         if (setCode && conf >= 60) {
           console.log(`✅ [setCodeOcr] Fast-path hit: "${setCode}" (conf=${conf})`);
-          const buf = fs.existsSync(out) ? fs.readFileSync(out) : null;
-          const debugCropPath = _saveDebugCrop(buf, ts, `fast_r${regionIndex}_t${thr ?? "raw"}`);
-          return { text, confidence: conf, setCode, debugCropPath };
+          return { text, confidence: conf, setCode };
         }
       } catch {
         // fall through
@@ -232,15 +208,13 @@ async function ocrSetCodeHighAccuracy(originalPath, tmpDir) {
           const conf = ocr?.data?.confidence ?? 0;
           const setCode = parseSetCode(text);
 
-          const cropBuf = fs.existsSync(out) ? fs.readFileSync(out) : null;
-          candidates.push({ regionIndex: i, thrIndex: t, text, conf, setCode, cropBuf });
+          candidates.push({ regionIndex: i, thrIndex: t, text, conf, setCode });
 
           if (setCode && conf >= 60) {
-            const debugCropPath = _saveDebugCrop(cropBuf, ts, `r${i}_t${t}`);
-            return { text, confidence: conf, setCode, debugCropPath };
+            return { text, confidence: conf, setCode };
           }
         } catch {
-          candidates.push({ regionIndex: i, thrIndex: t, text: "", conf: 0, setCode: null, cropBuf: null });
+          candidates.push({ regionIndex: i, thrIndex: t, text: "", conf: 0, setCode: null });
         } finally {
           try { if (fs.existsSync(out)) fs.unlinkSync(out); } catch {}
         }
@@ -254,19 +228,16 @@ async function ocrSetCodeHighAccuracy(originalPath, tmpDir) {
         b.conf - a.conf
     );
 
-    const best = candidates[0] || { text: "", conf: 0, setCode: null, cropBuf: null };
+    const best = candidates[0] || { text: "", conf: 0, setCode: null };
 
     if (!best.setCode) {
       console.log("⚠️ [setCodeOcr] No valid set code found:", originalPath);
     }
 
-    const debugCropPath = _saveDebugCrop(best.cropBuf || null, ts, "best");
-
     return {
       text: best.text || "",
       confidence: best.conf || 0,
       setCode: best.setCode || null,
-      debugCropPath,
     };
   } finally {
     releaseWorker(slot);

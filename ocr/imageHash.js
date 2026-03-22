@@ -132,14 +132,13 @@ async function hashScanSetSymbol(imagePath, dx = 0, dy = 0, returnBuffer = false
   const W = meta.width;
   const H = meta.height;
 
-  // Percent-based crop — works at any DPI/scan size.
-  // Set symbol sits in the type line, right side of card.
-  // Calibrate by checking the debug viewer: adjust these until the symbol is centred.
+  // Percent-based — calibrated from Lightning Bolt M10 fi-8170 scan (765x1060).
+  // Set symbol sits in the type line bar, right-justified.
   const region = clampRegion({
-    left:   Math.floor(W * 0.79) + dx,
-    top:    Math.floor(H * 0.548) + dy,
-    width:  Math.floor(W * 0.18),
-    height: Math.floor(H * 0.075),
+    left:   Math.floor(W * 0.797) + dx,
+    top:    Math.floor(H * 0.557) + dy,
+    width:  Math.floor(W * 0.150),
+    height: Math.floor(H * 0.071),
   }, W, H);
 
   // Hash input: matches hashReferenceSymbolBuffer pipeline exactly

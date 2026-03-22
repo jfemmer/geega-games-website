@@ -132,9 +132,15 @@ async function hashScanSetSymbol(imagePath, dx = 0, dy = 0, returnBuffer = false
   const W = meta.width;
   const H = meta.height;
 
-  const { left, top, width, height } = CROP.setSymbol;
-
-  const region = clampRegion({ left: left + dx, top: top + dy, width, height }, W, H);
+  // Percent-based crop — works at any DPI/scan size.
+  // Set symbol sits in the type line, right side of card.
+  // Calibrate by checking the debug viewer: adjust these until the symbol is centred.
+  const region = clampRegion({
+    left:   Math.floor(W * 0.79) + dx,
+    top:    Math.floor(H * 0.548) + dy,
+    width:  Math.floor(W * 0.18),
+    height: Math.floor(H * 0.075),
+  }, W, H);
 
   // Hash input: matches hashReferenceSymbolBuffer pipeline exactly
   const hashBuf = await sharp(imagePath)
@@ -149,7 +155,8 @@ async function hashScanSetSymbol(imagePath, dx = 0, dy = 0, returnBuffer = false
   const hash = await dhash64FromBuffer(hashBuf);
 
   if (returnBuffer) {
-    // Raw colour crop — no processing so we can see exactly what region is captured
+    // Raw colour crop — no processing so we can see exactly what region is captured.
+    // Once the symbol is visible here, the hash pipeline above will work correctly.
     const debugBuf = await sharp(imagePath)
       .extract(region)
       .resize(256, 256, { fit: "fill" })

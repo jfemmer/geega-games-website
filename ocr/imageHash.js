@@ -149,14 +149,10 @@ async function hashScanSetSymbol(imagePath, dx = 0, dy = 0, returnBuffer = false
   const hash = await dhash64FromBuffer(hashBuf);
 
   if (returnBuffer) {
-    // Debug view: thresholded so the symbol shape is visible, not raw card texture
+    // Raw colour crop — no processing so we can see exactly what region is captured
     const debugBuf = await sharp(imagePath)
       .extract(region)
-      .grayscale()
-      .normalize()
-      .sharpen()
       .resize(256, 256, { fit: "fill" })
-      .threshold(160)
       .png()
       .toBuffer();
     return { hash, buffer: debugBuf };

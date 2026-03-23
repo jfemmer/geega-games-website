@@ -768,10 +768,14 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
               set: card?.set,
               set_name: card?.set_name,
               collector_number: card?.collector_number,
+              // AFTER
               imageUrl:
+                card?.imageUrl ||
+                card?.image_normal ||
                 card?.image_uris?.normal ||
                 card?.card_faces?.[0]?.image_uris?.normal ||
-                ""
+                (card?.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "") ||
+               ""
             }
           });
 
@@ -822,11 +826,14 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             set: card?.set,
             set_name: card?.set_name,
             collector_number: card?.collector_number,
+            // AFTER
             imageUrl:
               card?.imageUrl ||
+              card?.image_normal ||
               card?.image_uris?.normal ||
               card?.card_faces?.[0]?.image_uris?.normal ||
-              (card?.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "")
+              (card?.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "") ||
+            ""
           }
         });
         
@@ -1460,7 +1467,14 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
         set: card?.set,
         set_name: card?.set_name,
         collector_number: card?.collector_number,
-        imageUrl: card?.image_uris?.normal || card?.card_faces?.[0]?.image_uris?.normal || ""
+        // AFTER
+        imageUrl:
+          card?.imageUrl ||
+          card?.image_normal ||
+          card?.image_uris?.normal ||
+          card?.card_faces?.[0]?.image_uris?.normal ||
+          (card?.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "") ||
+          ""
       },
       detectedSetCode: detectedSetCode || null,
       setSymbolScore: symbolResult?.score ?? null,

@@ -1049,8 +1049,17 @@ async function loadInventoryReview() {
       <div class="review-grid">
         ${orderedItems.map(item => {
           const chosenName = item?.chosen?.name || item?.cardName || item?.guessedName || "Unknown";
-          const chosenSetName = item?.chosen?.set_name || item?.set || item?.chosenSetName || "Unknown Set";
-          const chosenCollector = item?.chosen?.collector_number || item?.chosenCollector || "";
+          // AFTER
+          const chosenSetName = item?.chosen?.set_name
+            || item?.chosenSetName
+            || item?.chosen?.set
+            || item?.detectedSetCode
+            || "Unknown Set";
+
+          const chosenCollector = item?.chosen?.collector_number
+            || item?.chosenCollector
+            || item?.collector?.collectorNumber
+            || "";
           const scryfallImage =
             item?.chosen?.imageUrl ||
             item?.chosen?.image_uris?.normal ||

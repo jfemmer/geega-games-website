@@ -801,6 +801,14 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         // 5) Queue for manual review (passed confidence gate)
         const preserved = preserveReviewImage(originalPath, file.originalname);
 
+        console.log("🔍 [review] chosen object:", JSON.stringify({
+          name: card?.name,
+          set: card?.set,
+          set_name: card?.set_name,
+          collector_number: card?.collector_number,
+          imageUrl: card?.imageUrl
+        }));
+
         queueReviewRecord({
           reqId,
           file: file.originalname,
@@ -1447,6 +1455,14 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
 
   if (!shouldAutoIngest(score)) {
     const preserved = ensureReviewImage();
+
+    console.log("🔍 [review] chosen object:", JSON.stringify({
+      name: card?.name,
+      set: card?.set,
+      set_name: card?.set_name,
+      collector_number: card?.collector_number,
+      imageUrl: card?.imageUrl
+    }));
 
     queueReviewRecord({
       file: originalName || path.basename(filePath),

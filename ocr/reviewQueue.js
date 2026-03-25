@@ -26,6 +26,7 @@ function enqueueForReview(record, queuePath = DEFAULT_REVIEW_QUEUE_PATH) {
         try {
           const item = JSON.parse(line);
           if (String(item?.reviewHash || "").trim() === incomingHash) {
+            console.log("⛔ [reviewQueue] Duplicate hash, skipping:", incomingHash, "| file:", record?.file);
             return false; // duplicate review item
           }
         } catch {}
@@ -34,8 +35,10 @@ function enqueueForReview(record, queuePath = DEFAULT_REVIEW_QUEUE_PATH) {
 
     const line = JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n";
     fs.appendFileSync(queuePath, line, "utf8");
+    console.log("✅ [reviewQueue] Written:", record?.file, "| reason:", record?.reason, "| path:", queuePath);
     return true;
-  } catch {
+  } catch (err) {
+    console.error("❌ [reviewQueue] enqueueForReview failed:", err.message, "| path:", queuePath, "| file:", record?.file);
     return false;
   }
 }

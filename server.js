@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const axios = require('axios');
 const crypto = require('crypto'); // ✅ NEW (email verification)
+require('dotenv').config({ path: require('path').join(__dirname, '.env.local'), override: true });
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 console.log("Stripe key exists?", !!process.env.STRIPE_SECRET_KEY);
 console.log("MONGODB_URI:", process.env.MONGODB_URI);
@@ -1211,7 +1212,11 @@ const TradeIn = tradeInConnection.model('TradeIn', tradeInSchema, 'TradeIns');
 async function processSingleScanToInventory({ filePath, originalName, condition, foil, setCode }) {
   const scanId = `${Date.now()}_${path.basename(originalName || filePath)}`;
   const perFileStart = Date.now();
-  const tmpDir = OCR_DEBUG_DIR;
+  // FIX: was OCR_DEBUG_DIR — caused crops to be written then immediately deleted by OCR finally-blocks
+  // Use a separate temp dir so imageUtils.js debug copies in OCR_DEBUG_DIR survive for the viewer
+  const tmpDir = process.env.RAILWAY_ENVIRONMENT
+    ? "/tmp/ocr_tmp"
+    : path.join(__dirname, "uploads", "ocr_tmp");
   try { if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true }); } catch {}
 
   const isFoil = !!foil;

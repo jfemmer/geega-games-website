@@ -519,10 +519,34 @@ function buildPage(files) {
 
 // ─── Route registration ───────────────────────────────────────────────────────
 
+// How long to keep crops on disk before auto-purging (default: 30 minutes).
+// Raise this if you want crops to survive longer for post-scan inspection.
+const CROP_MAX_AGE_MS = Number(process.env.DEBUG_CROP_MAX_AGE_MS || 30 * 60 * 1000);
+
+function purgeStaleCrops() {
+  try {
+    if (!fs.existsSync(DEBUG_DIR)) return;
+    const now = Date.now();
+    const files = fs.readdirSync(DEBUG_DIR).filter(f => /\.(png|jpg|jpeg)$/i.test(f));
+    let purged = 0;
+    for (const f of files) {
+      try {
+        const mtime = fs.statSync(path.join(DEBUG_DIR, f)).mtimeMs;
+        if (now - mtime > CROP_MAX_AGE_MS) {
+          fs.unlinkSync(path.join(DEBUG_DIR, f));
+          purged++;
+        }
+      } catch {}
+    }
+    if (purged > 0) console.log(`🧹 [cropDebug] Purged ${purged} stale crops (>${CROP_MAX_AGE_MS / 60000}min old)`);
+  } catch {}
+}
+
 function registerCropDebugRoutes(app) {
-  // Serve the debug image files statically
-  const express = require("express");
-  app.use("/ocr_debug", express.static(DEBUG_DIR));
+  // NOTE: Do NOT register express.static("/ocr_debug") here.
+  // server.js already does: app.use('/ocr_debug', express.static(OCR_DEBUG_DIR))
+  // Registering it again here causes a double-handler conflict and can produce
+  // 404s if __dirname resolves differently. Let server.js own that route.
 
   // Main viewer page
   app.get("/debug/crops", (req, res) => {
@@ -557,6 +581,10 @@ function registerCropDebugRoutes(app) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Run an initial purge on startup, then every 5 minutes
+  purgeStaleCrops();
+  setInterval(purgeStaleCrops, 5 * 60 * 1000);
 
   console.log("🔬 Crop debug viewer mounted at: /debug/crops");
 }

@@ -1016,7 +1016,10 @@
   <!-- JS for Sidebar, Section Switching, and MTG Trends -->
 <script>
 
-  const API_BASE = "https://geega-games-website-production.up.railway.app";
+  // Line 1019 and 2291 — change to:
+const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? "http://localhost:3000"
+  : "https://geega-games-website-production.up.railway.app";
 
 
   // ===== SIDEBAR / SECTION SWITCHING =====
@@ -2288,7 +2291,9 @@ function showInventoryTab(tabId, btnEl) {
 }
 
 (function () {
-  const API_BASE = "https://geega-games-website-production.up.railway.app";
+  const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? "http://localhost:3000"
+  : "https://geega-games-website-production.up.railway.app";
   const INGEST_KEY = "a7GkP9zLm4Qr8Xv2Hs6Tw1Bn5Yc3Df0J";
 
   const badge = document.getElementById("review-badge");

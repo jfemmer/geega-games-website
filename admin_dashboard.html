@@ -1085,6 +1085,11 @@ async function loadInventoryReview() {
                   <strong>Matched Card</strong>
                   <img src="${scryfallImage}" alt="Matched card image" />
                 </div>
+                ${item?.setCodeCropUrl ? `
+                <div>
+                  <strong>Set Code Crop</strong>
+                  <img src="${API_BASE}${item.setCodeCropUrl}" alt="Set code OCR crop" style="image-rendering:pixelated;" />
+                </div>` : ""}
               </div>
 
               <div class="review-meta">
@@ -1093,10 +1098,20 @@ async function loadInventoryReview() {
                 <div><strong>Name Confidence:</strong> ${item?.name?.confidence ?? item?.nameConfidence ?? "—"}</div>
                 <div><strong>Collector OCR:</strong> ${item?.collector?.collectorNumber || item?.collectorNumber || "—"}</div>
                 <div><strong>Bottom Text:</strong> ${item?.collector?.text || item?.ocrTextBottom || "—"}</div>
+                <div><strong>Set Code OCR:</strong> ${item?.setCodeOcr?.setCode || "—"} (conf: ${item?.setCodeOcr?.confidence ?? "—"})</div>
+                <div><strong>Symbol Match:</strong> ${item?.detectedSetCode ? item.detectedSetCode.toUpperCase() : "—"} (score: ${item?.setSymbolScore?.toFixed(2) ?? "—"}, dist: ${item?.setSymbolBestDist ?? "—"})</div>
+                ${item?.setSymbolTop?.length ? `<div><strong>Symbol Top 3:</strong> ${item.setSymbolTop.slice(0,3).map(t => `${t.setCode}(d=${t.dist})`).join(", ")}</div>` : ""}
                 <div><strong>Proposed Card:</strong> ${chosenName}</div>
                 <div><strong>Set:</strong> ${chosenSetName}</div>
                 <div><strong>Collector #:</strong> ${chosenCollector || "—"}</div>
                 <div><strong>Score:</strong> ${score}</div>
+                ${item?.topLocalCandidates?.length ? `
+                <details style="margin-top:6px;">
+                  <summary style="cursor:pointer;font-weight:600;">Top Local Candidates (${item.topLocalCandidates.length})</summary>
+                  <ol style="margin:4px 0 0 16px;font-size:12px;">
+                    ${item.topLocalCandidates.map(c => `<li>${escapeHtml(c.name)} — ${c.set} #${c.collector_number} (score: ${c.score?.toFixed(1) ?? "—"})</li>`).join("")}
+                  </ol>
+                </details>` : ""}
               </div>
 
               <div class="review-fields">

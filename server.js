@@ -3311,10 +3311,41 @@ app.post("/api/inventory-review/:id/approve", async (req, res) => {
     const finalSet = setName || item?.chosen?.set_name;
     const finalCondition = condition || item.condition;
 
-    const imageUrl =
+    // Resolve a publicly accessible image URL.
+    // chosen.imageUrl may be a local-only path like /local_card_images/filename.jpg
+    // which only works when the browser talks to the local server.
+    // If it's not a full https:// Scryfall URL, fetch one from Scryfall now so the
+    // image is accessible from anywhere (Railway, GitHub Pages, etc).
+    let rawImageUrl =
       item?.chosen?.imageUrl ||
       item?.chosen?.image_uris?.normal ||
       "";
+
+    let imageUrl = rawImageUrl;
+
+    const isLocalPath = rawImageUrl && !rawImageUrl.startsWith("http");
+    if (isLocalPath || !imageUrl) {
+      // Try to fetch the Scryfall image using set code + collector number first (most precise),
+      // then fall back to a fuzzy name search.
+      const chosenSet = item?.chosen?.set || "";
+      const chosenCollector = item?.chosen?.collector_number || collectorNumber || "";
+      try {
+        if (chosenSet && chosenCollector) {
+          const sfRes = await axios.get(
+            `https://api.scryfall.com/cards/${encodeURIComponent(chosenSet)}/${encodeURIComponent(chosenCollector)}`
+          );
+          imageUrl =
+            sfRes.data?.image_uris?.normal ||
+            sfRes.data?.card_faces?.[0]?.image_uris?.normal ||
+            rawImageUrl;
+        } else if (finalName) {
+          imageUrl = await fetchScryfallImageUrl(finalName, finalSet || chosenSet);
+        }
+      } catch (imgErr) {
+        console.warn("⚠️ [approve] Could not fetch Scryfall image:", imgErr.message);
+        imageUrl = rawImageUrl; // fall back to whatever we had
+      }
+    }
 
     await CardInventory.findOneAndUpdate(
       {
@@ -3325,12 +3356,12 @@ app.post("/api/inventory-review/:id/approve", async (req, res) => {
       },
       {
         $inc: { quantity: 1 },
+        $set: { imageUrl },           // always update imageUrl so existing broken entries get fixed
         $setOnInsert: {
           cardName: finalName,
           set: finalSet,
           foil: item.foil,
           condition: finalCondition,
-          imageUrl,
           priceUsd: 0
         }
       },
@@ -3339,7 +3370,7 @@ app.post("/api/inventory-review/:id/approve", async (req, res) => {
 
     removeReviewItemById(id);
 
-    res.json({ success: true });
+    res.json({ success: true, imageUrl });
 
   } catch (err) {
     console.error("❌ Approve review item error:", err);

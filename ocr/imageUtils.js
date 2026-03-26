@@ -67,6 +67,56 @@ async function cropAndPrepNameBar(
   }
 }
 
+// Old-frame name bar crop (pre-8th Edition, ~1993–2003).
+// These cards have a taller name bar positioned higher on the card,
+// with tan/brown background. The modern crop (top=5.5%) cuts into the border.
+async function cropAndPrepNameBarOldFrame(
+  originalPath,
+  outPath,
+  useThreshold = false,
+  dx = 0,
+  dy = 0,
+  thresholdValue = 130
+) {
+  ensureDir(path.dirname(outPath));
+  if (DEBUG_OCR) ensureDir(DEBUG_DIR);
+
+  const meta = await sharp(originalPath).metadata();
+  const W = meta.width;
+  const H = meta.height;
+
+  const base = {
+    left:   Math.floor(W * 0.075),
+    top:    Math.floor(H * 0.038),   // higher than modern (was 0.055)
+    width:  Math.floor(W * 0.60),
+    height: Math.floor(H * 0.090),   // taller — old frames have more name bar height
+  };
+
+  const left   = Math.max(0, Math.min(W - 2, base.left + dx));
+  const top    = Math.max(0, Math.min(H - 2, base.top  + dy));
+  const width  = Math.max(1, Math.min(base.width,  W - left));
+  const height = Math.max(1, Math.min(base.height, H - top));
+
+  let pipeline = sharp(originalPath)
+    .extract({ left, top, width, height })
+    .grayscale()
+    .normalize()
+    .sharpen({ sigma: 1.2, m1: 0.5, m2: 0.3 })
+    .resize({ width: 1600, withoutEnlargement: false });
+
+  if (useThreshold) pipeline = pipeline.threshold(thresholdValue);
+
+  await pipeline.toFile(outPath);
+
+  if (DEBUG_OCR) {
+    const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
+    if (!samePath(debugCopy, outPath)) {
+      await sharp(outPath).toFile(debugCopy);
+      console.log("🟤 Saved OLD-FRAME NAME crop to:", debugCopy);
+    }
+  }
+}
+
 async function cropAndPrepCollectorRegion(
   originalPath,
   outPath,
@@ -137,6 +187,7 @@ function buildCollectorRegions(W, H) {
 
 module.exports = {
   cropAndPrepNameBar,
+  cropAndPrepNameBarOldFrame,   // ← add this
   cropAndPrepCollectorRegion,
   buildCollectorRegions,
   detectWhiteBorder,

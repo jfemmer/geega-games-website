@@ -88,7 +88,7 @@ function scoreCandidate(card, ctx) {
     reasons.push("finish_match");
   }
 
-  const artDist = hammingHex64(ctx.scan.art_hash, card.art_hash);
+ const artDist = hammingHex64(ctx.scan.art_hash, card.art_hash);
   const frameDist = hammingHex64(ctx.scan.frame_hash, card.frame_hash);
   const titleDist = hammingHex64(ctx.scan.title_hash, card.title_hash);
   const fullDist = hammingHex64(ctx.scan.full_hash, card.full_hash);
@@ -97,12 +97,29 @@ function scoreCandidate(card, ctx) {
       ? hammingHex64(ctx.scan.symbol_hash, card.symbol_hash)
       : 9999;
 
-  // Image evidence should support collector/set, not overpower them
-  score += Math.max(0, 20 - artDist * 1.8);
-  score += Math.max(0, 26 - frameDist * 2.0);
+  // Old cards (pre-2003) have faded/yellowed art that drifts from Scryfall
+  // reference scans. Use a softer distance penalty so aged prints aren't unfairly
+  // ranked below reprints with cleaner reference images.
+  const isVintage = (card.released_at || "") < "2003-01-01";
+  const artPenalty   = isVintage ? 1.0 : 1.8;
+  const framePenalty = isVintage ? 1.3 : 2.0;
+
+  score += Math.max(0, 20 - artDist   * artPenalty);
+  score += Math.max(0, 26 - frameDist * framePenalty);
   score += Math.max(0, 10 - titleDist * 1.2);
-  score += Math.max(0, 8 - fullDist * 0.8);
+  score += Math.max(0, 8  - fullDist  * 0.8);
   score += Math.max(0, 20 - symbolDist * 1.8);
+
+  // Copyright year bonus: if the OCR year matches the card's release year (±1),
+  // that's strong corroborating evidence for old printings.
+  if (ctx.copyrightYear && card.released_at) {
+    const cardYear = parseInt((card.released_at || "").slice(0, 4), 10);
+    if (Number.isFinite(cardYear)) {
+      const yearDiff = Math.abs(cardYear - ctx.copyrightYear);
+      if (yearDiff === 0) { score += 30; reasons.push("copyright_year_exact"); }
+      else if (yearDiff === 1) { score += 15; reasons.push("copyright_year_near"); }
+    }
+  }
 
   return {
     ...card,
@@ -142,6 +159,7 @@ async function findBestLocalMatches(scanImagePath, options = {}) {
     collectorNumber: options.collectorNumber || "",
     detectedSetCode: options.detectedSetCode || "",
     isFoil: !!options.isFoil,
+    copyrightYear: options.copyrightYear || null,   // ← new
     scan
   };
 

@@ -24,6 +24,7 @@ if (!stripe) {
 }
 
 const app = express();
+app.use(express.static(__dirname));
 
 const sseClients = new Set();
 
@@ -46,6 +47,7 @@ const {
   ocrCardNameHighAccuracy,
   ocrCollectorNumberHighAccuracy,
   ocrSetCodeHighAccuracy,
+  ocrCopyrightYear,             // ← add this
   findBestLocalMatches,
   computeOverallScore,
   shouldAutoIngest,
@@ -478,7 +480,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             nameConfidence: nameConf,
             collectorConfidence: 0,
             hadCollector: false,
-            matchCount: 999
+            matchCount: 999,
+            isPreModernSet: false
           }) ?? 0;
 
           console.log("🚨 REVIEW ITEM CREATED", {
@@ -519,9 +522,15 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
         }
 
         // 2) OCR: Collector number
+        // 2) OCR: Collector number, set code, and copyright year (run in parallel)
         console.log("🔢 [fi8170] OCR(bottom line) start", { reqId });
-        const bottom = await ocrCollectorNumberHighAccuracy(originalPath, tmpDir);
-        const setCodeOcrResult = await ocrSetCodeHighAccuracy(originalPath, tmpDir);
+        const [bottom, setCodeOcrResult, copyrightYearResult] = await Promise.all([
+          ocrCollectorNumberHighAccuracy(originalPath, tmpDir),
+          ocrSetCodeHighAccuracy(originalPath, tmpDir),
+          ocrCopyrightYear(originalPath, tmpDir),
+        ]);
+        const copyrightYear = copyrightYearResult?.year || null;
+        console.log("📅 [fi8170] Copyright year:", copyrightYear);
         const setCodeOcrValue  = setCodeOcrResult?.setCode || null;
         const setCodeCropUrl   = setCodeOcrResult?.debugCropPath
           ? `/ocr_debug/${path.basename(setCodeOcrResult.debugCropPath)}`
@@ -568,7 +577,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             collectorConfidence: bottom?.confidence ?? 0,
             hadCollector: !!collectorNumber,
             matchCount: 999,
-            setSymbolScore: symbolResult?.score ?? null
+            setSymbolScore: symbolResult?.score ?? null,
+            isPreModernSet: false
           }) ?? 0;
 
           const preserved = preserveReviewImage(originalPath, file.originalname);
@@ -623,6 +633,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             collectorNumber: collectorNumber || "",
             detectedSetCode: effectiveSetCode || detectedSetCode || "",
             isFoil,
+            copyrightYear,       // ← new
             limit: 25
           });
 
@@ -662,12 +673,15 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             card.imageUrl = `/local_card_images/${filename}`;
           }
         } catch (err) {
+          const isPreModernSet = (card?.released_at || "") < "1999-01-01";
+
           const score = computeOverallScore?.({
             nameConfidence: nameConf,
             collectorConfidence: bottom?.confidence ?? 0,
             hadCollector: !!collectorNumber,
             matchCount,
-            setSymbolScore: symbolResult?.score ?? null
+            setSymbolScore: symbolResult?.score ?? null,
+            isPreModernSet
           }) ?? 0;
 
           const preserved = preserveReviewImage(originalPath, file.originalname);
@@ -716,6 +730,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue;
         }
 
+        const isPreModernSet = (card?.released_at || "") < "1999-01-01";
+
         console.log("🧙 [fi8170] Scryfall chosen:", {
           reqId,
           name: card?.name,
@@ -731,7 +747,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           collectorConfidence: bottom?.confidence ?? 0,
           hadCollector: !!collectorNumber,
           matchCount,
-          setSymbolScore: symbolResult?.score ?? null
+          setSymbolScore: symbolResult?.score ?? null,
+          isPreModernSet
         }) ?? 0;
 
         console.log("✅ AUTO INGEST", {
@@ -769,14 +786,13 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
               set: card?.set,
               set_name: card?.set_name,
               collector_number: card?.collector_number,
-              // AFTER
               imageUrl:
                 card?.imageUrl ||
                 card?.image_normal ||
                 card?.image_uris?.normal ||
                 card?.card_faces?.[0]?.image_uris?.normal ||
                 (card?.local_image ? `/local_card_images/${path.basename(card.local_image)}` : "") ||
-               ""
+                ""
             }
           });
 
@@ -1440,6 +1456,8 @@ async function processSingleScanToInventory({ filePath, originalName, condition,
 
     throw new Error(`Sent to review: ${err?.message || "Scryfall lookup failed"}`);
   }
+
+   const isPreModernSet = (card?.released_at || "") < "1999-01-01";
 
   console.log("🧙 [scan-ingest] Scryfall chosen", {
     name: card?.name,

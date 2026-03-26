@@ -4,6 +4,7 @@ const { ocrSetCodeHighAccuracy } = require("./setCodeOcr");
 const { computeOverallScore, shouldAutoIngest } = require("./confidenceGate");
 const { enqueueForReview } = require("./reviewQueue");
 const { detectSetSymbol, ensureSetSymbolCache } = require("./setSymbolMatcher");
+const { ocrCopyrightYear } = require("./copyrightYearOcr");
 
 let findBestLocalMatches = null;
 
@@ -15,6 +16,7 @@ module.exports = {
   ocrCardNameHighAccuracy,
   ocrCollectorNumberHighAccuracy,
   ocrSetCodeHighAccuracy,
+  ocrCopyrightYear,            // ← add this
   findBestLocalMatches,
   computeOverallScore,
   shouldAutoIngest,

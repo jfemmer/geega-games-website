@@ -37,6 +37,10 @@ const DEBUG_OCR = true;
 // to keep the dark text visible. null = no binarization (use raw grayscale).
 const OCR_THRESHOLDS = [null, 180, 140, 110];
 
+// Thresholds tuned for pre-8th Edition cards: tan/brown name bars
+// where 180 washes out text. Lower values preserve ink on aged card stock.
+const OCR_THRESHOLDS_OLD_FRAME = [null, 130, 110, 150];
+
 const NAME_OFFSETS = [
   { dx: 0, dy: 0 },
   // ✅ FIX: Add a small vertical jitter so a slightly mis-registered scan
@@ -79,6 +83,7 @@ module.exports = {
   DEBUG_OCR,
   DEBUG_DIR,
   OCR_THRESHOLDS,
+  OCR_THRESHOLDS_OLD_FRAME,   // ← add this line
   NAME_OFFSETS,
   COLLECTOR_OFFSETS,
   SET_CODE_OFFSETS,

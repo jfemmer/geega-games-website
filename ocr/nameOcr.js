@@ -9,8 +9,8 @@
 const path = require("path");
 const fs = require("fs");
 const Tesseract = require("tesseract.js");
-const { cropAndPrepNameBar } = require("./imageUtils");
-const { OCR_THRESHOLDS, NAME_OFFSETS } = require("./constants");
+const { cropAndPrepNameBar, cropAndPrepNameBarOldFrame } = require("./imageUtils");
+const { OCR_THRESHOLDS, OCR_THRESHOLDS_OLD_FRAME, NAME_OFFSETS } = require("./constants");
 
 // ─── C10: Worker pool ──────────────────────────────────────────────────────────
 //
@@ -158,6 +158,22 @@ const ORDERED_PASSES = (() => {
   return passes;
 })();
 
+// Old-frame fallback passes — used when modern sweep confidence < 45.
+// Tries old-frame crop coordinates with old-frame-tuned thresholds.
+const ORDERED_PASSES_OLD_FRAME = (() => {
+  const passes = [];
+  for (const thr of OCR_THRESHOLDS_OLD_FRAME) {
+    passes.push({ dx: 0, dy: 0, thr });
+  }
+  for (const { dx, dy } of NAME_OFFSETS) {
+    if (dx === 0 && dy === 0) continue;
+    for (const thr of OCR_THRESHOLDS_OLD_FRAME) {
+      passes.push({ dx, dy, thr });
+    }
+  }
+  return passes;
+})();
+
 async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
   const ts = Date.now();
 
@@ -226,6 +242,55 @@ async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
   } finally {
     // C10: Always release back to pool
     releaseWorker(slot);
+  }
+
+  // ── Old-frame fallback ─────────────────────────────────────────────────────
+  // If the modern sweep produced nothing useful (best confidence < 45),
+  // try old-frame crop coordinates + old-frame thresholds.
+  // This handles pre-8th Edition cards with tan/brown name bars.
+  const modernBest = candidates.sort(
+    (a, b) => b.confidence - a.confidence || b.name.length - a.name.length
+  )[0];
+
+  if (!modernBest || modernBest.confidence < 45) {
+    console.log(`⚠️ [nameOcr] Modern sweep weak (conf=${modernBest?.confidence ?? 0}), trying old-frame crop…`);
+
+    for (const { dx, dy, thr } of ORDERED_PASSES_OLD_FRAME) {
+      const useThreshold = thr !== null && thr !== undefined;
+      const out = path.join(tmpDir, `name_old_${ts}_${dx}_${dy}_${thr ?? "raw"}.png`);
+
+      try {
+        await cropAndPrepNameBarOldFrame(
+          originalPath,
+          out,
+          useThreshold,
+          dx,
+          dy,
+          thr ?? 130
+        );
+        if (!fs.existsSync(out)) continue;
+      } catch (e) {
+        console.log("🔴 [nameOcr] old-frame crop failed:", e.message);
+        continue;
+      }
+
+      try {
+        const o = await recognizeWithTimeout(out, 30000, slot);
+        const name = cleanCardName(o?.data?.text);
+        const conf = o?.data?.confidence ?? 0;
+
+        if (name) candidates.push({ name, confidence: conf });
+
+        if (name && conf >= 75) {
+          console.log(`✅ [nameOcr] Old-frame hit (thr=${thr ?? "raw"}, dy=${dy}): "${name}" conf=${conf}`);
+          break;
+        }
+      } catch (e) {
+        console.log("🔴 [nameOcr] old-frame Tesseract failed:", e.message);
+      } finally {
+        try { if (fs.existsSync(out)) fs.unlinkSync(out); } catch {}
+      }
+    }
   }
 
   candidates.sort(

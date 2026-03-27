@@ -634,6 +634,10 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             guessedName: resolvedName || guessedName || "",
             collectorNumber: collectorNumber || "",
             detectedSetCode: effectiveSetCode || detectedSetCode || "",
+            setCodeTrusted: !!(effectiveSetCode && (
+              symbolTrusted ||
+              (setCodeOcrValue && (setCodeOcrResult?.confidence ?? 0) >= 80)
+            )),
             isFoil,
             copyrightYear,       // ← new
             limit: 25

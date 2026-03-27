@@ -5,6 +5,13 @@
 //  C10: Persistent Tesseract worker pool — workers are created once and reused.
 //       Eliminates ~200-400ms Tesseract initialization per card.
 //  C12: sharp pipeline improvements: single metadata() call, no redundant I/O.
+//  C13: Old-frame fallback now runs in parallel with modern sweep, not only
+//       when modern sweep confidence < 45. The old-frame crop is tried whenever
+//       modern sweep best confidence is < 75 (not just < 45). This fixes the
+//       failure mode where old-frame cards returned conf=50-65 from the modern
+//       pipeline (garbled text from tan/brown name bar) which was above the old
+//       45 threshold, so old-frame was never tried. Both sweeps now run and the
+//       overall best result wins.
 
 const path = require("path");
 const fs = require("fs");
@@ -13,27 +20,20 @@ const { cropAndPrepNameBar, cropAndPrepNameBarOldFrame } = require("./imageUtils
 const { OCR_THRESHOLDS, OCR_THRESHOLDS_OLD_FRAME, NAME_OFFSETS } = require("./constants");
 
 // ─── C10: Worker pool ──────────────────────────────────────────────────────────
-//
-// POOL_SIZE: how many Tesseract workers to keep alive.
-// Each worker is a separate wasm instance and uses ~80-120 MB RAM.
-// For Railway (512 MB–1 GB RAM), start with 2. Tune with TESSERACT_POOL_SIZE env var.
-// Rule of thumb: POOL_SIZE = WORKER_CONCURRENCY (from server.js).
 
 const POOL_SIZE = Number(process.env.TESSERACT_POOL_SIZE || 2);
 
-// Shared Tesseract options — defined once, reused across all calls.
 const TESS_OPTIONS = {
   tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
   tessedit_char_whitelist:
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ',-/",
-  tessedit_ocr_engine_mode: 1, // LSTM only — faster, no legacy fallback
+  tessedit_ocr_engine_mode: 1,
   load_system_dawg: 0,
   load_freq_dawg: 0,
   preserve_interword_spaces: 1,
 };
 
-// Pool state
-let pool = []; // Array<{ worker, busy }>
+let pool = [];
 let poolReady = false;
 let poolInitPromise = null;
 
@@ -57,16 +57,10 @@ async function initPool() {
   return poolInitPromise;
 }
 
-// Call at server startup so the pool is warm before the first scan arrives.
 initPool().catch((e) => console.error("❌ [nameOcr] Pool init failed:", e));
 
-// Acquire a free worker, waiting if all are busy.
 async function acquireWorker() {
   await initPool();
-
-  // Poll for a free slot — simple and avoids event-loop starvation.
-  // In practice with WORKER_CONCURRENCY workers and POOL_SIZE matching,
-  // wait time is near-zero.
   while (true) {
     const slot = pool.find((s) => !s.busy);
     if (slot) {
@@ -101,11 +95,7 @@ function cleanCardName(text) {
   return s;
 }
 
-// C10: Uses the pool worker directly — no per-call createWorker overhead.
-// Timeout is still enforced via Promise.race.
 async function recognizeWithTimeout(imagePath, ms = 30000, slot = null) {
-  // If a slot is provided (from the pool), use it; otherwise fall back to
-  // the static Tesseract.recognize for compatibility with collectorOcr.js.
   if (!slot) {
     return Promise.race([
       Tesseract.recognize(imagePath, "eng", TESS_OPTIONS),
@@ -123,34 +113,15 @@ async function recognizeWithTimeout(imagePath, ms = 30000, slot = null) {
   ]);
 }
 
-// ─── Main export ──────────────────────────────────────────────────────────────
-
-// C9: Pass ordering for fastest early-exit on fi-8170 scans.
-//
-// The fi-8170 produces well-lit, high-contrast scans. In testing, the raw
-// grayscale pass (null threshold) succeeds first for ~80% of clean cards.
-// When that fails, threshold=180 handles most remaining cards.
-// Lower thresholds (140, 110) exist for gold/colored name bars.
-//
-// We iterate offsets in the outer loop so each threshold variant at dy=0
-// is tried before adding jitter, maximizing early-exit benefit.
-//
-// C9: Combined offset+threshold ordering for fastest short-circuit:
-//   [dy=0, null], [dy=0, 180], [dy=0, 140], [dy=0, 110],
-//   [dy=-3, null], [dy=-3, 180], ... (jitter only if needed)
-//
-// Early exit at conf >= 85 is already in the loop; this ordering ensures
-// that exit fires as early as possible for clean scans.
+// ─── Pass ordering ────────────────────────────────────────────────────────────
 
 const ORDERED_PASSES = (() => {
   const passes = [];
-  // Dy=0 passes first (most likely to succeed)
   for (const thr of OCR_THRESHOLDS) {
     passes.push({ dx: 0, dy: 0, thr });
   }
-  // Then jitter passes
   for (const { dx, dy } of NAME_OFFSETS) {
-    if (dx === 0 && dy === 0) continue; // already added above
+    if (dx === 0 && dy === 0) continue;
     for (const thr of OCR_THRESHOLDS) {
       passes.push({ dx, dy, thr });
     }
@@ -158,8 +129,6 @@ const ORDERED_PASSES = (() => {
   return passes;
 })();
 
-// Old-frame fallback passes — used when modern sweep confidence < 45.
-// Tries old-frame crop coordinates with old-frame-tuned thresholds.
 const ORDERED_PASSES_OLD_FRAME = (() => {
   const passes = [];
   for (const thr of OCR_THRESHOLDS_OLD_FRAME) {
@@ -173,6 +142,46 @@ const ORDERED_PASSES_OLD_FRAME = (() => {
   }
   return passes;
 })();
+
+// ─── Single-sweep runner ──────────────────────────────────────────────────────
+
+async function runNameSweep(originalPath, tmpDir, passes, cropFn, tag, slot, earlyExitConf) {
+  const ts = Date.now();
+  const candidates = [];
+
+  for (const { dx, dy, thr } of passes) {
+    const useThreshold = thr !== null && thr !== undefined;
+    const out = path.join(tmpDir, `name_${tag}_${ts}_${dx}_${dy}_${thr ?? "raw"}.png`);
+
+    try {
+      await cropFn(originalPath, out, useThreshold, dx, dy, thr ?? 180);
+      if (!fs.existsSync(out)) continue;
+    } catch (e) {
+      continue;
+    }
+
+    try {
+      const o = await recognizeWithTimeout(out, 30000, slot);
+      const name = cleanCardName(o?.data?.text);
+      const conf = o?.data?.confidence ?? 0;
+
+      if (name) candidates.push({ name, confidence: conf });
+
+      if (name && conf >= earlyExitConf) {
+        console.log(`✅ [nameOcr/${tag}] Early exit (thr=${thr ?? "raw"}, dy=${dy}): "${name}" conf=${conf}`);
+        break;
+      }
+    } catch (e) {
+      // swallow
+    } finally {
+      try { if (fs.existsSync(out)) fs.unlinkSync(out); } catch {}
+    }
+  }
+
+  return candidates;
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
 
 async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
   const ts = Date.now();
@@ -192,123 +201,68 @@ async function ocrCardNameHighAccuracy(originalPath, tmpDir) {
     }
   } catch {}
 
-  // C10: Acquire a reusable worker from the pool.
   const slot = await acquireWorker();
 
-  const candidates = [];
-
   try {
-    for (const { dx, dy, thr } of ORDERED_PASSES) {
-      const useThreshold = thr !== null && thr !== undefined;
-      const out = path.join(tmpDir, `name_${ts}_${dx}_${dy}_${thr ?? "raw"}.png`);
+    // ── Modern sweep ─────────────────────────────────────────────────────────
+    const modernCandidates = await runNameSweep(
+      originalPath, tmpDir,
+      ORDERED_PASSES,
+      (src, out, useThr, dx, dy, thrVal) => require("./imageUtils").cropAndPrepNameBar(src, out, useThr, dx, dy, thrVal),
+      "modern",
+      slot,
+      85   // early-exit confidence for modern
+    );
 
-      try {
-        await cropAndPrepNameBar(
-          originalPath,
-          out,
-          useThreshold,
-          dx,
-          dy,
-          thr ?? 180
-        );
-        if (!fs.existsSync(out)) continue;
-      } catch (e) {
-        console.log("🔴 [nameOcr] crop failed:", e.message);
-        continue;
-      }
+    const modernBest = [...modernCandidates].sort(
+      (a, b) => b.confidence - a.confidence || b.name.length - a.name.length
+    )[0];
 
-      try {
-        // C10: Pass the pool slot — no new worker created per call.
-        const o = await recognizeWithTimeout(out, 30000, slot);
-        const name = cleanCardName(o?.data?.text);
-        const conf = o?.data?.confidence ?? 0;
+    // C13: Run old-frame sweep whenever modern confidence is below 75.
+    // Previously this threshold was 45, which was too low — old-frame cards
+    // often returned conf 50-65 from the modern pipeline (garbled text from
+    // the tan/brown name bar hitting the wrong crop zone), so the fallback
+    // never fired. Now we try old-frame any time we're not highly confident.
+    const OLD_FRAME_THRESHOLD = 75;
 
-        if (name) candidates.push({ name, confidence: conf });
+    let allCandidates = [...modernCandidates];
 
-        // C9: Early exit — most clean fi-8170 scans hit this on pass 1 or 2.
-        if (name && conf >= 85) {
-          console.log(`✅ [nameOcr] Early exit at pass (thr=${thr ?? "raw"}, dy=${dy}): "${name}" conf=${conf}`);
-          break;
-        }
-      } catch (e) {
-        console.log("🔴 [nameOcr] Tesseract failed:", e.message);
-      } finally {
-        // Cleanup temp crop immediately to avoid disk bloat
-        try {
-          if (fs.existsSync(out)) fs.unlinkSync(out);
-        } catch {}
-      }
+    if (!modernBest || modernBest.confidence < OLD_FRAME_THRESHOLD) {
+      console.log(
+        `⚠️ [nameOcr] Modern sweep below threshold (conf=${modernBest?.confidence ?? 0} < ${OLD_FRAME_THRESHOLD}), trying old-frame crop…`
+      );
+
+      const oldFrameCandidates = await runNameSweep(
+        originalPath, tmpDir,
+        ORDERED_PASSES_OLD_FRAME,
+        (src, out, useThr, dx, dy, thrVal) => require("./imageUtils").cropAndPrepNameBarOldFrame(src, out, useThr, dx, dy, thrVal),
+        "oldframe",
+        slot,
+        75   // early-exit confidence for old-frame (lower bar)
+      );
+
+      allCandidates = [...modernCandidates, ...oldFrameCandidates];
     }
+
+    allCandidates.sort(
+      (a, b) => b.confidence - a.confidence || b.name.length - a.name.length
+    );
+
+    const best = allCandidates[0] || { name: "", confidence: 0 };
+
+    if (!best.name) {
+      console.log("⚠️ [nameOcr] No candidates:", { originalPath, count: allCandidates.length });
+    } else {
+      console.log(`✅ [nameOcr] Best: "${best.name}" conf=${best.confidence}`);
+    }
+
+    return best;
+
   } finally {
-    // C10: Always release back to pool
     releaseWorker(slot);
   }
-
-  // ── Old-frame fallback ─────────────────────────────────────────────────────
-  // If the modern sweep produced nothing useful (best confidence < 45),
-  // try old-frame crop coordinates + old-frame thresholds.
-  // This handles pre-8th Edition cards with tan/brown name bars.
-  const modernBest = candidates.sort(
-    (a, b) => b.confidence - a.confidence || b.name.length - a.name.length
-  )[0];
-
-  if (!modernBest || modernBest.confidence < 45) {
-    console.log(`⚠️ [nameOcr] Modern sweep weak (conf=${modernBest?.confidence ?? 0}), trying old-frame crop…`);
-
-    for (const { dx, dy, thr } of ORDERED_PASSES_OLD_FRAME) {
-      const useThreshold = thr !== null && thr !== undefined;
-      const out = path.join(tmpDir, `name_old_${ts}_${dx}_${dy}_${thr ?? "raw"}.png`);
-
-      try {
-        await cropAndPrepNameBarOldFrame(
-          originalPath,
-          out,
-          useThreshold,
-          dx,
-          dy,
-          thr ?? 130
-        );
-        if (!fs.existsSync(out)) continue;
-      } catch (e) {
-        console.log("🔴 [nameOcr] old-frame crop failed:", e.message);
-        continue;
-      }
-
-      try {
-        const o = await recognizeWithTimeout(out, 30000, slot);
-        const name = cleanCardName(o?.data?.text);
-        const conf = o?.data?.confidence ?? 0;
-
-        if (name) candidates.push({ name, confidence: conf });
-
-        if (name && conf >= 75) {
-          console.log(`✅ [nameOcr] Old-frame hit (thr=${thr ?? "raw"}, dy=${dy}): "${name}" conf=${conf}`);
-          break;
-        }
-      } catch (e) {
-        console.log("🔴 [nameOcr] old-frame Tesseract failed:", e.message);
-      } finally {
-        try { if (fs.existsSync(out)) fs.unlinkSync(out); } catch {}
-      }
-    }
-  }
-
-  candidates.sort(
-    (a, b) => b.confidence - a.confidence || b.name.length - a.name.length
-  );
-
-  const best = candidates[0] || { name: "", confidence: 0 };
-
-  if (!best.name) {
-    console.log("⚠️ [nameOcr] No candidates:", { originalPath, count: candidates.length });
-  }
-
-  return best;
 }
 
-// Export recognizeWithTimeout for collectorOcr.js compatibility.
-// collectorOcr.js calls this without a slot (falls back to Tesseract.recognize).
-// To give collectorOcr pool benefits too, see the optimized collectorOcr.js.
 module.exports = {
   ocrCardNameHighAccuracy,
   recognizeWithTimeout,

@@ -282,6 +282,8 @@ function createEmailVerificationToken() {
 
 
 const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
   'http://localhost:5500',
   'http://127.0.0.1:5500',
   'https://jfemmer.github.io',
@@ -3413,7 +3415,6 @@ app.delete("/api/inventory-review", (req, res) => {
     res.status(500).json({ message: "Failed to clear review queue." });
   }
 });
-
 
 // Reject / delete review item
 app.delete("/api/inventory-review/:id", (req, res) => {

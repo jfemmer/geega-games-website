@@ -912,8 +912,16 @@
 
   <!-- INVENTORY REVIEW TAB -->
   <div id="inventory-review-tab" class="inventory-inner-tab" style="display:none;">
-    <h3>Inventory Review Queue</h3>
-    <p style="margin-top:-4px; color:#666;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <h3 style="margin:0;">Inventory Review Queue</h3>
+      <button
+        id="clear-all-reviews-btn"
+        onclick="clearAllReviews()"
+        style="background:#c0392b; color:#fff; border:none; border-radius:6px; padding:8px 16px; font-size:14px; font-weight:600; cursor:pointer; display:none;"
+        title="Permanently delete every item in the review queue"
+      >🗑️ Clear All Reviews</button>
+    </div>
+    <p style="margin-top:6px; color:#666;">
       Review scanned images and compare them to the matched inventory card before approving.
     </p>
 
@@ -1043,10 +1051,13 @@ async function loadInventoryReview() {
     const items = await res.json();
     const orderedItems = Array.isArray(items) ? [...items].reverse() : [];
 
+    const clearBtn = document.getElementById("clear-all-reviews-btn");
     if (!Array.isArray(orderedItems) || orderedItems.length === 0) {
       wrap.innerHTML = "<p>No review items waiting.</p>";
+      if (clearBtn) clearBtn.style.display = "none";
       return;
     }
+    if (clearBtn) clearBtn.style.display = "";
 
     wrap.innerHTML = `
       <div class="review-grid">
@@ -1194,6 +1205,23 @@ async function rejectReviewItem(id) {
     loadInventoryReview();
   } catch (err) {
     console.error("❌ rejectReviewItem error:", err);
+    alert(`❌ ${err.message}`);
+  }
+}
+
+async function clearAllReviews() {
+  const ok = confirm("Clear ALL review items? This cannot be undone.");
+  if (!ok) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/inventory-review`, { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message || `Clear failed: ${res.status}`);
+
+    alert(`🗑️ Cleared ${json.cleared ?? "all"} review item(s).`);
+    loadInventoryReview();
+  } catch (err) {
+    console.error("❌ clearAllReviews error:", err);
     alert(`❌ ${err.message}`);
   }
 }

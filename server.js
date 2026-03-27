@@ -3397,6 +3397,24 @@ app.post("/api/inventory-review/:id/approve", async (req, res) => {
 });
 
 
+// Clear ALL review items at once
+app.delete("/api/inventory-review", (req, res) => {
+  try {
+    const items = readReviewQueue();
+    const count = items.length;
+    const ok = writeReviewQueue([]);
+    if (!ok) {
+      return res.status(500).json({ message: "Failed to clear review queue." });
+    }
+    console.log(`🗑️ [inventory-review] Cleared all ${count} review items.`);
+    res.json({ success: true, cleared: count });
+  } catch (err) {
+    console.error("❌ Failed clearing review queue:", err);
+    res.status(500).json({ message: "Failed to clear review queue." });
+  }
+});
+
+
 // Reject / delete review item
 app.delete("/api/inventory-review/:id", (req, res) => {
   try {

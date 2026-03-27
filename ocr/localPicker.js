@@ -50,9 +50,22 @@ function scoreCandidate(card, ctx) {
   }
 
   if (ctx.detectedSetCode) {
-    if (String(card.set || "").toLowerCase() === String(ctx.detectedSetCode).toLowerCase()) {
+    const cardSet = String(card.set || "").toLowerCase();
+    const wantSet = String(ctx.detectedSetCode).toLowerCase();
+    if (cardSet === wantSet) {
       score += 55;
       reasons.push("set_symbol_match");
+    } else if (ctx.setCodeTrusted) {
+      // High-confidence OCR set code — treat wrong set as a hard reject,
+      // same as collector mismatch. A card can't be right if its set is wrong
+      // and we're confident about the set.
+      return {
+        ...card,
+        imageUrl: toPublicImageUrl(card.local_image),
+        _score: -9999,
+        _distances: { artDist: 9999, frameDist: 9999, titleDist: 9999, fullDist: 9999, symbolDist: 9999 },
+        _reasons: ["set_mismatch_hard_reject"]
+      };
     } else {
       score -= 25;
       reasons.push("set_symbol_mismatch_penalty");
@@ -158,6 +171,7 @@ async function findBestLocalMatches(scanImagePath, options = {}) {
     guessedName: options.guessedName || "",
     collectorNumber: options.collectorNumber || "",
     detectedSetCode: options.detectedSetCode || "",
+    setCodeTrusted: !!options.setCodeTrusted,   // hard-reject on mismatch when true
     isFoil: !!options.isFoil,
     copyrightYear: options.copyrightYear || null,   // ← new
     scan

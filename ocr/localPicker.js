@@ -32,6 +32,29 @@ function toPublicImageUrl(localImagePath) {
   return `/local_card_images/${path.basename(localImagePath)}`;
 }
 
+// C13: Fuzzy name match for old-frame cards where OCR often garbles
+// a few characters. Returns 0-1 score based on how many characters of
+// the OCR result appear in the card name in order (longest common subsequence
+// as a fraction of the shorter string). Used only as a soft signal.
+function fuzzyNameScore(ocrNorm, cardNorm) {
+  if (!ocrNorm || !cardNorm) return 0;
+  if (ocrNorm === cardNorm) return 1;
+
+  // Exact prefix match is very strong for garbled OCR
+  if (cardNorm.startsWith(ocrNorm) || ocrNorm.startsWith(cardNorm)) return 0.85;
+
+  // Count character overlap (rough LCS approximation)
+  let matches = 0;
+  let ci = 0;
+  for (let oi = 0; oi < ocrNorm.length && ci < cardNorm.length; oi++) {
+    if (ocrNorm[oi] === cardNorm[ci]) {
+      matches++;
+      ci++;
+    }
+  }
+  return matches / Math.max(ocrNorm.length, cardNorm.length);
+}
+
 function scoreCandidate(card, ctx) {
   let score = 0;
   const reasons = [];
@@ -39,11 +62,20 @@ function scoreCandidate(card, ctx) {
   const ocrNameNorm = normalizeName(ctx.guessedName || "");
   const cardNameNorm = normalizeName(card.normalized_name || card.name || "");
 
-  // OCR name is only a very weak hint now
+  // C13: Use fuzzy name matching instead of exact-only.
+  // Old-frame OCR regularly garbles 1-3 chars so exact match is too strict.
+  // Score scale: exact=4, near-exact=3, partial=1-2, no match=0.
   if (ocrNameNorm && cardNameNorm) {
-    if (ocrNameNorm === cardNameNorm) {
+    const ns = fuzzyNameScore(ocrNameNorm, cardNameNorm);
+    if (ns >= 1.0) {
       score += 4;
-      reasons.push("exact_name_weak");
+      reasons.push("exact_name");
+    } else if (ns >= 0.85) {
+      score += 3;
+      reasons.push("prefix_name");
+    } else if (ns >= 0.60) {
+      score += 1;
+      reasons.push("fuzzy_name_weak");
     } else {
       reasons.push("name_ignored");
     }
@@ -56,9 +88,6 @@ function scoreCandidate(card, ctx) {
       score += 55;
       reasons.push("set_symbol_match");
     } else if (ctx.setCodeTrusted) {
-      // High-confidence OCR set code — treat wrong set as a hard reject,
-      // same as collector mismatch. A card can't be right if its set is wrong
-      // and we're confident about the set.
       return {
         ...card,
         imageUrl: toPublicImageUrl(card.local_image),
@@ -101,21 +130,24 @@ function scoreCandidate(card, ctx) {
     reasons.push("finish_match");
   }
 
- const artDist = hammingHex64(ctx.scan.art_hash, card.art_hash);
+  const artDist   = hammingHex64(ctx.scan.art_hash,   card.art_hash);
   const frameDist = hammingHex64(ctx.scan.frame_hash, card.frame_hash);
   const titleDist = hammingHex64(ctx.scan.title_hash, card.title_hash);
-  const fullDist = hammingHex64(ctx.scan.full_hash, card.full_hash);
+  const fullDist  = hammingHex64(ctx.scan.full_hash,  card.full_hash);
   const symbolDist =
     ctx.scan.symbol_hash && card.symbol_hash
       ? hammingHex64(ctx.scan.symbol_hash, card.symbol_hash)
       : 9999;
 
-  // Old cards (pre-2003) have faded/yellowed art that drifts from Scryfall
-  // reference scans. Use a softer distance penalty so aged prints aren't unfairly
-  // ranked below reprints with cleaner reference images.
-  const isVintage = (card.released_at || "") < "2003-01-01";
-  const artPenalty   = isVintage ? 1.0 : 1.8;
-  const framePenalty = isVintage ? 1.3 : 2.0;
+  // C13: Old cards (pre-2003) have faded/yellowed art that drifts further from
+  // Scryfall reference scans than modern cards. The penalty slope is reduced so
+  // a high art distance doesn't completely bury the correct old printing.
+  // Pre-1999 (vintage) gets the softest penalty; 1999-2003 gets a medium penalty.
+  const isVintage    = (card.released_at || "") < "1999-01-01";
+  const isEarlyMod   = !isVintage && (card.released_at || "") < "2003-01-01";
+
+  const artPenalty   = isVintage ? 0.8  : isEarlyMod ? 1.2 : 1.8;
+  const framePenalty = isVintage ? 1.0  : isEarlyMod ? 1.5 : 2.0;
 
   score += Math.max(0, 20 - artDist   * artPenalty);
   score += Math.max(0, 26 - frameDist * framePenalty);
@@ -123,14 +155,17 @@ function scoreCandidate(card, ctx) {
   score += Math.max(0, 8  - fullDist  * 0.8);
   score += Math.max(0, 20 - symbolDist * 1.8);
 
-  // Copyright year bonus: if the OCR year matches the card's release year (±1),
-  // that's strong corroborating evidence for old printings.
+  // Copyright year bonus — strongest signal for old printings.
+  // yearDiff=0: +30 points (very strong)
+  // yearDiff=1: +15 points (strong, e.g. card printed Dec 1993, released Jan 1994)
+  // yearDiff=2: +5  points (weak corroboration, handles delayed releases)
   if (ctx.copyrightYear && card.released_at) {
     const cardYear = parseInt((card.released_at || "").slice(0, 4), 10);
     if (Number.isFinite(cardYear)) {
       const yearDiff = Math.abs(cardYear - ctx.copyrightYear);
-      if (yearDiff === 0) { score += 30; reasons.push("copyright_year_exact"); }
+      if (yearDiff === 0)      { score += 30; reasons.push("copyright_year_exact"); }
       else if (yearDiff === 1) { score += 15; reasons.push("copyright_year_near"); }
+      else if (yearDiff === 2) { score += 5;  reasons.push("copyright_year_close"); }
     }
   }
 
@@ -151,12 +186,12 @@ function scoreCandidate(card, ctx) {
 
 async function findBestLocalMatches(scanImagePath, options = {}) {
   const cards = loadLocalIndex().filter(card =>
-  card.local_image &&
-  card.art_hash &&
-  card.frame_hash &&
-  card.title_hash &&
-  card.full_hash &&
-  String(card.layout || "").toLowerCase() !== "token"
+    card.local_image &&
+    card.art_hash &&
+    card.frame_hash &&
+    card.title_hash &&
+    card.full_hash &&
+    String(card.layout || "").toLowerCase() !== "token"
   ).filter(card => {
     const scanCollector = normalizeCollector(options.collectorNumber || "");
     if (!scanCollector) return true;
@@ -168,23 +203,23 @@ async function findBestLocalMatches(scanImagePath, options = {}) {
   const scan = await hashLocalImageFingerprints(scanImagePath);
 
   const ctx = {
-    guessedName: options.guessedName || "",
+    guessedName:     options.guessedName || "",
     collectorNumber: options.collectorNumber || "",
     detectedSetCode: options.detectedSetCode || "",
-    setCodeTrusted: !!options.setCodeTrusted,   // hard-reject on mismatch when true
-    isFoil: !!options.isFoil,
-    copyrightYear: options.copyrightYear || null,   // ← new
+    setCodeTrusted:  !!options.setCodeTrusted,
+    isFoil:          !!options.isFoil,
+    copyrightYear:   options.copyrightYear || null,
     scan
   };
 
   const scored = cards
-  .map(card => scoreCandidate(card, ctx))
-  .filter(card => Number.isFinite(card?._score) && card._score > -9999);
+    .map(card => scoreCandidate(card, ctx))
+    .filter(card => Number.isFinite(card?._score) && card._score > -9999);
 
   scored.sort((a, b) => b._score - a._score);
 
-  const top = scored.slice(0, options.limit || 25);
-  const best = top[0] || null;
+  const top    = scored.slice(0, options.limit || 25);
+  const best   = top[0] || null;
   const second = top[1] || null;
   const margin = best && second ? (best._score - second._score) : 999;
 

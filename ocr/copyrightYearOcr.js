@@ -5,7 +5,12 @@
 // or "TM & © 1993 Wizards of the Coast". This year is the single most
 // reliable signal for narrowing down which printing an old card belongs to.
 //
-// Region: bottom-right quadrant of the card, same vertical band as collector number.
+// On OLD-FRAME cards (pre-8th Edition): there is NO collector number.
+// The copyright line is the only text in the bottom strip, positioned at
+// roughly H*0.925-0.955, right half of the card.
+//
+// On MODERN-FRAME cards (8th Edition onward): collector number is on the left,
+// copyright sits on the right of the same strip or is absent post-2015.
 
 const fs = require("fs");
 const path = require("path");
@@ -14,91 +19,81 @@ const Tesseract = require("tesseract.js");
 const { acquireWorker, releaseWorker } = require("./nameOcr");
 const { DEBUG_OCR, DEBUG_DIR } = require("./constants");
 
-// ─── Region builder ───────────────────────────────────────────────────────────
-//
-// FIX (Bug 2): Old-frame cards have no collector number so the copyright line
-// sits lower than on modern cards — approximately H*0.930 rather than H*0.915.
-// We now try two vertical bands: the lower band first (old-frame primary),
-// then a higher band as a fallback for modern-frame cards that do have a
-// copyright line (pre-2015).
-//
-// The region intentionally stays in the right half of the card (left=0.50)
-// so it never overlaps the collector number on the left side.
-
-function buildCopyrightRegions(W, H) {
-  return [
-    // Primary: old-frame position — copyright line near the card edge, no collector above it.
-    {
-      left:   Math.floor(W * 0.50),
-      top:    Math.floor(H * 0.930),  // was 0.915 — now targets actual old-frame line
-      width:  Math.floor(W * 0.44),
-      height: Math.floor(H * 0.045), // slightly taller to catch registration drift
-    },
-    // Fallback: modern-frame position — useful for pre-2015 modern-frame cards
-    // that still print a copyright year.
-    {
-      left:   Math.floor(W * 0.50),
-      top:    Math.floor(H * 0.912),
-      width:  Math.floor(W * 0.44),
-      height: Math.floor(H * 0.038),
-    },
-    // Wide fallback: covers the full bottom strip in case of unusual layout.
-    {
-      left:   Math.floor(W * 0.30),
-      top:    Math.floor(H * 0.925),
-      width:  Math.floor(W * 0.64),
-      height: Math.floor(H * 0.055),
-    },
-  ];
-}
-
 // ─── Tesseract options ────────────────────────────────────────────────────────
 //
-// FIX (Bug 1): recognizeWithTimeout previously always used TESS_OPTIONS from
-// nameOcr.js, which strips © and & from the character whitelist. Those symbols
-// anchor the copyright line ("© 1994", "TM & © 1993"). We now call
-// slot.worker.recognize() directly with COPYRIGHT_OPTS so the whitelist is used.
+// ROOT CAUSE FIX: recognizeWithTimeout() always injects TESS_OPTIONS from
+// nameOcr.js, whose character whitelist excludes © and &. Those are the
+// anchor characters for "© 1994" and "TM & © 1993". We MUST call
+// slot.worker.recognize() directly with these options, never go through
+// recognizeWithTimeout.
 
 const COPYRIGHT_OPTS = {
   tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-  // Keep © alternatives, letters (so "Wizards" doesn't confuse the parser),
-  // digits, and common punctuation on the copyright line.
   tessedit_char_whitelist:
     "©TMtm&0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .",
 };
 
-// ─── Year parser ──────────────────────────────────────────────────────────────
+// ─── Region builder ────────────────────────────────────────────────────────────
 //
-// FIX (Bug 4 partial): Extended lower bound to 1990. Alpha/Beta/Unlimited are
-// 1993, Antiquities 1994, and nothing earlier than 1993 was commercially released,
-// but 1990 gives a safe margin. Post-2015 cards rarely print a year.
+// Three regions, tried in order:
+//   [0] Old-frame primary: the copyright line on pre-8th cards sits at H*0.928-0.958.
+//       No collector number exists so the full right half is available.
+//   [1] Overlap band: covers both old-frame and modern-frame positions (wider net).
+//   [2] Wide fallback: full-width bottom strip for unusual layouts.
+
+function buildCopyrightRegions(W, H) {
+  return [
+    {
+      // Old-frame primary — copyright is the only line in this area
+      left:   Math.floor(W * 0.38),   // start slightly left of center to catch "TM &" prefix
+      top:    Math.floor(H * 0.925),
+      width:  Math.floor(W * 0.56),
+      height: Math.floor(H * 0.038),  // tight: just the one text line at 300dpi
+    },
+    {
+      // Modern-frame / overlap: same right-half but taller to catch any shift
+      left:   Math.floor(W * 0.45),
+      top:    Math.floor(H * 0.910),
+      width:  Math.floor(W * 0.50),
+      height: Math.floor(H * 0.055),
+    },
+    {
+      // Wide fallback: entire bottom strip, useful when layout is uncertain
+      left:   Math.floor(W * 0.20),
+      top:    Math.floor(H * 0.915),
+      width:  Math.floor(W * 0.75),
+      height: Math.floor(H * 0.065),
+    },
+  ];
+}
+
+// ─── Year parser ───────────────────────────────────────────────────────────────
 
 function parseCopyrightYear(text) {
   if (!text) return null;
+  // Match 4-digit years 1990-2015. Alpha/Beta/Unlimited are 1993;
+  // nothing earlier was commercially released.
   const m = text.match(/\b(199\d|200\d|201[0-5])\b/);
   return m ? parseInt(m[1], 10) : null;
 }
 
-// ─── Debug save helper ────────────────────────────────────────────────────────
-//
-// FIX (Bug 5): Save crops to ocr_debug/ when DEBUG_OCR=true, same pattern as
-// other OCR modules, so you can actually inspect what region is being cropped.
+// ─── Debug save ────────────────────────────────────────────────────────────────
 
-function _saveDebugCrop(buf, ts, tag) {
+function saveDebugCrop(buf, ts, tag) {
   if (!DEBUG_OCR || !buf) return null;
   try {
     fs.mkdirSync(DEBUG_DIR, { recursive: true });
     const filename = `copyright_${ts}_${tag}.png`;
     const outPath = path.join(DEBUG_DIR, filename);
     fs.writeFileSync(outPath, buf);
-    console.log("🟠 [copyrightYearOcr] Debug crop saved:", outPath);
+    console.log("🟠 [copyrightYearOcr] Debug crop:", outPath);
     return outPath;
   } catch {
     return null;
   }
 }
 
-// ─── Main export ──────────────────────────────────────────────────────────────
+// ─── Main export ───────────────────────────────────────────────────────────────
 
 async function ocrCopyrightYear(originalPath, tmpDir) {
   const ts = Date.now();
@@ -116,13 +111,20 @@ async function ocrCopyrightYear(originalPath, tmpDir) {
   const regions = buildCopyrightRegions(W, H);
   const slot = await acquireWorker();
 
-  // Pass ordering: raw grayscale (null) first — works for clean/high-contrast scans.
-  // Then lower thresholds for aged/yellowed stock where 180 washes out thin ink.
-  const thresholds = [null, 130, 160, 110];
+  // Threshold ordering: raw grayscale first (fast exit for clean scans),
+  // then low thresholds for aged/yellowed stock, then mid-range.
+  const thresholds = [null, 130, 110, 160];
 
   try {
     for (let ri = 0; ri < regions.length; ri++) {
       const region = regions[ri];
+
+      const clampedRegion = {
+        left:   Math.max(0, Math.min(W - 2, region.left)),
+        top:    Math.max(0, Math.min(H - 2, region.top)),
+        width:  Math.max(1, Math.min(region.width,  W - region.left)),
+        height: Math.max(1, Math.min(region.height, H - region.top)),
+      };
 
       for (const thr of thresholds) {
         const tag = `r${ri}_t${thr ?? "raw"}`;
@@ -130,13 +132,6 @@ async function ocrCopyrightYear(originalPath, tmpDir) {
         const useThreshold = thr !== null;
 
         try {
-          const clampedRegion = {
-            left:   Math.max(0, Math.min(W - 2, region.left)),
-            top:    Math.max(0, Math.min(H - 2, region.top)),
-            width:  Math.max(1, Math.min(region.width,  W - region.left)),
-            height: Math.max(1, Math.min(region.height, H - region.top)),
-          };
-
           let pipeline = sharp(originalPath)
             .extract(clampedRegion)
             .grayscale()
@@ -147,13 +142,14 @@ async function ocrCopyrightYear(originalPath, tmpDir) {
           if (useThreshold) pipeline = pipeline.threshold(thr);
           await pipeline.toFile(out);
 
-          // FIX (Bug 5): Save debug crop before OCR, so it persists even if OCR throws.
+          // Save debug crop BEFORE OCR so it persists even if OCR fails.
           if (DEBUG_OCR && fs.existsSync(out)) {
-            _saveDebugCrop(fs.readFileSync(out), ts, tag);
+            saveDebugCrop(fs.readFileSync(out), ts, tag);
           }
 
-          // FIX (Bug 1): Call slot.worker.recognize directly with COPYRIGHT_OPTS,
-          // bypassing recognizeWithTimeout which always injects TESS_OPTIONS.
+          // CRITICAL: call slot.worker.recognize with COPYRIGHT_OPTS directly.
+          // Do NOT use recognizeWithTimeout() -- it forces TESS_OPTIONS which
+          // strips copyright symbols from the whitelist, breaking the year regex.
           const ocr = await Promise.race([
             slot.worker.recognize(out, COPYRIGHT_OPTS),
             new Promise((_, reject) =>
@@ -165,11 +161,12 @@ async function ocrCopyrightYear(originalPath, tmpDir) {
           const year = parseCopyrightYear(text);
 
           if (year) {
-            console.log(`✅ [copyrightYearOcr] Found year ${year} (region=${ri}, thr=${thr ?? "raw"}): "${text}"`);
-            return { text, year, debugTag: tag };
+            console.log(`✅ [copyrightYearOcr] Year ${year} (region=${ri}, thr=${thr ?? "raw"}): "${text}"`);
+            return { text, year };
           } else {
             console.log(`⬜ [copyrightYearOcr] No year (region=${ri}, thr=${thr ?? "raw"}): "${text}"`);
           }
+
         } catch (e) {
           console.log(`⚠️ [copyrightYearOcr] Pass failed (region=${ri}, thr=${thr ?? "raw"}):`, e.message);
         } finally {
@@ -180,6 +177,7 @@ async function ocrCopyrightYear(originalPath, tmpDir) {
 
     console.log(`⚠️ [copyrightYearOcr] No year found in: ${path.basename(originalPath)}`);
     return { text: "", year: null };
+
   } finally {
     releaseWorker(slot);
   }

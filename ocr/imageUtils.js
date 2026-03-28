@@ -3,6 +3,15 @@ const path = require("path");
 const fs = require("fs");
 const { FIXED_DIMS, CROP, DEBUG_OCR, DEBUG_DIR } = require("./constants");
 
+// FIX 1: imageUtils.js now uses CROP.nameBar from constants.js as the single
+// source of truth for name bar crop coordinates. Previously there were two
+// conflicting definitions — a hardcoded percent-based crop here that differed
+// from CROP.nameBar. The percent-based math is kept but now derived from
+// CROP.nameBar values at FIXED_DIMS, so both systems agree.
+//
+// Scale factors allow the crop to work at any scanner resolution, not just
+// FIXED_DIMS. At exactly FIXED_DIMS the sx/sy factors are 1.0.
+
 function ensureDir(dir) {
   try { fs.mkdirSync(dir, { recursive: true }); } catch {}
 }
@@ -26,18 +35,18 @@ async function cropAndPrepNameBar(
   const W = meta.width;
   const H = meta.height;
 
-  // Always use percent-based crop — scanner dimensions vary slightly per scan.
-  //
-  // Calibrated from debug crop of Counterspell at ~770x1062:
-  //   - top:    8.5% skips the outer black border + hatched frame region
-  //   - height: 9%   captures the full name text including descenders
-  //   - left:   7.5% skips the left card border
-  //   - width:  60%  stops before mana cost symbols (was 73%, bled into pips)
+  // FIX 1: Scale CROP.nameBar pixel coords to this scan's actual dimensions.
+  // CROP.nameBar is calibrated for FIXED_DIMS ({w:1299, h:1777}).
+  // sx/sy are 1.0 when the scan is exactly that size, and scale gracefully
+  // if the scanner produces slightly different output dimensions.
+  const sx = W / FIXED_DIMS.w;
+  const sy = H / FIXED_DIMS.h;
+
   const base = {
-    left:   Math.floor(W * 0.075),
-    top:    Math.floor(H * 0.055),  // was 0.085, move up
-    width:  Math.floor(W * 0.60),
-    height: Math.floor(H * 0.07),   // was 0.09, tighten height
+    left:   Math.round(CROP.nameBar.left   * sx),
+    top:    Math.round(CROP.nameBar.top    * sy),
+    width:  Math.round(CROP.nameBar.width  * sx),
+    height: Math.round(CROP.nameBar.height * sy),
   };
 
   const left   = Math.max(0, Math.min(W - 2, base.left + dx));
@@ -60,16 +69,17 @@ async function cropAndPrepNameBar(
     const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
     if (!samePath(debugCopy, outPath)) {
       await sharp(outPath).toFile(debugCopy);
-      console.log("🟣 Saved NAME crop to:", debugCopy);
+      console.log(`🟣 Saved NAME crop to: ${debugCopy}  [crop: left=${left} top=${top} w=${width} h=${height}]`);
     } else {
-      console.log("🟣 Saved NAME crop to (no-copy):", outPath);
+      console.log(`🟣 Saved NAME crop to (no-copy): ${outPath}`);
     }
   }
 }
 
 // Old-frame name bar crop (pre-8th Edition, ~1993–2003).
-// These cards have a taller name bar positioned higher on the card,
-// with tan/brown background. The modern crop (top=5.5%) cuts into the border.
+// These cards have a taller name bar positioned slightly higher on the card.
+// The old-frame crop does NOT use CROP.nameBar because that is calibrated for
+// modern-frame positioning. Instead it uses its own offset, also scaled.
 async function cropAndPrepNameBarOldFrame(
   originalPath,
   outPath,
@@ -85,11 +95,17 @@ async function cropAndPrepNameBarOldFrame(
   const W = meta.width;
   const H = meta.height;
 
+  const sx = W / FIXED_DIMS.w;
+  const sy = H / FIXED_DIMS.h;
+
+  // Old-frame name bar sits ~10px higher than CROP.nameBar.top and is ~15%
+  // taller. Derive from CROP.nameBar so there is still one source of truth;
+  // the old-frame adjustments are expressed as deltas.
   const base = {
-    left:   Math.floor(W * 0.075),
-    top:    Math.floor(H * 0.038),   // higher than modern (was 0.055)
-    width:  Math.floor(W * 0.60),
-    height: Math.floor(H * 0.090),   // taller — old frames have more name bar height
+    left:   Math.round(CROP.nameBar.left   * sx),
+    top:    Math.round((CROP.nameBar.top - 10) * sy),   // slightly higher
+    width:  Math.round(CROP.nameBar.width  * sx),
+    height: Math.round(CROP.nameBar.height * 1.15 * sy), // ~15% taller
   };
 
   const left   = Math.max(0, Math.min(W - 2, base.left + dx));
@@ -112,7 +128,7 @@ async function cropAndPrepNameBarOldFrame(
     const debugCopy = path.join(DEBUG_DIR, path.basename(outPath));
     if (!samePath(debugCopy, outPath)) {
       await sharp(outPath).toFile(debugCopy);
-      console.log("🟤 Saved OLD-FRAME NAME crop to:", debugCopy);
+      console.log(`🟤 Saved OLD-FRAME NAME crop to: ${debugCopy}  [crop: left=${left} top=${top} w=${width} h=${height}]`);
     }
   }
 }
@@ -178,16 +194,16 @@ function buildCollectorRegions(W, H) {
   return [
     {
       left:   Math.floor(W * 0.06),
-      top:    Math.floor(H * 0.920),  // was 0.915, trim top
+      top:    Math.floor(H * 0.920),
       width:  Math.floor(W * 0.13),
-      height: Math.floor(H * 0.020),  // was 0.025, reduce to keep bottom the same
+      height: Math.floor(H * 0.020),
     },
   ];
 }
 
 module.exports = {
   cropAndPrepNameBar,
-  cropAndPrepNameBarOldFrame,   // ← add this
+  cropAndPrepNameBarOldFrame,
   cropAndPrepCollectorRegion,
   buildCollectorRegions,
   detectWhiteBorder,

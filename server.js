@@ -106,11 +106,6 @@ const REVIEW_QUEUE_PATH =
   process.env.REVIEW_QUEUE_PATH ||
   path.join(__dirname, "review_queue", "inventory-review.jsonl");
 
-// Fix 5+6: analytics log — one record per human approval, used by scripts/reviewAnalytics.js
-const REVIEW_ANALYTICS_PATH =
-  process.env.REVIEW_ANALYTICS_PATH ||
-  path.join(__dirname, "review_queue", "review_analytics.jsonl");
-
 const REVIEW_IMAGE_DIR = path.join(__dirname, "review_uploads");
 
 if (!fs.existsSync(REVIEW_IMAGE_DIR)) {
@@ -551,8 +546,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             : [];
 
         const symbolResult = await detectSetSymbol(originalPath, {
-          allowedSetCodes,
-          setCodeOcrValue: setCodeOcrValue || ""   // Fix 4B: OCR hint for tie-breaking
+          allowedSetCodes
         });
 
         const detectedSetCode = symbolResult?.setCode || "";
@@ -639,14 +633,13 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           localMatchMeta = await findBestLocalMatches(originalPath, {
             guessedName: resolvedName || guessedName || "",
             collectorNumber: collectorNumber || "",
-            collectorConfidence: bottom?.confidence ?? 0,  // Fix 2: needed for soft-reject threshold
             detectedSetCode: effectiveSetCode || detectedSetCode || "",
             setCodeTrusted: !!(effectiveSetCode && (
               symbolTrusted ||
               (setCodeOcrValue && (setCodeOcrResult?.confidence ?? 0) >= 80)
             )),
             isFoil,
-            copyrightYear,
+            copyrightYear,       // ← new
             limit: 25
           });
 
@@ -686,21 +679,15 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             card.imageUrl = `/local_card_images/${filename}`;
           }
         } catch (err) {
-          // Fix 3: use copyrightYear-based pre-modern detection; card may be null here
-          const isPreModernSet =
-            (copyrightYear !== null && copyrightYear < 1999) ||
-            (card?.released_at || "") < "1999-01-01";
+          const isPreModernSet = (card?.released_at || "") < "1999-01-01";
 
           const score = computeOverallScore?.({
             nameConfidence: nameConf,
             collectorConfidence: bottom?.confidence ?? 0,
             hadCollector: !!collectorNumber,
-            exactCollectorMatch: false,          // Fix 3: match failed, no exact collector
             matchCount,
             setSymbolScore: symbolResult?.score ?? null,
-            isPreModernSet,
-            copyrightYear: copyrightYear ?? null,
-            localMatchMargin: localMatchMeta?.margin ?? null,
+            isPreModernSet
           }) ?? 0;
 
           const preserved = preserveReviewImage(originalPath, file.originalname);
@@ -749,14 +736,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue;
         }
 
-        // Fix 3: derive pre-modern from copyright year (scan-based, not match-based)
-        const isPreModernSet =
-          (copyrightYear !== null && copyrightYear < 1999) ||
-          (card?.released_at || "") < "1999-01-01";
-
-        // Fix 3: check whether localPicker found an exact (tier-A) collector match
-        const exactCollectorMatch = Array.isArray(card?._reasons) &&
-          card._reasons.includes("exact_collector");
+        const isPreModernSet = (card?.released_at || "") < "1999-01-01";
 
         console.log("🧙 [fi8170] Scryfall chosen:", {
           reqId,
@@ -764,9 +744,7 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           set: card?.set,
           set_name: card?.set_name,
           collector_number: card?.collector_number,
-          matchCount,
-          exactCollectorMatch,
-          localMargin: localMatchMeta?.margin ?? null
+          matchCount
         });
 
         // 4) Compute overall score + confidence gate
@@ -774,12 +752,9 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           nameConfidence: nameConf,
           collectorConfidence: bottom?.confidence ?? 0,
           hadCollector: !!collectorNumber,
-          exactCollectorMatch,                        // Fix 3
           matchCount,
           setSymbolScore: symbolResult?.score ?? null,
-          isPreModernSet,
-          copyrightYear: copyrightYear ?? null,       // Fix 3
-          localMatchMargin: localMatchMeta?.margin ?? null, // Fix 3
+          isPreModernSet
         }) ?? 0;
 
         console.log("✅ AUTO INGEST", {
@@ -3419,42 +3394,6 @@ app.post("/api/inventory-review/:id/approve", async (req, res) => {
 
     removeReviewItemById(id);
 
-    // Fix 5+6: append a labelled analytics record so reviewAnalytics.js can
-    // measure per-failure-reason accuracy and guide threshold tuning.
-    try {
-      const analyticsRecord = {
-        ts: new Date().toISOString(),
-        reviewHash: item.reviewHash || "",
-        reason: item.reason || "",
-        score: item.score ?? null,
-        localMatchMargin: item.bestLocalMargin ?? null,
-        guessedName: item.guessedName || "",
-        nameConfidence: item.name?.confidence ?? null,
-        collectorNumber: item.collector?.collectorNumber || null,
-        collectorConfidence: item.collector?.confidence ?? null,
-        hadCollector: !!(item.collector?.collectorNumber),
-        detectedSetCode: item.detectedSetCode || null,
-        setSymbolScore: item.setSymbolScore ?? null,
-        pipelineChosen: item.chosen
-          ? { name: item.chosen.name, set: item.chosen.set, collector: item.chosen.collector_number }
-          : null,
-        humanApproved: {
-          name: finalName,
-          set: finalSet,
-          collector: collectorNumber || item?.chosen?.collector_number || null
-        },
-        pipelineWasCorrect:
-          item.chosen?.name === finalName &&
-          item.chosen?.set === finalSet,
-      };
-      const line = JSON.stringify(analyticsRecord) + "\n";
-      const dir = path.dirname(REVIEW_ANALYTICS_PATH);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.appendFileSync(REVIEW_ANALYTICS_PATH, line, "utf8");
-    } catch (analyticsErr) {
-      console.warn("⚠️ [analytics] Failed writing analytics record:", analyticsErr.message);
-    }
-
     res.json({ success: true, imageUrl });
 
   } catch (err) {
@@ -3508,6 +3447,44 @@ app.get("/api/watch-folder-debug", (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Admin route: force-rebuild the set symbol hash cache.
+// Hit this in your browser after deploying the token/memorabilia filter fix:
+//   http://localhost:3000/api/admin/refresh-symbol-cache?key=YOUR_INGEST_KEY
+// The rebuild fetches all ~600 playable sets from Scryfall and takes ~2-3 minutes.
+// Watch the server console for progress. When done it logs the new entry count.
+app.get("/api/admin/refresh-symbol-cache", async (req, res) => {
+  const key = req.query.key || req.headers["x-ingest-key"] || "";
+  if (!process.env.INGEST_KEY || key !== process.env.INGEST_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  // Delete the on-disk cache file so the rebuild starts clean
+  const cachePath = process.env.RAILWAY_ENVIRONMENT
+    ? "/tmp/scryfall_set_symbol_hash_cache.json"
+    : path.join(__dirname, "scryfall_set_symbol_hash_cache.json");
+
+  try {
+    if (fs.existsSync(cachePath)) {
+      fs.unlinkSync(cachePath);
+      console.log("🗑️ [symbol-cache] Deleted stale cache file:", cachePath);
+    }
+  } catch (e) {
+    console.warn("⚠️ [symbol-cache] Could not delete cache file:", e.message);
+  }
+
+  // Respond immediately so the browser doesn't time out — rebuild runs in background
+  res.json({ message: "Cache rebuild started. Watch server logs for progress.", cachePath });
+
+  // Run rebuild in background
+  ensureSetSymbolCache(true)
+    .then(data => {
+      console.log(`✅ [symbol-cache] Rebuild complete — ${data?.entries?.length ?? 0} entries (token/memorabilia/art_series excluded)`);
+    })
+    .catch(err => {
+      console.error("❌ [symbol-cache] Rebuild failed:", err.message);
+    });
 });
 
 registerCropDebugRoutes(app);

@@ -71,9 +71,10 @@ function buildCopyrightRegions(W, H) {
 
 function parseCopyrightYear(text) {
   if (!text) return null;
-  // Match 4-digit years 1990-2015. Alpha/Beta/Unlimited are 1993;
+  // Match 4-digit years 1990-2029. Alpha/Beta/Unlimited are 1993;
   // nothing earlier was commercially released.
-  const m = text.match(/\b(199\d|200\d|201[0-5])\b/);
+  // FIX: was capped at 2015, missing all post-2015 sets (2016, 2018, 2021, 2023, etc.)
+  const m = text.match(/\b(199\d|200\d|201\d|202\d)\b/);
   return m ? parseInt(m[1], 10) : null;
 }
 

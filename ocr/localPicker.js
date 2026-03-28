@@ -27,30 +27,28 @@ function normalizeCollector(str) {
     .replace(/^0+/, "");
 }
 
+// FIX 2: Extract only digit characters from a collector string.
+// Used as a fallback comparison when the strict normalized form doesn't match.
+// OCR commonly reads "113" when the card says "★113", "C113", or "113p".
+// Digit-only comparison catches these without fully trusting noisy OCR.
+function digitsOnly(str) {
+  return String(str || "").replace(/[^0-9]/g, "");
+}
+
 function toPublicImageUrl(localImagePath) {
   if (!localImagePath) return "";
   return `/local_card_images/${path.basename(localImagePath)}`;
 }
 
-// C13: Fuzzy name match for old-frame cards where OCR often garbles
-// a few characters. Returns 0-1 score based on how many characters of
-// the OCR result appear in the card name in order (longest common subsequence
-// as a fraction of the shorter string). Used only as a soft signal.
 function fuzzyNameScore(ocrNorm, cardNorm) {
   if (!ocrNorm || !cardNorm) return 0;
   if (ocrNorm === cardNorm) return 1;
-
-  // Exact prefix match is very strong for garbled OCR
   if (cardNorm.startsWith(ocrNorm) || ocrNorm.startsWith(cardNorm)) return 0.85;
 
-  // Count character overlap (rough LCS approximation)
   let matches = 0;
   let ci = 0;
   for (let oi = 0; oi < ocrNorm.length && ci < cardNorm.length; oi++) {
-    if (ocrNorm[oi] === cardNorm[ci]) {
-      matches++;
-      ci++;
-    }
+    if (ocrNorm[oi] === cardNorm[ci]) { matches++; ci++; }
   }
   return matches / Math.max(ocrNorm.length, cardNorm.length);
 }
@@ -62,20 +60,14 @@ function scoreCandidate(card, ctx) {
   const ocrNameNorm = normalizeName(ctx.guessedName || "");
   const cardNameNorm = normalizeName(card.normalized_name || card.name || "");
 
-  // C13: Use fuzzy name matching instead of exact-only.
-  // Old-frame OCR regularly garbles 1-3 chars so exact match is too strict.
-  // Score scale: exact=4, near-exact=3, partial=1-2, no match=0.
   if (ocrNameNorm && cardNameNorm) {
     const ns = fuzzyNameScore(ocrNameNorm, cardNameNorm);
     if (ns >= 1.0) {
-      score += 4;
-      reasons.push("exact_name");
+      score += 4; reasons.push("exact_name");
     } else if (ns >= 0.85) {
-      score += 3;
-      reasons.push("prefix_name");
+      score += 3; reasons.push("prefix_name");
     } else if (ns >= 0.60) {
-      score += 1;
-      reasons.push("fuzzy_name_weak");
+      score += 1; reasons.push("fuzzy_name_weak");
     } else {
       reasons.push("name_ignored");
     }
@@ -85,8 +77,7 @@ function scoreCandidate(card, ctx) {
     const cardSet = String(card.set || "").toLowerCase();
     const wantSet = String(ctx.detectedSetCode).toLowerCase();
     if (cardSet === wantSet) {
-      score += 55;
-      reasons.push("set_symbol_match");
+      score += 55; reasons.push("set_symbol_match");
     } else if (ctx.setCodeTrusted) {
       return {
         ...card,
@@ -96,38 +87,58 @@ function scoreCandidate(card, ctx) {
         _reasons: ["set_mismatch_hard_reject"]
       };
     } else {
-      score -= 25;
-      reasons.push("set_symbol_mismatch_penalty");
+      score -= 25; reasons.push("set_symbol_mismatch_penalty");
     }
   }
 
+  // FIX 2: Collector number comparison — three-tier logic.
+  //
+  // Tier A (strict): normalized strings match exactly → +60, strong accept.
+  // Tier B (digit fallback): normalized strings differ but digit-only forms
+  //   match → +30. Handles OCR variants like "★113"→"113" or "C113"→"113".
+  //   Only applied when collectorConfidence >= 60 to avoid false positives.
+  // Tier C (hard reject): both tiers fail AND confidence is high (>=75).
+  //   If confidence is low (<75) we demote to a soft -50 penalty instead of
+  //   hard-rejecting — OCR noise should not remove the correct card entirely.
   const scanCollector = normalizeCollector(ctx.collectorNumber || "");
   const cardCollector = normalizeCollector(card.collector_number || "");
 
   if (scanCollector && cardCollector) {
     if (scanCollector === cardCollector) {
+      // Tier A: exact match
       score += 60;
       reasons.push("exact_collector");
     } else {
-      return {
-        ...card,
-        imageUrl: toPublicImageUrl(card.local_image),
-        _score: -9999,
-        _distances: {
-          artDist: 9999,
-          frameDist: 9999,
-          titleDist: 9999,
-          fullDist: 9999,
-          symbolDist: 9999
-        },
-        _reasons: ["collector_mismatch_hard_reject"]
-      };
+      // Tier B: digit-only fallback
+      const scanDigits = digitsOnly(scanCollector);
+      const cardDigits = digitsOnly(cardCollector);
+      const digitMatch = scanDigits && cardDigits && scanDigits === cardDigits;
+      const collConf = ctx.collectorConfidence ?? 100; // default high if not provided
+
+      if (digitMatch && collConf >= 60) {
+        score += 30;
+        reasons.push("digit_collector_match");
+      } else {
+        // Tier C: mismatch — hard reject only when we trust the OCR
+        if (collConf >= 75) {
+          return {
+            ...card,
+            imageUrl: toPublicImageUrl(card.local_image),
+            _score: -9999,
+            _distances: { artDist: 9999, frameDist: 9999, titleDist: 9999, fullDist: 9999, symbolDist: 9999 },
+            _reasons: ["collector_mismatch_hard_reject"]
+          };
+        } else {
+          // Low confidence OCR: soft penalty instead of elimination
+          score -= 50;
+          reasons.push("collector_mismatch_soft_penalty");
+        }
+      }
     }
   }
 
   if (ctx.isFoil ? !!card.foil : !!card.nonfoil) {
-    score += 10;
-    reasons.push("finish_match");
+    score += 10; reasons.push("finish_match");
   }
 
   const artDist   = hammingHex64(ctx.scan.art_hash,   card.art_hash);
@@ -139,12 +150,8 @@ function scoreCandidate(card, ctx) {
       ? hammingHex64(ctx.scan.symbol_hash, card.symbol_hash)
       : 9999;
 
-  // C13: Old cards (pre-2003) have faded/yellowed art that drifts further from
-  // Scryfall reference scans than modern cards. The penalty slope is reduced so
-  // a high art distance doesn't completely bury the correct old printing.
-  // Pre-1999 (vintage) gets the softest penalty; 1999-2003 gets a medium penalty.
-  const isVintage    = (card.released_at || "") < "1999-01-01";
-  const isEarlyMod   = !isVintage && (card.released_at || "") < "2003-01-01";
+  const isVintage  = (card.released_at || "") < "1999-01-01";
+  const isEarlyMod = !isVintage && (card.released_at || "") < "2003-01-01";
 
   const artPenalty   = isVintage ? 0.8  : isEarlyMod ? 1.2 : 1.8;
   const framePenalty = isVintage ? 1.0  : isEarlyMod ? 1.5 : 2.0;
@@ -155,10 +162,6 @@ function scoreCandidate(card, ctx) {
   score += Math.max(0, 8  - fullDist  * 0.8);
   score += Math.max(0, 20 - symbolDist * 1.8);
 
-  // Copyright year bonus — strongest signal for old printings.
-  // yearDiff=0: +30 points (very strong)
-  // yearDiff=1: +15 points (strong, e.g. card printed Dec 1993, released Jan 1994)
-  // yearDiff=2: +5  points (weak corroboration, handles delayed releases)
   if (ctx.copyrightYear && card.released_at) {
     const cardYear = parseInt((card.released_at || "").slice(0, 4), 10);
     if (Number.isFinite(cardYear)) {
@@ -173,13 +176,7 @@ function scoreCandidate(card, ctx) {
     ...card,
     imageUrl: toPublicImageUrl(card.local_image),
     _score: score,
-    _distances: {
-      artDist,
-      frameDist,
-      titleDist,
-      fullDist,
-      symbolDist
-    },
+    _distances: { artDist, frameDist, titleDist, fullDist, symbolDist },
     _reasons: reasons
   };
 }
@@ -195,20 +192,26 @@ async function findBestLocalMatches(scanImagePath, options = {}) {
   ).filter(card => {
     const scanCollector = normalizeCollector(options.collectorNumber || "");
     if (!scanCollector) return true;
-
+    // FIX 2: Pre-filter uses digit-only comparison so OCR variants don't
+    // incorrectly remove candidates before scoring even starts.
     const cardCollector = normalizeCollector(card.collector_number || "");
-    return !cardCollector || cardCollector === scanCollector;
+    if (!cardCollector) return true;
+    return (
+      cardCollector === scanCollector ||
+      digitsOnly(cardCollector) === digitsOnly(scanCollector)
+    );
   });
 
   const scan = await hashLocalImageFingerprints(scanImagePath);
 
   const ctx = {
-    guessedName:     options.guessedName || "",
-    collectorNumber: options.collectorNumber || "",
-    detectedSetCode: options.detectedSetCode || "",
-    setCodeTrusted:  !!options.setCodeTrusted,
-    isFoil:          !!options.isFoil,
-    copyrightYear:   options.copyrightYear || null,
+    guessedName:          options.guessedName || "",
+    collectorNumber:      options.collectorNumber || "",
+    collectorConfidence:  options.collectorConfidence ?? 100,
+    detectedSetCode:      options.detectedSetCode || "",
+    setCodeTrusted:       !!options.setCodeTrusted,
+    isFoil:               !!options.isFoil,
+    copyrightYear:        options.copyrightYear || null,
     scan
   };
 
@@ -223,13 +226,7 @@ async function findBestLocalMatches(scanImagePath, options = {}) {
   const second = top[1] || null;
   const margin = best && second ? (best._score - second._score) : 999;
 
-  return {
-    chosen: best,
-    second,
-    margin,
-    pool: top,
-    scan
-  };
+  return { chosen: best, second, margin, pool: top, scan };
 }
 
 module.exports = {

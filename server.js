@@ -106,6 +106,11 @@ const REVIEW_QUEUE_PATH =
   process.env.REVIEW_QUEUE_PATH ||
   path.join(__dirname, "review_queue", "inventory-review.jsonl");
 
+// Fix 5+6: analytics log — one record per human approval, used by scripts/reviewAnalytics.js
+const REVIEW_ANALYTICS_PATH =
+  process.env.REVIEW_ANALYTICS_PATH ||
+  path.join(__dirname, "review_queue", "review_analytics.jsonl");
+
 const REVIEW_IMAGE_DIR = path.join(__dirname, "review_uploads");
 
 if (!fs.existsSync(REVIEW_IMAGE_DIR)) {
@@ -546,7 +551,8 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             : [];
 
         const symbolResult = await detectSetSymbol(originalPath, {
-          allowedSetCodes
+          allowedSetCodes,
+          setCodeOcrValue: setCodeOcrValue || ""   // Fix 4B: OCR hint for tie-breaking
         });
 
         const detectedSetCode = symbolResult?.setCode || "";
@@ -633,13 +639,14 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           localMatchMeta = await findBestLocalMatches(originalPath, {
             guessedName: resolvedName || guessedName || "",
             collectorNumber: collectorNumber || "",
+            collectorConfidence: bottom?.confidence ?? 0,  // Fix 2: needed for soft-reject threshold
             detectedSetCode: effectiveSetCode || detectedSetCode || "",
             setCodeTrusted: !!(effectiveSetCode && (
               symbolTrusted ||
               (setCodeOcrValue && (setCodeOcrResult?.confidence ?? 0) >= 80)
             )),
             isFoil,
-            copyrightYear,       // ← new
+            copyrightYear,
             limit: 25
           });
 
@@ -679,15 +686,21 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
             card.imageUrl = `/local_card_images/${filename}`;
           }
         } catch (err) {
-          const isPreModernSet = (card?.released_at || "") < "1999-01-01";
+          // Fix 3: use copyrightYear-based pre-modern detection; card may be null here
+          const isPreModernSet =
+            (copyrightYear !== null && copyrightYear < 1999) ||
+            (card?.released_at || "") < "1999-01-01";
 
           const score = computeOverallScore?.({
             nameConfidence: nameConf,
             collectorConfidence: bottom?.confidence ?? 0,
             hadCollector: !!collectorNumber,
+            exactCollectorMatch: false,          // Fix 3: match failed, no exact collector
             matchCount,
             setSymbolScore: symbolResult?.score ?? null,
-            isPreModernSet
+            isPreModernSet,
+            copyrightYear: copyrightYear ?? null,
+            localMatchMargin: localMatchMeta?.margin ?? null,
           }) ?? 0;
 
           const preserved = preserveReviewImage(originalPath, file.originalname);
@@ -736,7 +749,14 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           continue;
         }
 
-        const isPreModernSet = (card?.released_at || "") < "1999-01-01";
+        // Fix 3: derive pre-modern from copyright year (scan-based, not match-based)
+        const isPreModernSet =
+          (copyrightYear !== null && copyrightYear < 1999) ||
+          (card?.released_at || "") < "1999-01-01";
+
+        // Fix 3: check whether localPicker found an exact (tier-A) collector match
+        const exactCollectorMatch = Array.isArray(card?._reasons) &&
+          card._reasons.includes("exact_collector");
 
         console.log("🧙 [fi8170] Scryfall chosen:", {
           reqId,
@@ -744,7 +764,9 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           set: card?.set,
           set_name: card?.set_name,
           collector_number: card?.collector_number,
-          matchCount
+          matchCount,
+          exactCollectorMatch,
+          localMargin: localMatchMeta?.margin ?? null
         });
 
         // 4) Compute overall score + confidence gate
@@ -752,9 +774,12 @@ app.post("/api/fi8170/scan-to-inventory", upload.array("cardImages"), async (req
           nameConfidence: nameConf,
           collectorConfidence: bottom?.confidence ?? 0,
           hadCollector: !!collectorNumber,
+          exactCollectorMatch,                        // Fix 3
           matchCount,
           setSymbolScore: symbolResult?.score ?? null,
-          isPreModernSet
+          isPreModernSet,
+          copyrightYear: copyrightYear ?? null,       // Fix 3
+          localMatchMargin: localMatchMeta?.margin ?? null, // Fix 3
         }) ?? 0;
 
         console.log("✅ AUTO INGEST", {
@@ -3393,6 +3418,42 @@ app.post("/api/inventory-review/:id/approve", async (req, res) => {
     );
 
     removeReviewItemById(id);
+
+    // Fix 5+6: append a labelled analytics record so reviewAnalytics.js can
+    // measure per-failure-reason accuracy and guide threshold tuning.
+    try {
+      const analyticsRecord = {
+        ts: new Date().toISOString(),
+        reviewHash: item.reviewHash || "",
+        reason: item.reason || "",
+        score: item.score ?? null,
+        localMatchMargin: item.bestLocalMargin ?? null,
+        guessedName: item.guessedName || "",
+        nameConfidence: item.name?.confidence ?? null,
+        collectorNumber: item.collector?.collectorNumber || null,
+        collectorConfidence: item.collector?.confidence ?? null,
+        hadCollector: !!(item.collector?.collectorNumber),
+        detectedSetCode: item.detectedSetCode || null,
+        setSymbolScore: item.setSymbolScore ?? null,
+        pipelineChosen: item.chosen
+          ? { name: item.chosen.name, set: item.chosen.set, collector: item.chosen.collector_number }
+          : null,
+        humanApproved: {
+          name: finalName,
+          set: finalSet,
+          collector: collectorNumber || item?.chosen?.collector_number || null
+        },
+        pipelineWasCorrect:
+          item.chosen?.name === finalName &&
+          item.chosen?.set === finalSet,
+      };
+      const line = JSON.stringify(analyticsRecord) + "\n";
+      const dir = path.dirname(REVIEW_ANALYTICS_PATH);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(REVIEW_ANALYTICS_PATH, line, "utf8");
+    } catch (analyticsErr) {
+      console.warn("⚠️ [analytics] Failed writing analytics record:", analyticsErr.message);
+    }
 
     res.json({ success: true, imageUrl });
 

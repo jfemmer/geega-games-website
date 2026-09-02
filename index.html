@@ -438,6 +438,70 @@ header.top-banner {
   background-color: #f3eaff;
 }
 
+/* === SITE UPDATE / ANNOUNCEMENT BANNER === */
+.site-update-banner {
+  background: linear-gradient(to right, #f3e8ff, #ede0ff);
+  color: #4b2673;
+  padding: 12px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 16px;
+  text-align: center;
+  border-bottom: 1px solid #e0ccff;
+  box-shadow: 0 2px 6px rgba(106, 13, 173, 0.08);
+  line-height: 1.4;
+}
+
+.site-update-banner__text {
+  font-size: 15px;
+  max-width: 780px;
+}
+
+.site-update-banner__text strong {
+  color: rebeccapurple;
+}
+
+.site-update-banner__cta {
+  display: inline-block;
+  background-color: rebeccapurple;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  padding: 9px 18px;
+  border-radius: 8px;
+  white-space: nowrap;
+  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.site-update-banner__cta:hover {
+  background-color: #562b8c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(106, 13, 173, 0.25);
+}
+
+.site-update-banner__cta:focus-visible {
+  outline: 3px solid #b98cff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .site-update-banner {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+  .site-update-banner__text {
+    font-size: 14px;
+  }
+  .site-update-banner__cta {
+    width: 100%;
+    max-width: 320px;
+  }
+}
+
 .welcome-banner {
   background: linear-gradient(to right, #d6b3ff, #f3e1ff);
   color: rebeccapurple;
@@ -602,6 +666,13 @@ header.top-banner {
 </head>
 
 <body>  
+  <div class="site-update-banner" role="region" aria-label="Site announcement">
+    <span class="site-update-banner__text">
+      <strong>Online Ordering Is Coming Soon!</strong> We're working hard to get Geega Games fully ready for online orders and secure payment processing. We're taking the extra time to make sure everything works smoothly, because we want to give you the best experience possible.
+    </span>
+    <a href="signup.html" class="site-update-banner__cta">Sign Up for Updates &rarr;</a>
+  </div>
+
   <div id="welcome-banner" class="welcome-banner" style="display: none;">
     <span class="welcome-icon">🎉</span>
     <span class="welcome-text">Welcome back to Geega Games!</span>
@@ -749,69 +820,76 @@ header.top-banner {
     }
   
     async function renderAllCards() {
-      const session = ++renderSessionToken;
-      const container = document.getElementById('card-container');
-      container.innerHTML = '';
-  
-      filteredCards.forEach(card => {
-        const cardDiv = document.createElement('div');
-        cardDiv.className = 'card';
-  
-        const imageWrapper = document.createElement('div');
-        imageWrapper.className = `image-wrapper ${card.foil ? 'foil-shimmer' : ''}`;
-        imageWrapper.innerHTML = `<img src="${card.imageUrl}" alt="${card.cardName}" loading="lazy" />`;
-  
-        const foilLabel = card.foilType ? card.foilType : (card.foil ? "Foil" : "");
-        const variantLabel = card.variantType || "";
-        const labels = [variantLabel, foilLabel].filter(Boolean).join(" / ");
-  
-        const title = document.createElement('h3');
-        title.className = 'card-title';
-        title.textContent = labels ? `${card.cardName} (${labels})` : card.cardName;
-  
-        const set = document.createElement('p');
-        set.className = 'card-text';
-        set.textContent = `Set: ${card.set}`;
-  
-        const condition = document.createElement('p');
-        condition.className = 'card-condition';
-        condition.textContent = `Condition: ${formatCondition(card.condition)}`;
-  
-        const quantity = document.createElement('p');
-        quantity.textContent = `Quantity in Stock: ${card.quantity}`;
-  
-        const price = document.createElement('p');
-        const isFoil = card.foil || !!card.foilType;
-        let rawPrice = parseFloat(isFoil ? card.priceUsdFoil : card.priceUsd);
-        if (isFoil && (isNaN(rawPrice) || rawPrice === 0)) {
-          rawPrice = parseFloat(card.priceUsd);
-        }
-        const adjustedPrice = isNaN(rawPrice) ? 'N/A' : (rawPrice < 0.5 ? '0.50' : rawPrice.toFixed(2));
-        price.textContent = `Price: $${adjustedPrice}`;
-        if (labels) price.title = `Edition: ${labels}`;
-  
-        cardDiv.addEventListener('click', () => {
-          showLegalities(card.cardName);
-        });
-  
-        const firstName = localStorage.getItem('firstName');
-        let addToCartBtn = null;
-  
-        if (firstName) {
-          addToCartBtn = document.createElement('button');
-          addToCartBtn.textContent = 'Add to Cart';
-          addToCartBtn.className = 'add-to-cart-button';
-         addToCartBtn.onclick = (e) => {
-          e.stopPropagation();
-          addToCart(card, e.currentTarget);
-        };
-        }
-  
-        cardDiv.append(imageWrapper, title, set, condition, quantity, price);
-        if (addToCartBtn) cardDiv.appendChild(addToCartBtn);
-        container.appendChild(cardDiv);
-      });
+  const session = ++renderSessionToken;
+  const container = document.getElementById('card-container');
+  container.innerHTML = '';
+
+  filteredCards.forEach(card => {
+    const cardDiv = document.createElement('div');
+    cardDiv.className = 'card';
+
+    const imageWrapper = document.createElement('div');
+    imageWrapper.className = `image-wrapper ${card.foil ? 'foil-shimmer' : ''}`;
+    imageWrapper.innerHTML = `<img src="${card.imageUrl}" alt="${card.cardName}" loading="lazy" />`;
+
+    const foilLabel = card.foilType ? card.foilType : (card.foil ? "Foil" : "");
+    const variantLabel = card.variantType || "";
+    const labels = [...new Set([variantLabel, foilLabel].filter(Boolean))]
+      .map(str => str.replace(/\b\w/g, c => c.toUpperCase())) // Capitalize first letters
+      .join(" / ");
+
+    // ✅ Remove (Inverted) from card name
+    const cleanedName = card.cardName
+    .replace(/\s*\((Showcase|Borderless|Inverted|Extended Art|Full-Art|Retro Frame|Textless|Serialized|Etched Foil|Gilded Foil|Rainbow Foil)\)/gi, '')
+    .trim();
+
+    const title = document.createElement('h3');
+    title.className = 'card-title';
+    title.textContent = labels ? `${cleanedName} (${labels})` : cleanedName;
+
+    const set = document.createElement('p');
+    set.className = 'card-text';
+    set.textContent = `Set: ${card.set}`;
+
+    const condition = document.createElement('p');
+    condition.className = 'card-condition';
+    condition.textContent = `Condition: ${formatCondition(card.condition)}`;
+
+    const quantity = document.createElement('p');
+    quantity.textContent = `Quantity in Stock: ${card.quantity}`;
+
+    const price = document.createElement('p');
+    const isFoil = card.foil || !!card.foilType;
+    let rawPrice = parseFloat(isFoil ? card.priceUsdFoil : card.priceUsd);
+    if (isFoil && (isNaN(rawPrice) || rawPrice === 0)) {
+      rawPrice = parseFloat(card.priceUsd);
     }
+    const adjustedPrice = isNaN(rawPrice) ? 'N/A' : (rawPrice < 0.5 ? '0.50' : rawPrice.toFixed(2));
+    price.textContent = `Price: $${adjustedPrice}`;
+    if (labels) price.title = `Edition: ${labels}`;
+
+    cardDiv.addEventListener('click', () => {
+      showLegalities(card.cardName);
+    });
+
+    const firstName = localStorage.getItem('firstName');
+    let addToCartBtn = null;
+
+    if (firstName) {
+      addToCartBtn = document.createElement('button');
+      addToCartBtn.textContent = 'Add to Cart';
+      addToCartBtn.className = 'add-to-cart-button';
+      addToCartBtn.onclick = (e) => {
+        e.stopPropagation();
+        addToCart(card, e.currentTarget);
+      };
+    }
+
+    cardDiv.append(imageWrapper, title, set, condition, quantity, price);
+    if (addToCartBtn) cardDiv.appendChild(addToCartBtn);
+    container.appendChild(cardDiv);
+  });
+}
   
 async function addToCart(card, button) {
   const userId = localStorage.getItem('userId');

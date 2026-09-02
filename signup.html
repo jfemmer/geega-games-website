@@ -86,6 +86,29 @@
       text-decoration: underline;
     }
 
+    .signup-intro {
+      background: linear-gradient(135deg, #f3e8ff, #ede0ff);
+      border: 1px solid #e0ccff;
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-bottom: 26px;
+      text-align: left;
+    }
+
+    .signup-intro h3 {
+      margin: 0 0 8px;
+      color: rebeccapurple;
+      font-size: 1.05rem;
+    }
+
+    .signup-intro p {
+      margin: 0;
+      text-align: left;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #4b2673;
+    }
+
     .error-message {
       color: crimson;
       font-size: 14px;
@@ -252,6 +275,13 @@ widget.addEventListener("gmp-select", async (event) => {
   <div class="signup-container">
     <h2>Create a Geega Games Account</h2>
 
+    <div class="signup-intro">
+      <h3>Be the first to know when online ordering goes live</h3>
+      <p>
+        We're getting Geega Games ready for online orders and secure payment processing. Create your free account now and turn on announcements below to be notified the moment ordering opens — plus get updates on new arrivals and restocks. Your account will be ready to check out as soon as we launch.
+      </p>
+    </div>
+
     <form id="signup-form" autocomplete="on">
       <input type="text" id="first-name" placeholder="First Name" autocomplete="given-name" required />
       <input type="text" id="last-name" placeholder="Last Name" autocomplete="family-name" required />
@@ -278,7 +308,7 @@ widget.addEventListener("gmp-select", async (event) => {
       <div class="checkbox-section">
         <label class="section-label">
           <input type="checkbox" id="opt-in-announcements" checked />
-          I want to receive announcements
+          Notify me about the launch, new arrivals &amp; announcements
         </label>
         <div id="announcement-options" class="checkbox-suboptions" style="display:none;">
           <label> Email&nbsp;&nbsp;<input type="checkbox" id="notify-email" checked /></label>
